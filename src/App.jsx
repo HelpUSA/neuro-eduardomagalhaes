@@ -8,16 +8,23 @@ import { ClinicLocation } from './components/ClinicLocation';
 import { Footer } from './components/Footer';
 import { PatientPortalModal } from './components/PatientPortalModal';
 import { MedicalLaudosApp } from './components/MedicalLaudosApp';
+import { translations } from './i18n/translations';
 
 export default function App() {
+  const [lang, setLang] = useState('pt');
   const [isPatientPortalOpen, setIsPatientPortalOpen] = useState(false);
   const [isDoctorPanelOpen, setIsDoctorPanelOpen] = useState(false);
+
+  const t = translations[lang] || translations.pt;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-cyan-500 selection:text-slate-950">
       
-      {/* Navigation Header */}
+      {/* Navigation Header with 3-Language Selector */}
       <Header
+        lang={lang}
+        setLang={setLang}
+        t={t}
         onOpenPatientPortal={() => setIsPatientPortalOpen(true)}
         onOpenDoctorPanel={() => setIsDoctorPanelOpen(true)}
       />
@@ -25,25 +32,31 @@ export default function App() {
       {/* Main Content */}
       <main>
         <Hero
+          t={t}
           onOpenPatientPortal={() => setIsPatientPortalOpen(true)}
           onOpenDoctorPanel={() => setIsDoctorPanelOpen(true)}
         />
         
         <Specialties
+          t={t}
           onOpenPatientPortal={() => setIsPatientPortalOpen(true)}
         />
         
         <ExamsInfo
+          t={t}
           onOpenPatientPortal={() => setIsPatientPortalOpen(true)}
         />
         
-        <AboutDoctor />
+        <AboutDoctor t={t} />
         
-        <ClinicLocation />
+        <ClinicLocation t={t} />
       </main>
 
-      {/* Footer with HelpUS Branding */}
+      {/* Footer with Official HelpUS Logo & 3-Language Selector */}
       <Footer
+        lang={lang}
+        setLang={setLang}
+        t={t}
         onOpenPatientPortal={() => setIsPatientPortalOpen(true)}
         onOpenDoctorPanel={() => setIsDoctorPanelOpen(true)}
       />
