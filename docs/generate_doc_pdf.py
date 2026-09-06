@@ -28,21 +28,21 @@ class NumberedCanvas(canvas.Canvas):
         self.setFillColor(colors.HexColor("#64748B"))
         
         if self._pageNumber > 1:
-            self.drawString(54, 800, "Relatório de Requisitos & Acompanhamento | Clínica Dr. Eduardo Magalhães")
+            self.drawString(54, 800, "Relatório de Acompanhamento | Clínica Dr. Eduardo Magalhães (06/09/2026)")
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.5)
             self.line(54, 792, 541, 792)
         
         footer_text = f"Página {self._pageNumber} de {page_count}"
         self.drawRightString(541, 32, footer_text)
-        self.drawString(54, 32, "Documentação Oficial de Requisitos e Implementações - HelpUS Technology")
+        self.drawString(54, 32, "Documentação Oficial de Acompanhamento - HelpUS Technology")
         self.setStrokeColor(colors.HexColor("#CBD5E1"))
         self.setLineWidth(0.5)
         self.line(54, 44, 541, 44)
         self.restoreState()
 
 def build_pdf():
-    pdf_filename = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\Documentacao_Requisitos_e_Acompanhamento_Dr_Eduardo.pdf"
+    pdf_filename = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\Documentacao_Acompanhamento_2026-09-06.pdf"
     doc = SimpleDocTemplate(
         pdf_filename,
         pagesize=A4,
@@ -59,12 +59,11 @@ def build_pdf():
     BG_LIGHT = colors.HexColor("#F8FAFC")
     ACCENT = colors.HexColor("#0369A1")
 
-    title_style = ParagraphStyle('DocTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, leading=18, textColor=PRIMARY, spaceAfter=4)
-    subtitle_style = ParagraphStyle('DocSubtitle', parent=styles['Normal'], fontName='Helvetica', fontSize=9.5, leading=13, textColor=SECONDARY, spaceAfter=8)
+    title_style = ParagraphStyle('DocTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=13, leading=17, textColor=PRIMARY, spaceAfter=4)
+    subtitle_style = ParagraphStyle('DocSubtitle', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=12, textColor=SECONDARY, spaceAfter=8)
     h1_style = ParagraphStyle('SectionH1', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=PRIMARY, spaceBefore=10, spaceAfter=4)
     h2_style = ParagraphStyle('SectionH2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, leading=12, textColor=ACCENT, spaceBefore=6, spaceAfter=3)
     body_style = ParagraphStyle('BodyDark', parent=styles['Normal'], fontName='Helvetica', fontSize=8, leading=11.5, textColor=TEXT_DARK, spaceAfter=3)
-    bullet_style = ParagraphStyle('BulletText', parent=body_style, leftIndent=10, spaceAfter=2)
     caption_style = ParagraphStyle('Caption', parent=styles['Normal'], fontName='Helvetica-Oblique', fontSize=7.5, leading=10, textColor=colors.HexColor("#64748B"), spaceAfter=6, alignment=1)
 
     story = []
@@ -74,8 +73,8 @@ def build_pdf():
     if os.path.exists(img_path):
         doctor_img = Image(img_path, width=44, height=44)
         header_text = [
-            Paragraph("RELATÓRIO DE ESPECIFICAÇÃO & IMPLEMENTAÇÕES", title_style),
-            Paragraph("Parte 1: Requisitos Solicitados pelo Dr. Eduardo | Parte 2: Funcionalidades & Telas", subtitle_style)
+            Paragraph("RELATÓRIO DE ACOMPANHAMENTO DE IMPLEMENTAÇÕES", title_style),
+            Paragraph("Parte 1: Requisitos Solicitados pelo Dr. Eduardo | Parte 2: Funcionalidades & Telas Onde Foi Implementado", subtitle_style)
         ]
         t_header = Table([[header_text, doctor_img]], colWidths=[435, 48])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
@@ -85,9 +84,9 @@ def build_pdf():
 
     # Meta Table
     meta_data = [
-        [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data:</b> 06/09/2026", body_style)],
-        [Paragraph("<b>Projeto:</b> Plataforma neuro.eduardomagalhaes", body_style), Paragraph("<b>Status:</b> Produção Ativa com Imagens", body_style)],
-        [Paragraph("<b>Domínio Final:</b> clinicaeduardomagalhaes.com.br", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
+        [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 06/09/2026", body_style)],
+        [Paragraph("<b>Identificador:</b> DOC-2026-09-06", body_style), Paragraph("<b>Status:</b> Produção Ativa com Imagens", body_style)],
+        [Paragraph("<b>Projeto:</b> neuro.eduardomagalhaes", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
     ]
     t_meta = Table(meta_data, colWidths=[240, 243])
     t_meta.setStyle(TableStyle([
@@ -103,11 +102,11 @@ def build_pdf():
     story.append(Spacer(1, 6))
 
     # PARTE 1
-    story.append(Paragraph("PARTE 1: SOLICITAÇÕES E DIRETRIZES DO CLIENTE", h1_style))
+    story.append(Paragraph("PARTE 1: SOLICITAÇÕES E DIRETRIZES DO CLIENTE (DR. EDUARDO MAGALHÃES)", h1_style))
     story.append(Paragraph(
-        "Consolidação de todas as solicitações enviadas pelo <b>Dr. Eduardo Magalhães</b> via WhatsApp sobre o sigilo da secretária, "
-        "organização de laudos por pastas/subpastas, biblioteca de 24 modelos de EEG, dupla validação com certificado digital e QR Code, "
-        "e eliminação de riscos de envio de exames.", body_style
+        "Registro estruturado das solicitações enviadas pelo <b>Dr. Eduardo Magalhães</b> via WhatsApp sobre a privacidade da secretária, "
+        "organização de laudos por pastas/subpastas, biblioteca de 24 modelos de EEG, dupla validação por certificado digital + QR Code, "
+        "e eliminação de riscos no envio de exames.", body_style
     ))
 
     req_table = [
@@ -159,7 +158,7 @@ def build_pdf():
     story.append(Spacer(1, 8))
 
     # PARTE 2
-    story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES E TELAS DESENVOLVIDAS", h1_style))
+    story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES E TELAS ONDE FOI IMPLEMENTADO", h1_style))
 
     story.append(Paragraph("2.1. Painel do Consultório & Alternador de Perfis (RBAC & LGPD)", h2_style))
     story.append(Paragraph("Implementado o alternador de perfis (Médico Dr. Eduardo vs. Secretária Juliana Costa). Quando o perfil Secretária está ativo, a conclusão médica é oculta automaticamente.", body_style))
@@ -186,7 +185,7 @@ def build_pdf():
         story.append(Paragraph("Figura 3: Laudo Oficial gerado pelo sistema com papel timbrado, carimbo médico, selo digital e QR Code de validação.", caption_style))
 
     doc.build(story, canvasmaker=NumberedCanvas)
-    print("PDF de Documentação com Imagens criado com sucesso!")
+    print("PDF Documentacao_Acompanhamento_2026-09-06.pdf criado com sucesso!")
 
 if __name__ == '__main__':
     build_pdf()
