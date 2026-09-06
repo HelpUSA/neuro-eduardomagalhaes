@@ -35,7 +35,7 @@ class NumberedCanvas(canvas.Canvas):
         
         footer_text = f"Página {self._pageNumber} de {page_count}"
         self.drawRightString(541, 32, footer_text)
-        self.drawString(54, 32, "Documentação Oficial de Requisitos do Sistema - HelpUS Technology")
+        self.drawString(54, 32, "Documentação Oficial de Requisitos e Implementações - HelpUS Technology")
         self.setStrokeColor(colors.HexColor("#CBD5E1"))
         self.setLineWidth(0.5)
         self.line(54, 44, 541, 44)
@@ -59,22 +59,23 @@ def build_pdf():
     BG_LIGHT = colors.HexColor("#F8FAFC")
     ACCENT = colors.HexColor("#0369A1")
 
-    title_style = ParagraphStyle('DocTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=15, leading=19, textColor=PRIMARY, spaceAfter=4)
-    subtitle_style = ParagraphStyle('DocSubtitle', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=13, textColor=SECONDARY, spaceAfter=8)
-    h1_style = ParagraphStyle('SectionH1', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11.5, leading=15, textColor=PRIMARY, spaceBefore=10, spaceAfter=5)
-    h2_style = ParagraphStyle('SectionH2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9.5, leading=13, textColor=ACCENT, spaceBefore=7, spaceAfter=3)
-    body_style = ParagraphStyle('BodyDark', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=12, textColor=TEXT_DARK, spaceAfter=4)
+    title_style = ParagraphStyle('DocTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, leading=18, textColor=PRIMARY, spaceAfter=4)
+    subtitle_style = ParagraphStyle('DocSubtitle', parent=styles['Normal'], fontName='Helvetica', fontSize=9.5, leading=13, textColor=SECONDARY, spaceAfter=8)
+    h1_style = ParagraphStyle('SectionH1', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=PRIMARY, spaceBefore=10, spaceAfter=4)
+    h2_style = ParagraphStyle('SectionH2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, leading=12, textColor=ACCENT, spaceBefore=6, spaceAfter=3)
+    body_style = ParagraphStyle('BodyDark', parent=styles['Normal'], fontName='Helvetica', fontSize=8, leading=11.5, textColor=TEXT_DARK, spaceAfter=3)
     bullet_style = ParagraphStyle('BulletText', parent=body_style, leftIndent=10, spaceAfter=2)
+    caption_style = ParagraphStyle('Caption', parent=styles['Normal'], fontName='Helvetica-Oblique', fontSize=7.5, leading=10, textColor=colors.HexColor("#64748B"), spaceAfter=6, alignment=1)
 
     story = []
 
     # Header Banner
     img_path = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\foto eduardo.jpg"
     if os.path.exists(img_path):
-        doctor_img = Image(img_path, width=46, height=46)
+        doctor_img = Image(img_path, width=44, height=44)
         header_text = [
-            Paragraph("RELATÓRIO DE REQUISITOS, ARQUITETURA & EVOLUÇÃO", title_style),
-            Paragraph("Acompanhamento Clínico, Modelos DOCX, Banco de Dados & Assinatura Digital", subtitle_style)
+            Paragraph("RELATÓRIO DE ESPECIFICAÇÃO & IMPLEMENTAÇÕES", title_style),
+            Paragraph("Parte 1: Requisitos Solicitados pelo Dr. Eduardo | Parte 2: Funcionalidades & Telas", subtitle_style)
         ]
         t_header = Table([[header_text, doctor_img]], colWidths=[435, 48])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
@@ -85,7 +86,7 @@ def build_pdf():
     # Meta Table
     meta_data = [
         [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data:</b> 06/09/2026", body_style)],
-        [Paragraph("<b>Projeto:</b> Plataforma neuro.eduardomagalhaes", body_style), Paragraph("<b>Canal:</b> WhatsApp Oficial + 24 DOCX EEG", body_style)],
+        [Paragraph("<b>Projeto:</b> Plataforma neuro.eduardomagalhaes", body_style), Paragraph("<b>Status:</b> Produção Ativa com Imagens", body_style)],
         [Paragraph("<b>Domínio Final:</b> clinicaeduardomagalhaes.com.br", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
     ]
     t_meta = Table(meta_data, colWidths=[240, 243])
@@ -93,36 +94,33 @@ def build_pdf():
         ('BACKGROUND', (0,0), (-1,-1), BG_LIGHT),
         ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
         ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#E2E8F0")),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
         ('LEFTPADDING', (0,0), (-1,-1), 6),
         ('RIGHTPADDING', (0,0), (-1,-1), 6),
     ]))
     story.append(t_meta)
     story.append(Spacer(1, 6))
 
-    # 1. Introdução
-    story.append(Paragraph("1. Introdução & Objetivo", h1_style))
+    # PARTE 1
+    story.append(Paragraph("PARTE 1: SOLICITAÇÕES E DIRETRIZES DO CLIENTE", h1_style))
     story.append(Paragraph(
-        "Este relatório atualizado consolida a especificação de requisitos, o fluxo de digitalização dos <b>24 modelos de EEG</b>, "
-        "o modelo de base de dados relacional de pacientes (PostgreSQL), o controle de sigilo da secretária (LGPD) e o mecanismo "
-        "de <b>dupla assinatura (Visual + Digital ICP-Brasil + QR Code)</b>.", body_style
+        "Consolidação de todas as solicitações enviadas pelo <b>Dr. Eduardo Magalhães</b> via WhatsApp sobre o sigilo da secretária, "
+        "organização de laudos por pastas/subpastas, biblioteca de 24 modelos de EEG, dupla validação com certificado digital e QR Code, "
+        "e eliminação de riscos de envio de exames.", body_style
     ))
 
-    # 2. Tabela de Requisitos
-    story.append(Paragraph("2. Mapeamento dos Requisitos Solicitados", h1_style))
-
     req_table = [
-        [Paragraph("<b>ID</b>", h2_style), Paragraph("<b>Solicitação do Dr. Eduardo</b>", h2_style), Paragraph("<b>Solução Projetada / Implementação</b>", h2_style), Paragraph("<b>Status</b>", h2_style)],
+        [Paragraph("<b>ID</b>", h2_style), Paragraph("<b>Solicitação do Dr. Eduardo</b>", h2_style), Paragraph("<b>Solução Técnica Projetada</b>", h2_style), Paragraph("<b>Status</b>", h2_style)],
         [
             Paragraph("REQ-01", body_style),
-            Paragraph("<b>Privacidade da Secretária:</b> Secretária cadastra paciente mas não enxerga laudo médico.", body_style),
+            Paragraph("<b>Privacidade da Secretária:</b> Secretária cadastra paciente mas não enxerga o laudo médico.", body_style),
             Paragraph("Módulo RBAC onde o perfil Recepção acessa apenas dados de cadastro e oculta o diagnóstico médico.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ],
         [
             Paragraph("REQ-02", body_style),
-            Paragraph("<b>Organização por Pastas & Busca:</b> Navegar por pastas/subpastas e busca rápida de modelos.", body_style),
+            Paragraph("<b>Pastas & Busca de Modelos:</b> Navegar por pastas/subpastas e busca rápida de modelos.", body_style),
             Paragraph("Árvore de pastas por patologia + filtro de pesquisa inteligente por palavras-chave.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ],
@@ -130,7 +128,7 @@ def build_pdf():
             Paragraph("REQ-03", body_style),
             Paragraph("<b>Assinatura Digital & Jurídica:</b> Assinatura com certificado digital ICP-Brasil + carimbo visual.", body_style),
             Paragraph("Integração de assinatura PAdES/ICP-Brasil + carimbo visual + QR Code de validação no rodapé.", body_style),
-            Paragraph("<font color='#0284c7'><b>Em Andamento</b></font>", body_style)
+            Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ],
         [
             Paragraph("REQ-04", body_style),
@@ -142,13 +140,7 @@ def build_pdf():
             Paragraph("REQ-05", body_style),
             Paragraph("<b>Anexo de Gráficos do Aparelho:</b> Anexar o PDF de gráficos sem risco de troca de arquivos.", body_style),
             Paragraph("Vínculo direto do Laudo Assinado + PDF de Gráficos no prontuário. O paciente baixa tudo no Portal.", body_style),
-            Paragraph("<font color='#0284c7'><b>Em Andamento</b></font>", body_style)
-        ],
-        [
-            Paragraph("REQ-06", body_style),
-            Paragraph("<b>Modelos de EEG:</b> Incorporar os 24 modelos de Eletroencefalograma e Mapeamento Cerebral.", body_style),
-            Paragraph("Cadastramento dos 24 modelos (Disfunção Cortical, Paroxismos/EPI e Normais) em variáveis do sistema.", body_style),
-            Paragraph("<font color='#0284c7'><b>Em Andamento</b></font>", body_style)
+            Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ]
     ]
 
@@ -157,33 +149,44 @@ def build_pdf():
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#F1F5F9")),
         ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
         ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#E2E8F0")),
-        ('TOPPADDING', (0,0), (-1,-1), 3.5),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 3.5),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
         ('LEFTPADDING', (0,0), (-1,-1), 5),
         ('RIGHTPADDING', (0,0), (-1,-1), 5),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
     ]))
     story.append(t_req)
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 8))
 
-    # 3. Funcionamento dos Modelos DOCX
-    story.append(Paragraph("3. Estruturação dos Modelos `.docx` & Variáveis Automáticas", h1_style))
-    story.append(Paragraph("• <b>Digitalização Inteligente:</b> Os 24 modelos de EEG e ENMG foram mapeados em variáveis automáticas: <i>{{NOME_PACIENTE}}</i>, <i>{{DATA_NASCIMENTO}}</i>, <i>{{MEDICO_SOLICITANTE}}</i>, <i>{{DATA_EXAME}}</i> e <i>{{CONCLUSAO_LAUDO}}</i>.", body_style))
-    story.append(Paragraph("• <b>Fluxo em 3 Passos:</b> (1) Seleção do Paciente -> (2) Escolha do Modelo via Árvore/Busca com Texto Pré-preenchido -> (3) Finalização & Geração do PDF Timbrado.", body_style))
+    # PARTE 2
+    story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES E TELAS DESENVOLVIDAS", h1_style))
 
-    # 4. Assinatura Digital
-    story.append(Paragraph("4. Assinatura Eletrônica em 2 Camadas & QR Code", h1_style))
-    story.append(Paragraph("• <b>Camada Visual:</b> Imagem do carimbo oficial e assinatura física do Dr. Eduardo com CRM.", bullet_style))
-    story.append(Paragraph("• <b>Camada Criptográfica (ICP-Brasil PAdES):</b> Assinatura digital com Certificado A1/A3 selando o PDF contra adulteração.", bullet_style))
-    story.append(Paragraph("• <b>QR Code de Validação Antifraude:</b> Leitura de QR Code no rodapé que confirma a veracidade no site da clínica.", bullet_style))
+    story.append(Paragraph("2.1. Painel do Consultório & Alternador de Perfis (RBAC & LGPD)", h2_style))
+    story.append(Paragraph("Implementado o alternador de perfis (Médico Dr. Eduardo vs. Secretária Juliana Costa). Quando o perfil Secretária está ativo, a conclusão médica é oculta automaticamente.", body_style))
 
-    # 5. Anexo de Gráficos e LGPD
-    story.append(Paragraph("5. Anexo de Gráficos do Aparelho & Sigilo da Secretária (LGPD)", h1_style))
-    story.append(Paragraph("• <b>Eliminação do Risco de Troca de Exames:</b> O PDF de gráficos gerado pelo aparelho é anexado diretamente ao prontuário do paciente no sistema. A secretária envia apenas o link seguro do portal, zerando manuseio de PDFs avulsos.", body_style))
-    story.append(Paragraph("• <b>Sigilo Garantido:</b> A secretária gerencia agendamentos e envios sem visualizar diagnósticos médicos.", body_style))
+    img_painel = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\painel_medico_laudos.jpg"
+    if os.path.exists(img_painel):
+        story.append(Image(img_painel, width=483, height=270))
+        story.append(Paragraph("Figura 1: Painel do Consultório exibindo o gerador de laudos, alternador de perfis e seletor de modelos por pastas.", caption_style))
+
+    story.append(Paragraph("2.2. Portal do Paciente com Download Conjunto (Laudo + Gráficos)", h2_style))
+    story.append(Paragraph("Desenvolvido o portal seguro (CPF + Nasc) com dois botões independentes para baixar o Laudo Oficial em PDF e os Gráficos do Aparelho.", body_style))
+
+    img_portal = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\portal_paciente_exames.jpg"
+    if os.path.exists(img_portal):
+        story.append(Image(img_portal, width=483, height=270))
+        story.append(Paragraph("Figura 2: Portal do Paciente exibindo os botões de download para o Laudo Oficial PDF e os Gráficos do Aparelho.", caption_style))
+
+    story.append(Paragraph("2.3. Laudo Oficial PDF Timbrado com Assinatura & QR Code", h2_style))
+    story.append(Paragraph("Gerador de PDF timbrado contendo carimbo profissional com CRM, selo de assinatura digital ICP-Brasil e QR Code de autenticidade no rodapé.", body_style))
+
+    img_laudo = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\assinatura_digital_qrcode.jpg"
+    if os.path.exists(img_laudo):
+        story.append(Image(img_laudo, width=483, height=270))
+        story.append(Paragraph("Figura 3: Laudo Oficial gerado pelo sistema com papel timbrado, carimbo médico, selo digital e QR Code de validação.", caption_style))
 
     doc.build(story, canvasmaker=NumberedCanvas)
-    print("PDF de Documentação atualizado com sucesso!")
+    print("PDF de Documentação com Imagens criado com sucesso!")
 
 if __name__ == '__main__':
     build_pdf()

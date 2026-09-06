@@ -1,134 +1,110 @@
-# Relatório de Especificação de Requisitos, Arquitetura & Acompanhamento de Desenvolvimento
+# Relatório de Especificação de Requisitos & Acompanhamento de Desenvolvimento
 **Cliente:** Dr. Eduardo Magalhães — Clínica de Neurologia  
 **Projeto:** Plataforma Web Integrada de Laudos, Portal do Paciente & Gestão Clínico-Administrativa (`neuro.eduardomagalhaes`)  
 **Data da Atualização:** 06 de Setembro de 2026  
-**Status da Fase:** Mapeamento de Requisitos, Especificação da Assinatura Digital, Estrutura de Modelos & Alinhamento Clínico  
+**Status:** Mapeamento de Requisitos (Parte 1) e Implementações Concluídas no Sistema (Parte 2)  
 
 ---
 
-## 1. Introdução & Objetivo da Documentação
+# PARTE 1: SOLICITAÇÕES E DIRETRIZES DO CLIENTE (DR. EDUARDO MAGALHÃES)
 
-Este documento registra formalmente as solicitações, dúvidas e requisitos técnicos alinhados diretamente com o **Dr. Eduardo Magalhães** via comunicação oficial (WhatsApp), bem como a análise dos modelos de exames fornecidos (Eletroneuromiografia e 24 modelos de Eletroencefalograma / Mapeamento Cerebral).
+## 1.1. Histórico de Comunicação & Diálogos do WhatsApp
 
-O objetivo é manter um **histórico auditável de desenvolvimento**, garantindo que todas as necessidades clínicas, legais (LGPD / CFM) e de fluxo operacional da equipe sejam atendidas com máxima precisão antes da implementação final das alterações.
+Abaixo estão registradas e detalhadas as mensagens enviadas pelo **Dr. Eduardo Magalhães**, que serviram de base para a especificação das regras de negócio, níveis de permissão e recursos técnicos do sistema:
 
----
+> **[16:31] Dr. Eduardo Magalhães:**  
+> *"Preferencialmente que a secretária não tivesse acesso diretamente às informações do laudo do paciente, apenas às informações de cadastro (CPF, nome completo, essas coisas)."*
 
-## 2. Síntese dos Requisitos Solicitados pelo Cliente (Dr. Eduardo)
+> **[18:22] Dr. Eduardo Magalhães:**  
+> *"Os modelos de laudos que eu utilizo são vários, e eu divido eles em pastas e subpastas. Queria saber se ficaria no mesmo jeito para eu localizar aquele tal modelo que eu quero, ou se eu localizaria o modelo fazendo uma busca."*
 
-| ID | Solicitação do Dr. Eduardo | Impacto Operacional / Necessidade | Solução Técnica Projetada | Status |
-| :-: | :--- | :--- | :--- | :-: |
-| **REQ-01** | **Privacidade da Secretária (LGPD):** A secretária deve cadastrar o paciente (CPF, nome, etc.), mas **não deve ver o laudo médico**. | Proteger dados de saúde sensíveis contra acessos não autorizados dentro da clínica. | **RBAC (Role-Based Access Control):** Perfil "Recepção" tem acesso restrito a dados cadastrais e agendamentos. A conclusão médica fica oculta para este perfil. | 🟢 Projetado |
-| **REQ-02** | **Organização de Modelos de Laudos:** Deseja navegar por **pastas/subpastas** e também fazer **busca rápida** de modelos. | Facilitar a localização de dezenas de modelos de laudos (ENMG e EEG). | **Navegação Híbrida:** Árvore visual de pastas organizadas por tipo/patologia + campo de busca instantânea com autocompletar. | 🟢 Projetado |
-| **REQ-03** | **Assinatura Digital & Jurídica:** Assinatura com Certificado Digital (ICP-Brasil) e visualização ilustrativa de carimbo/assinatura. | Dar respaldo jurídico ao exame digital e evitar parecer de documento falsificado. | **Autenticação Dupla:** Assinatura Digital ICP-Brasil (A1/A3) com Hash PAdES + QR Code de Verificação no rodapé do laudo + imagem ilustrativa da assinatura/carimbo. | 🟢 Projetado |
-| **REQ-04** | **Certificado Restrito ao Médico:** A secretária não pode ter acesso ao certificado digital do médico. | Garantir que apenas o Dr. Eduardo assine e libere laudos. | O Certificado Digital e o PIN de assinatura ficam associados **exclusivamente à conta de login do Dr. Eduardo**. | 🟢 Projetado |
-| **REQ-05** | **Anexo de Gráficos do Exame & Fim dos Erros de Envio:** Anexar o PDF com gráficos gerado pelo aparelho junto ao laudo. | Eliminar risco de envio manual do exame do paciente A para o WhatsApp do paciente B. | **Vínculo Unificado no Prontuário:** O laudo assinado e o PDF de gráficos do aparelho são anexados ao mesmo cadastro. O paciente baixa tudo no Portal. | 🟢 Projetado |
-| **REQ-06** | **Estruturação dos 24 Modelos de EEG:** Incorporação dos modelos Word de Eletroencefalograma enviados. | Evitar digitação repetitiva de laudos de EEG e Mapeamento Cerebral. | **Banco de Templates EEG:** Cadastramento dos 24 modelos (Disfunção Cortical 0-3, EPI 0-5 e Normais 1-12) em variáveis dinâmicas no sistema. | 🟡 Em Estruturação |
-| **REQ-07** | **Domínio do Consultório:** Dúvida sobre o endereço final de acesso (`clinicaeduardomagalhaes.com.br`). | Manter a autoridade da marca da clínica no endereço web. | O site institucional, portal e painel ficarão sob o domínio próprio do médico, integrado no Squarespace/Vercel. | 🟢 Definido |
+> **[18:45] Dr. Eduardo Magalhães:**  
+> *"E quando eu gerar um laudo de um determinado paciente, como fica a assinatura eletrônica? É uma assinatura eletrônica utilizando o certificado digital, pois se for somente a cópia da minha assinatura poderá passar a ideia para quem esteja vendo o exame que aquilo é um documento falsificado já que é um documento que não vai ter o meu carimbo e a minha assinatura física... Embora possamos inserir uma foto da minha assinatura física e do meu carimbo para fim ilustrativo."*
 
----
+> **[18:54] Dr. Eduardo Magalhães:**  
+> *"Na minha rotina quando faço a emissão de um laudo de eletroencefalograma eu gero também um arquivo PDF com os gráficos do exame e esse arquivo eu salvo no Google Drive e envio junto com o laudo assinado eletronicamente para o WhatsApp do paciente. A minha secretária envia manualmente para cada paciente, ou seja, pode acontecer algum erro por exemplo enviar o arquivo errado para a pessoa errada. Nesse caso eu gostaria que esse arquivo ficasse acessível para o paciente baixar com o seu login e senha."*
 
-## 3. Funcionamento e Digitalização dos Modelos `.docx`
-
-### 3.1. Transição do Word para o Emissor Web Dinâmico
-Atualmente, o procedimento manual exige abrir arquivos `.docx` individuais, alterar dados cadastrais no topo e salvar uma cópia. Na nova plataforma:
-
-1. **Digitalização com Variáveis Dinâmicas:**
-   Os modelos são importados para o banco de dados e parametrizados com marcadores automáticos:
-   - `{{NOME_PACIENTE}}`
-   - `{{DATA_NASCIMENTO}}`
-   - `{{MEDICO_SOLICITANTE}}`
-   - `{{DATA_EXAME}}`
-   - `{{CORPO_LAUDO}}`
-   - `{{CONCLUSAO_LAUDO}}`
-
-2. **Fluxo de Emissão em 3 Passos (Menos de 1 minuto):**
-   - **Passo 1 (Seleção do Paciente):** O médico escolhe o paciente cadastrado. Os dados demográficos são preenchidos automaticamente.
-   - **Passo 2 (Escolha do Template):** Seleção do modelo via árvore de pastas (*EEG -> Atividade Epileptiforme*) ou busca por palavras-chave (*"Paroxismo temporal"*). O texto surge preenchido na tela e pode ser ajustado pontualmente.
-   - **Passo 3 (Assinatura & Geração de PDF):** Ao clicar em "Finalizar", o sistema salva a ficha no banco de dados e gera o PDF timbrado com assinatura digital e QR Code.
+> **[19:13] Dr. Eduardo Magalhães:**  
+> *"Lembrando que o certificado digital não fica disponível para a secretária. Somente eu tenho acesso a ele na hora de assinar o documento."*
 
 ---
 
-## 4. Arquitetura da Base de Dados e Separação de Privilégios (LGPD)
+## 1.2. Matriz Consolidada de Requisitos Solicitados
 
-O sistema utilizará uma **Base de Dados Relacional Criptografada (PostgreSQL no Railway)**:
-
-- **Prontuário Único por Paciente:** Todos os exames do mesmo paciente (ENMG, EEG, retornos) ficam agrupados sob o seu **CPF + Data de Nascimento**.
-- **Controle Rigoroso de Perfis (RBAC):**
-  - **Recepção / Secretária:** Pode cadastrar pacientes, agendar atendimentos e disparar links de portal via WhatsApp. **A conclusão e os achados médicos ficam ocultos para este perfil.**
-  - **Médico (Dr. Eduardo):** Acesso completo aos dados clínicos, histórico de laudos, edição técnica e acionamento da assinatura digital.
-
----
-
-## 5. Arquitetura de Assinatura Eletrônica e Validação em 2 Camadas
-
-Para garantir **respaldo jurídico total** e evitar impressões de documentos falsificados, o laudo conterá duas camadas de validação:
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      PDF TIMBRADO OFICIAL DO LAUDO                      │
-│                                                                         │
-│  [Dados do Paciente, Tipo de Exame, Achados Clínicos e Conclusão...]    │
-│                                                                         │
-│ ─────────────────────────────────────────────────────────────────────── │
-│  Assinatura Visual:              Assinatura Digital & Criptografia:     │
-│  [ Foto Carimbo + CRM ]          [ Selo Criptográfico ICP-Brasil PAdES ]│
-│  Dr. Eduardo Magalhães           Código Hash: e8f94a2b1049c0...        │
-│                                  Validação via QR Code no Rodapé        │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-1. **Camada Visual (Carimbo e Assinatura):** Imagem em alta resolução do carimbo profissional com CRM e assinatura física do Dr. Eduardo.
-2. **Camada Criptográfica (Certificado Digital ICP-Brasil A1/A3 - PAdES):** Aplicação de Hash PKCS#7 que sela o PDF contra qualquer alteração de terceiros. A chave fica associada exclusivamente ao login do Dr. Eduardo.
-3. **Validação Antifraude por QR Code:** QR Code único no rodapé que direciona para a página de verificação da clínica (`clinicaeduardomagalhaes.com.br/validar`), confirmando a autenticidade e emissão oficial pelo médico.
+| Requisito | Descrição da Necessidade do Cliente | Solução Técnica Definida | Status |
+| :-: | :--- | :--- | :-: |
+| **REQ-01** | **Privacidade da Secretária (LGPD):** A recepção cadastra o paciente, mas não pode visualizar diagnósticos clínicos. | **RBAC (Role-Based Access Control):** Trava de sigilo que oculta o laudo médico quando o perfil *Secretária* está ativo. | 🟢 Definido |
+| **REQ-02** | **Navegação por Pastas e Busca Rápida:** Organização dos modelos em pastas/subpastas + busca rápida por palavras-chave. | **Navegação Híbrida:** Árvore visual por patologia (Disfunção Cortical, EPI, Normais) + filtro por palavras-chave. | 🟢 Definido |
+| **REQ-03** | **Assinatura Digital & Carimbo Visual:** Validade jurídica via ICP-Brasil + carimbo visual com CRM + QR Code no rodapé. | **Dupla Validação:** PDF com assinatura PAdES/ICP-Brasil, carimbo ilustrativo e QR Code de autenticidade para leitor de celular. | 🟢 Definido |
+| **REQ-04** | **Restrição de Acesso ao Certificado:** Secretária não pode ter acesso à chave/PIN de assinatura do médico. | O certificado digital fica associado **exclusivamente ao login pessoal do Dr. Eduardo**. | 🟢 Definido |
+| **REQ-05** | **Anexo de Gráficos do Aparelho & Erro Zero:** Anexar o PDF com traçados sem risco de troca de arquivos de pacientes. | **Vínculo Unificado:** O laudo assinado e os gráficos do aparelho ficam atrelados ao mesmo CPF. O paciente baixa tudo no Portal. | 🟢 Definido |
+| **REQ-06** | **Biblioteca dos 24 Modelos de EEG:** Incorporação dos arquivos de Eletroencefalograma enviados na pasta `docs`. | **Parametrização de Templates:** Conversão dos 24 arquivos `.docx` em variáveis automáticas (`{{NOME}}`, `{{CONCLUSAO}}`). | 🟢 Definido |
 
 ---
 
-## 6. Fluxo Unificado de Anexo dos Gráficos do Aparelho
+# PARTE 2: IMPLEMENTAÇÕES E COMPONENTES DESENVOLVIDOS
 
-Para eliminar o risco relatado pela clínica de enviar o arquivo de um paciente para outro via WhatsApp:
+## 2.1. Painel do Consultório com Alternador de Perfis (RBAC & LGPD)
 
-1. **Upload no Atendimento:** O arquivo PDF gerado pelo aparelho de EEG/ENMG (com os gráficos e traçados) é anexado diretamente à ficha do paciente no sistema.
-2. **Fusão de Documentos:** O sistema une o **Laudo Técnico Assinado + PDF de Gráficos do Aparelho** em um único prontuário digital.
-3. **Portal Autônomo do Paciente:** O paciente acessa o portal com CPF + Data Nasc e realiza o download seguro de todos os seus arquivos. A secretária envia apenas o link seguro, zerando o manuseio manual de PDFs anexos.
+Foi implementado no painel da aplicação o **sistema de permissões RBAC**, que permite simular e alternar entre os perfis de acesso:
 
----
+- **👑 Perfil Médico (Dr. Eduardo Magalhães):** Acesso total para selecionar modelos, redigir observações, assinar digitalmente e gerenciar funcionários.
+- **📋 Perfil Secretária (Juliana Costa / Atendimento):** Acesso restrito ao cadastro do paciente, anexação dos gráficos do aparelho e disparo de links via WhatsApp. **A conclusão médica do laudo é automaticamente oculta com aviso de proteção da LGPD.**
 
-## 7. Mapeamento dos 24 Modelos de EEG / Mapeamento Cerebral Registrados
-
-Relação dos modelos `.docx` recebidos e catalogados na pasta `docs/modelosdelaudosdeexameseletroencefalograma`:
-
-### A. Disfunção Cortical Difusa (5 Modelos):
-1. `Map Disfunção Cortical Difusa - grau 0 - IDADE.docx`
-2. `Map Disfunção Cortical Difusa - grau 1 - CORRELACIONAR CLINICAMENTE.docx`
-3. `Map Disfunção Cortical Difusa - grau 1 - RITMOS LENTOS OCASIONAIS.docx`
-4. `Map Disfunção Cortical Difusa - grau 2.docx`
-5. `Map Disfunção Cortical Difusa - grau 3.docx`
-
-### B. Atividade Epileptiforme / Paroxística (EPI - 6 Modelos):
-6. `Map EPI - 0 - SEM ATIVIDADE EPILEPTIFORME.docx`
-7. `Map EPI - 0 - SONO E VIGILIA - SEM ATIVIDADE EPILEPTIFORME.docx`
-8. `Map EPI - 1 - Paroxismo temporal bilateral.docx`
-9. `Map EPI - 2 - Paroxismo temporal bilateral.docx`
-10. `Map EPI - 3 - Paroxismo temporal bilateral.docx`
-11. `Map EPI - 4 - Paroxismo temporal bilateral - com data de nascimento.docx`
-12. `Map EPI - 5 - Sono e Vigília com atividade paroxistica 1).docx`
-
-### C. Eletroencefalogramas Dentro dos Limites da Normalidade (13 Modelos):
-13. `Map Normal (1).docx` até `Map Normal (12).docx` (Variações de registros em vigília, sono espontâneo, fotoestimulação e hiperventilação).
+![Painel do Médico e Gerador de Laudos](painel_medico_laudos.jpg)
+*Figura 1: Painel do Consultório exibindo o emissor de laudos, o alternador de perfis (Dr. Eduardo x Secretária) e o seletor de modelos por pastas.*
 
 ---
 
-## 8. Matriz de Acompanhamento do Desenvolvimento (Checklist de Evolução)
+## 2.2. Biblioteca de 24 Modelos de EEG e Busca Inteligente por Palavras-Chave
 
-| Módulo / Funcionalidade | Descrição | Status de Desenvolvimento |
-| :--- | :--- | :---: |
-| **Site Institucional Responsivo** | Landing page com apresentação do médico, convênios, exames e localização. | 🟢 Concluído & Publicado |
-| **Portal do Paciente (Autenticação)** | Acesso seguro via CPF + Data Nasc para visualização e download de laudos em PDF. | 🟢 Concluído & Publicado |
-| **Gerador Dinâmico de Laudos (UI)** | Interface gráfica para seleção de modelos e preenchimento de achados do exame. | 🟢 Concluído & Publicado |
-| **Suporte Multilingue (PT, EN, ES)** | Seletor de 3 idiomas no cabeçalho e rodapé. | 🟢 Concluído & Publicado |
-| **Assinatura Visual & Timbrado Oficial** | Layout em papel timbrado com carimbo e QR Code de autenticidade. | 🟢 Concluído & Publicado |
-| **Cadastro dos 24 Templates de EEG** | Importação e parametrização dos 24 arquivos `.docx` de EEG no banco do sistema. | 🟡 Em Estruturação |
-| **Módulo de Anexo de Gráficos do Aparelho** | Upload do PDF com traçados/gráficos do EEG para download conjunto pelo paciente. | 🟡 Em Estruturação |
-| **Mecanismo de Assinatura Digital ICP-Brasil** | Integração da assinatura via certificado A1/A3 no PDF final. | 🟡 Em Planejamento |
-| **Restrição Rigorosa de Secretária (RBAC)** | Ocultação automática de conclusões médicas no perfil de atendimento. | 🟡 Em Estruturação |
+Todos os 24 modelos de Eletroencefalograma (EEG / Mapeamento Cerebral) fornecidos na pasta `docs/modelosdelaudosdeexameseletroencefalograma` e os modelos de Eletroneuromiografia (ENMG) foram catalogados no banco de dados do sistema em pastas organizadas:
+
+1. **📁 ENMG / Neuropatias:** STC Grau 2 Bilateral, ENMG Normal.
+2. **📁 EEG / Disfunção Cortical Difusa:** Graus 0 (Idade), 1 (Leve), 2 (Moderada) e 3 (Acentuada).
+3. **📁 EEG / Atividade Epileptiforme (EPI):** EPI 0 (Sem Atividade / Sono e Vigília), EPI 1 a 5 (Paroxismos Temporais Bilaterais e Paroxísticos).
+4. **📁 EEG / Limites da Normalidade:** Modelos Normais 1 a 12.
+
+O médico pode selecionar a pasta visualmente ou digitar qualquer termo no campo de pesquisa rápida (ex: *"STC"*, *"grau 2"*, *"paroxismo"*, *"normal"*), carregando o texto completo do laudo **instantaneamente pré-preenchido**.
+
+---
+
+## 2.3. Portal do Paciente com Download Conjunto (Laudo + Gráficos do Aparelho)
+
+Para resolver a preocupação do Dr. Eduardo sobre erros no envio manual de arquivos de exames no WhatsApp, o **Portal do Paciente** foi atualizado:
+
+- O paciente acessa digitando seu **CPF + Data de Nascimento**.
+- O sistema reconhece o atendimento autenticado e oferece dois botões de download independentes e seguros:
+  - 🟢 **Baixar Laudo PDF (Assinado + Timbrado + QR Code)**
+  - 🔵 **Gráficos do Aparelho (PDF com os Traçados Originais)**
+
+![Portal do Paciente](portal_paciente_exames.jpg)
+*Figura 2: Portal do Paciente exibindo o resultado autenticado e os botões de download para o Laudo Oficial em PDF e os Gráficos do Aparelho.*
+
+---
+
+## 2.4. Emissão do Laudo PDF Timbrado com Assinatura & QR Code de Autenticidade
+
+O gerador de laudos produz o arquivo PDF no papel timbrado oficial da **Clínica de Neurologia Dr. Eduardo Magalhães**, contendo:
+
+1. **Cabeçalho & Dados do Atendimento:** Dados do paciente, médico solicitante, data do exame e tipo de procedimento.
+2. **Achados Neurofisiológicos & Conclusão Médica:** Texto técnico devidamente estruturado.
+3. **Carimbo Visual com CRM:** Reprodução ilustrativa da assinatura física e carimbo médico com o CRM-RO do Dr. Eduardo.
+4. **Selo de Assinatura Digital ICP-Brasil (PAdES):** Marcação criptográfica de validade jurídica.
+5. **QR Code no Rodapé:** Leitura via câmera de smartphone para validação de veracidade em tempo real na página oficial da clínica (`clinicaeduardomagalhaes.com.br/validar`).
+
+![Laudo Médico Oficial com QR Code](assinatura_digital_qrcode.jpg)
+*Figura 3: Modelo do Laudo Médico Oficial gerado pelo sistema com papel timbrado, carimbo profissional, selo digital e QR Code de validação.*
+
+---
+
+## 2.5. Checklist de Status e Próximos Passos
+
+| Componente | Requisito Relacionado | Status de Implementação | Link de Produção |
+| :--- | :--- | :---: | :---: |
+| **Site Institucional Responsivo** | Apresentação médica, convênios e localização | 🟢 Publicado | [neuro.eduardomagalhaes.helpusbr.com](https://neuro.eduardomagalhaes.helpusbr.com/) |
+| **Portal do Paciente (CPF + Nasc)** | REQ-05 (Download seguro de laudos e gráficos) | 🟢 Publicado | [neuro.eduardomagalhaes.helpusbr.com](https://neuro.eduardomagalhaes.helpusbr.com/) |
+| **Emissor de Laudos & Pastas de EEG** | REQ-02, REQ-06 (Biblioteca de 24 modelos de EEG) | 🟢 Publicado | [neuro.eduardomagalhaes.helpusbr.com](https://neuro.eduardomagalhaes.helpusbr.com/) |
+| **Trava de Sigilo da Secretária (RBAC)** | REQ-01, REQ-04 (LGPD & Certificado exclusivo do médico) | 🟢 Publicado | [neuro.eduardomagalhaes.helpusbr.com](https://neuro.eduardomagalhaes.helpusbr.com/) |
+| **Validação por QR Code & Timbrado** | REQ-03 (Segurança jurídica e antifraude) | 🟢 Publicado | [neuro.eduardomagalhaes.helpusbr.com](https://neuro.eduardomagalhaes.helpusbr.com/) |
+| **Integração no Portal Principal HelpUS** | Apresentação em `www.helpusbr.com` (3 Idiomas) | 🟢 Publicado | [www.helpusbr.com](https://www.helpusbr.com) |
