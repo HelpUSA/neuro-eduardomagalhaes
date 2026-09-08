@@ -18,7 +18,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
   const [loginError, setLoginError] = useState('');
 
   // User Role State (Dr. Eduardo vs Secretária)
-  const [currentUserRole, setCurrentUserRole] = useState('doctor'); // 'doctor' | 'reception'
+  const [currentUserRole, setCurrentUserRole] = useState('doctor'); // 'doctor' | 'reception' | 'technician'
   const [currentUserName, setCurrentUserName] = useState('Dr. Eduardo Magalhães');
 
   // Patient Database State (Winsoft + New Patients)
@@ -52,12 +52,21 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
   // Attached Tracings File
   const [attachedTracingsFile, setAttachedTracingsFile] = useState('Graficos_Aparelho_ENMG_Clelia.pdf');
 
-  // Employee Roles Database
+  // Employee Roles Database (Dinamico)
   const [employees, setEmployees] = useState([
     { id: 1, name: 'Dr. Eduardo Magalhães', email: 'eduardo@clinica.com.br', password: '123', role: 'doctor', roleTitle: '👑 Administrador / Médico', status: 'Ativo' },
     { id: 2, name: 'Juliana Costa', email: 'juliana@clinica.com.br', password: '123', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' },
     { id: 3, name: 'Fernanda Souza', email: 'fernanda@clinica.com.br', password: '123', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' }
   ]);
+
+  // User Management Modal State (CRUD)
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState(null);
+  const [userFormName, setUserFormName] = useState('');
+  const [userFormEmail, setUserFormEmail] = useState('');
+  const [userFormPassword, setUserFormPassword] = useState('');
+  const [userFormRole, setUserFormRole] = useState('reception');
+  const [userFormStatus, setUserFormStatus] = useState('Ativo');
 
   if (!isOpen) return null;
 
@@ -66,7 +75,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
     e.preventDefault();
     setLoginError('');
 
-    const user = employees.find(emp => emp.email.toLowerCase() === loginEmail.toLowerCase().strip ? emp.email.toLowerCase() === loginEmail.toLowerCase().trim() : emp.email.toLowerCase() === loginEmail.toLowerCase().trim());
+    const user = employees.find(emp => emp.email.toLowerCase().trim() === loginEmail.toLowerCase().trim());
     
     if (user && (loginPassword === user.password || loginPassword === '123')) {
       setCurrentUserRole(user.role);
@@ -105,6 +114,73 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
   const handleLogout = () => {
     setIsAuthenticated(false);
     setLoginError('');
+  };
+
+  // User CRUD Handlers
+  const handleOpenAddUser = () => {
+    setEditingUserId(null);
+    setUserFormName('');
+    setUserFormEmail('');
+    setUserFormPassword('123');
+    setUserFormRole('reception');
+    setUserFormStatus('Ativo');
+    setIsUserModalOpen(true);
+  };
+
+  const handleOpenEditUser = (emp) => {
+    setEditingUserId(emp.id);
+    setUserFormName(emp.name);
+    setUserFormEmail(emp.email);
+    setUserFormPassword(emp.password || '123');
+    setUserFormRole(emp.role);
+    setUserFormStatus(emp.status || 'Ativo');
+    setIsUserModalOpen(true);
+  };
+
+  const handleSaveUser = (e) => {
+    e.preventDefault();
+    if (!userFormName || !userFormEmail) return;
+
+    const roleTitles = {
+      doctor: '👑 Administrador / Médico',
+      reception: '📋 Secretária / Atendimento',
+      technician: '🔬 Técnico de Exames'
+    };
+
+    if (editingUserId) {
+      setEmployees(prev => prev.map(emp => emp.id === editingUserId ? {
+        ...emp,
+        name: userFormName,
+        email: userFormEmail,
+        password: userFormPassword,
+        role: userFormRole,
+        roleTitle: roleTitles[userFormRole] || 'Funcionário',
+        status: userFormStatus
+      } : emp));
+    } else {
+      const newUser = {
+        id: Date.now(),
+        name: userFormName,
+        email: userFormEmail,
+        password: userFormPassword || '123',
+        role: userFormRole,
+        roleTitle: roleTitles[userFormRole] || 'Funcionário',
+        status: userFormStatus
+      };
+      setEmployees(prev => [...prev, newUser]);
+    }
+
+    setIsUserModalOpen(false);
+  };
+
+  const handleDeleteUser = (id) => {
+    if (employees.length <= 1) {
+      alert("Não é possível excluir o único usuário do sistema.");
+      return;
+    }
+    if (window.confirm("Tem certeza que deseja revogar o acesso deste usuário?")) {
+      setEmployees(prev => prev.filter(emp => emp.id !== id));
+    }
   };
 
   // Toggle Folder Expansion
@@ -414,7 +490,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
                     onClick={() => setActiveTab('users')}
                     className={`px-4 py-2 rounded-xl transition ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
                   >
-                    <ShieldCheck className="w-4 h-4 inline mr-1.5" /> Gestão de Equipe (RBAC)
+                    <ShieldCheck className="w-4 h-4 inline mr-1.5" /> Gestão de Equipe ({employees.length} Usuários)
                   </button>
                 )}
               </div>
@@ -757,66 +833,186 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
               </div>
             )}
 
-            {/* TAB 3: GESTÃO DE EQUIPE (RBAC) */}
+            {/* TAB 3: GESTÃO DE EQUIPE & RBAC (Dr. Eduardo) */}
             {activeTab === 'users' && currentUserRole === 'doctor' && (
               <div className="pt-4 space-y-4">
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-4">
                   <div>
                     <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                       <ShieldCheck className="w-5 h-5 text-amber-400" />
                       <span>Gestão de Usuários & Níveis de Acesso (RBAC)</span>
                     </h3>
                     <p className="text-xs text-slate-400 mt-1">
-                      Defina quais funcionários possuem acesso ao diagnóstico e laudos médicos (LGPD).
+                      Crie, edite ou revogue contas de funcionários e defina as permissões de acesso ao sistema.
                     </p>
                   </div>
 
                   <button
-                    onClick={() => alert("Simulação: Modal para cadastrar nova secretária/funcionário adicionado.")}
-                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2"
+                    onClick={handleOpenAddUser}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-md shadow-amber-500/20"
                   >
-                    <UserPlus className="w-4 h-4" /> Cadastrar Novo Usuário
+                    <UserPlus className="w-4 h-4" /> + Cadastrar Novo Usuário
                   </button>
                 </div>
 
+                {/* Employees Table with Edit/Delete Actions */}
                 <div className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden">
                   <table className="w-full text-left text-xs text-slate-300">
                     <thead className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
                       <tr>
-                        <th className="p-3">Nome</th>
-                        <th className="p-3">E-mail</th>
-                        <th className="p-3">Perfil de Acesso</th>
-                        <th className="p-3">Acesso ao Laudo (LGPD)</th>
-                        <th className="p-3 text-right">Status</th>
+                        <th className="p-3">Nome do Usuário</th>
+                        <th className="p-3">E-mail de Acesso</th>
+                        <th className="p-3">Nível de Acesso (Perfil)</th>
+                        <th className="p-3">Permissão Médica (LGPD)</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3 text-right">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60">
                       {employees.map(emp => (
                         <tr key={emp.id} className="hover:bg-slate-800/40 transition">
                           <td className="p-3 font-semibold text-white">{emp.name}</td>
-                          <td className="p-3 text-slate-400">{emp.email}</td>
+                          <td className="p-3 text-slate-400 font-mono">{emp.email}</td>
                           <td className="p-3 font-bold text-cyan-300">{emp.roleTitle}</td>
                           <td className="p-3">
                             {emp.role === 'doctor' ? (
                               <span className="text-emerald-400 font-bold flex items-center gap-1">
-                                <Check className="w-3.5 h-3.5" /> Total (Médico)
+                                <Check className="w-3.5 h-3.5" /> Total (Médico / Assinatura)
+                              </span>
+                            ) : emp.role === 'technician' ? (
+                              <span className="text-cyan-400 font-bold flex items-center gap-1">
+                                <Eye className="w-3.5 h-3.5" /> Anexo de Traçados
                               </span>
                             ) : (
                               <span className="text-amber-400 font-bold flex items-center gap-1">
-                                <Lock className="w-3.5 h-3.5" /> Oculto (Secretária)
+                                <Lock className="w-3.5 h-3.5" /> Oculto (Secretária - LGPD)
                               </span>
                             )}
                           </td>
-                          <td className="p-3 text-right">
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
-                              {emp.status}
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${emp.status === 'Ativo' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
+                              {emp.status || 'Ativo'}
                             </span>
+                          </td>
+                          <td className="p-3 text-right flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleOpenEditUser(emp)}
+                              title="Editar Usuário"
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            {emp.role !== 'doctor' && (
+                              <button
+                                onClick={() => handleDeleteUser(emp.id)}
+                                title="Revogar Acesso"
+                                className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+
+                {/* MODAL: EDIT / CREATE USER FORM */}
+                {isUserModalOpen && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+                    <div className="relative w-full max-w-md bg-slate-900 rounded-3xl p-6 border border-slate-800 shadow-2xl space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                          <UserPlus className="w-5 h-5 text-amber-400" />
+                          <span>{editingUserId ? 'Editar Usuário' : 'Cadastrar Novo Usuário'}</span>
+                        </h3>
+                        <button onClick={() => setIsUserModalOpen(false)} className="text-slate-400 hover:text-white">
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleSaveUser} className="space-y-3.5">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
+                          <input
+                            type="text"
+                            value={userFormName}
+                            onChange={(e) => setUserFormName(e.target.value)}
+                            placeholder="ex: Dra. Juliana Santos"
+                            required
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">E-mail de Login</label>
+                          <input
+                            type="email"
+                            value={userFormEmail}
+                            onChange={(e) => setUserFormEmail(e.target.value)}
+                            placeholder="ex: juliana@clinica.com.br"
+                            required
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Senha de Acesso</label>
+                          <input
+                            type="text"
+                            value={userFormPassword}
+                            onChange={(e) => setUserFormPassword(e.target.value)}
+                            placeholder="Defina a senha (ex: 123456)"
+                            required
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-mono"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Nível de Acesso (Perfil RBAC)</label>
+                          <select
+                            value={userFormRole}
+                            onChange={(e) => setUserFormRole(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
+                          >
+                            <option value="reception">📋 Secretária / Atendimento (LGPD - Laudo Oculto)</option>
+                            <option value="doctor">👑 Administrador / Médico (Acesso Total + Assinatura)</option>
+                            <option value="technician">🔬 Técnico de Exames (Anexo de Traçados)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-300 mb-1">Status da Conta</label>
+                          <select
+                            value={userFormStatus}
+                            onChange={(e) => setUserFormStatus(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
+                          >
+                            <option value="Ativo">Ativo (Acesso Liberado)</option>
+                            <option value="Inativo">Inativo (Acesso Suspenso)</option>
+                          </select>
+                        </div>
+
+                        <div className="pt-3 flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsUserModalOpen(false)}
+                            className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shadow-md shadow-amber-500/20"
+                          >
+                            Salvar Usuário
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
