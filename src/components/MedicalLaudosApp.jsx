@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
-import { INITIAL_PATIENT_DATABASE, formatCPF, findPatientByCPF } from '../data/patientDatabase';
+import { INITIAL_PATIENT_DATABASE, formatCPF, findPatientByCPF, fetchCpfOnlineData } from '../data/patientDatabase';
 
 export const MedicalLaudosApp = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState('generator'); // 'generator' | 'search' | 'users' | 'winsoft'
@@ -17,7 +17,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
 
   // Patient Database State (Winsoft + New Patients)
   const [patientDb, setPatientDb] = useState(INITIAL_PATIENT_DATABASE);
-  const [cpfSearchStatus, setCpfSearchStatus] = useState(null); // null | 'found' | 'not_found'
+  const [cpfSearchStatus, setCpfSearchStatus] = useState(null); // null | 'found' | 'found_online' | 'not_found' | 'loading'
 
   // Selected Category / Folder View / Template
   const [viewMode, setViewMode] = useState('folders'); // 'folders' | 'search'
@@ -402,9 +402,19 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
                 </h4>
 
                 {/* CPF Lookup Toast Indicator */}
+                {cpfSearchStatus === 'loading' && (
+                  <span className="px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Consultando CPF Online (Estilo Mevo)...
+                  </span>
+                )}
                 {cpfSearchStatus === 'found' && (
                   <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
                     <Check className="w-3.5 h-3.5" /> Paciente Localizado na Base Winsoft!
+                  </span>
+                )}
+                {cpfSearchStatus === 'found_online' && (
+                  <span className="px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Paciente Localizado via Consulta de CPF (Mevo)!
                   </span>
                 )}
                 {cpfSearchStatus === 'not_found' && (

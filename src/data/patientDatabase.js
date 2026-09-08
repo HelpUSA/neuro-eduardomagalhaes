@@ -67,3 +67,32 @@ export const findPatientByCPF = (db, searchCpf) => {
   if (!targetDigits) return null;
   return db.find(p => cleanCPF(p.cpf) === targetDigits) || null;
 };
+
+/**
+ * Consulta de CPF via API pública (BrasilAPI / Consulta Mevo)
+ */
+export const fetchCpfOnlineData = async (cpfStr) => {
+  const digits = cleanCPF(cpfStr);
+  if (digits.length !== 11) return null;
+
+  try {
+    // Tenta consulta na API pública de validação de CPF / dados cadastrais
+    const response = await fetch(`https://brasilapi.com.br/api/cpf/v1/${digits}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        name: data.name || data.nome || null,
+        birthDate: data.type === 'PF' ? (data.createdAt || null) : null,
+        source: 'BrasilAPI / Receita Federal'
+      };
+    }
+  } catch (err) {
+    console.warn('Consulta online de CPF falhou ou indisponível:', err);
+  }
+
+  return null;
+};
