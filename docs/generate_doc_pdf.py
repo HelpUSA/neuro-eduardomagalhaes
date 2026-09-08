@@ -74,7 +74,7 @@ def build_pdf():
         doctor_img = Image(img_path, width=44, height=44)
         header_text = [
             Paragraph("RELATÓRIO DE ACOMPANHAMENTO & ROTEIRO DE USO", title_style),
-            Paragraph("Parte 1: Solicitações & Modelos Drive | Parte 2: Funcionalidades | Parte 3: Roteiro Passo a Passo", subtitle_style)
+            Paragraph("Parte 1: Solicitações & Modelos Drive | Parte 2: Funcionalidades | Parte 3: Roteiro com Telas", subtitle_style)
         ]
         t_header = Table([[header_text, doctor_img]], colWidths=[435, 48])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
@@ -104,9 +104,9 @@ def build_pdf():
     # PARTE 1
     story.append(Paragraph("PARTE 1: SOLICITAÇÕES E MATERIAIS DISPONIBILIZADOS PELO CLIENTE", h1_style))
     story.append(Paragraph(
-        "Registro detalhado das solicitações enviadas pelo <b>Dr. Eduardo Magalhães</b> via WhatsApp sobre a navegação visual em árvore por 2-3 cliques nas pastas do Google Drive, "
+        "Registro detalhado das solicitações enviadas pelo <b>Dr. Eduardo Magalhães</b> via WhatsApp referente à navegação em árvore por 2-3 cliques nas pastas do Google Drive, "
         "auto-busca de dados por CPF (estilo Mevo), integração com a base histórica de 18 anos da clínica (Winsoft - Jean Cordeiro) e gestão de usuários/senhas. "
-        "Foram extraídos e cadastrados <b>126 modelos de laudo em 10 categorias oficiais</b> enviadas no Google Drive.", body_style
+        "Foram extraídos e cadastrados <b>126 modelos de laudo em 10 categorias oficiais</b> disponibilizadas no Google Drive.", body_style
     ))
 
     req_table = [
@@ -159,44 +159,43 @@ def build_pdf():
     story.append(Paragraph("<b>2.4. Módulo de Gestão de Usuários & Níveis de Acesso (RBAC):</b> Modal interativo de criação/edição/exclusão de secretárias e médicos pelo Dr. Eduardo.", body_style))
     story.append(Spacer(1, 5))
 
-    # PARTE 3: ROTEIRO PASSO A PASSO
+    # PARTE 3: ROTEIRO PASSO A PASSO COM CAPTURAS ATUALIZADAS
     story.append(Paragraph("PARTE 3: ROTEIRO PASSO A PASSO DE USO (DR. EDUARDO & SECRETÁRIA)", h1_style))
 
-    story.append(Paragraph("1️⃣ Passo 1: Autenticação de Acesso (Login com E-mail e Senha)", h2_style))
-    story.append(Paragraph("Acesse <b>neuro.eduardomagalhaes.helpusbr.com</b> e clique em 'Painel'. Faça login com 👑 <b>Dr. Eduardo</b> (eduardo@clinica.com.br / 123) para acesso total ou 📋 <b>Secretária</b> (juliana@clinica.com.br / 123) com trava de sigilo LGPD.", body_style))
+    story.append(Paragraph("1️⃣ Passo 1: Autenticação de Acesso, Árvore de Pastas & Busca CPF (Mevo Style)", h2_style))
+    story.append(Paragraph("Acesse <b>neuro.eduardomagalhaes.helpusbr.com</b> e clique em 'Painel'. Alterne/Faça login com 👑 <b>Dr. Eduardo</b> (eduardo@clinica.com.br / 123) ou 📋 <b>Secretária</b> (juliana@clinica.com.br / 123). Navegue por 2 cliques nas 10 pastas do Drive e digite o CPF para busca automática.", body_style))
 
-    img_painel = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\painel_medico_laudos.jpg"
-    if os.path.exists(img_painel):
-        story.append(Image(img_painel, width=483, height=245))
-        story.append(Paragraph("Figura 1: Tela do Painel do Consultório com autenticação por login, árvore de pastas e emissor de laudos.", caption_style))
+    img_painel_novo = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\painel_medico_laudos_novo.jpg"
+    if os.path.exists(img_painel_novo):
+        story.append(Image(img_painel_novo, width=483, height=270))
+        story.append(Paragraph("Figura 1: Novo Painel do Consultório exibindo o Navegador de Pastas do Drive (10 categorias/126 modelos) e a Busca por CPF em tempo real (Mevo Style).", caption_style))
 
-    story.append(Paragraph("2️⃣ Passo 2: Seleção de Modelos por Pastas (Drive) ou Busca por Digitação", h2_style))
-    story.append(Paragraph("Clique nas pastas de categorias (ex: STC, Mapeamento Cerebral, Radiculopatias) para selecionar qualquer um dos 126 modelos com 2 cliques, ou use a barra de busca por palavra-chave.", body_style))
+    story.append(Paragraph("2️⃣ Passo 2: Gestão de Usuários, Senhas & Níveis de Acesso (Exclusivo Dr. Eduardo)", h2_style))
+    story.append(Paragraph("Na aba 'Gestão de Equipe', o Dr. Eduardo pode cadastrar novas secretárias ou médicos clicando em '+ Cadastrar Usuário', definindo e-mails, senhas e Níveis de Acesso (Médico, Secretária LGPD, Técnico).", body_style))
 
-    story.append(Paragraph("3️⃣ Passo 3: Digitação do CPF e Auto-Preenchimento (Mevo Style + Winsoft)", h2_style))
-    story.append(Paragraph("Digite os 11 números do CPF. O sistema aplica a máscara (000.000.000-00), consulta a base local do Winsoft ou a API online (estilo Mevo) e preenche o Nome e Data Nasc. automaticamente.", body_style))
+    img_rbac = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\gestao_usuarios_rbac.jpg"
+    if os.path.exists(img_rbac):
+        story.append(Image(img_rbac, width=483, height=270))
+        story.append(Paragraph("Figura 2: Nova Tela de Gestão de Usuários & Níveis de Acesso (RBAC) com o formulário de cadastro e permissões da equipe.", caption_style))
 
-    story.append(Paragraph("4️⃣ Passo 4: Gestão de Equipe & Cadastro de Secretárias/Médicos (Dr. Eduardo)", h2_style))
-    story.append(Paragraph("Estando logado como Dr. Eduardo, acesse a aba 'Gestão de Equipe' para cadastrar novos funcionários, definir e-mails/senhas, alterar níveis de acesso (RBAC) ou revogar usuários.", body_style))
+    story.append(Paragraph("3️⃣ Passo 3: Base de Pacientes Winsoft (18 Anos de Histórico) & Carga CSV", h2_style))
+    story.append(Paragraph("Na aba 'Base Winsoft', consulte toda a lista de pacientes cadastrados da clínica, utilize o botão 'Importar Lista (CSV)' para atualizar os dados do Winsoft ou clique em 'Usar no Laudo' para preenchimento em 1 clique.", body_style))
 
-    story.append(Paragraph("5️⃣ Passo 5: Assinatura Digital & Emissão do PDF Timbrado com QR Code", h2_style))
+    img_winsoft = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\base_winsoft_pacientes.jpg"
+    if os.path.exists(img_winsoft):
+        story.append(Image(img_winsoft, width=483, height=270))
+        story.append(Paragraph("Figura 3: Nova Tela da Base de Dados Winsoft exibindo a lista de pacientes, botão de importação CSV e atalho 'Usar no Laudo'.", caption_style))
+
+    story.append(Paragraph("4️⃣ Passo 4: Assinatura Digital PAdES, Carimbo & QR Code no Rodapé", h2_style))
     story.append(Paragraph("No perfil do Dr. Eduardo, revise o laudo e clique em 'Assinar & Gerar PDF Timbrado' para produzir o PDF oficial com carimbo profissional, selo ICP-Brasil e QR Code antifraude no rodapé.", body_style))
 
     img_laudo = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\assinatura_digital_qrcode.jpg"
     if os.path.exists(img_laudo):
-        story.append(Image(img_laudo, width=483, height=245))
-        story.append(Paragraph("Figura 2: Laudo Oficial gerado pelo sistema com papel timbrado, carimbo médico, selo ICP-Brasil e QR Code de validação.", caption_style))
-
-    story.append(Paragraph("6️⃣ Passo 6: Anexo de Gráficos e Portal do Paciente (Download Seguro)", h2_style))
-    story.append(Paragraph("Anexe os gráficos do aparelho e envie o link via WhatsApp. O paciente acessa o portal digitando CPF + Data Nasc. e baixa o Laudo Oficial PDF e os Gráficos do Aparelho.", body_style))
-
-    img_portal = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\portal_paciente_exames.jpg"
-    if os.path.exists(img_portal):
-        story.append(Image(img_portal, width=483, height=245))
-        story.append(Paragraph("Figura 3: Portal do Paciente com autenticação CPF e download seguro dos laudos e gráficos.", caption_style))
+        story.append(Image(img_laudo, width=483, height=255))
+        story.append(Paragraph("Figura 4: Modelo do Laudo Médico Oficial com papel timbrado, carimbo profissional, selo ICP-Brasil e QR Code de validação.", caption_style))
 
     doc.build(story, canvasmaker=NumberedCanvas)
-    print("PDF Documentacao_Acompanhamento_2026-09-08.pdf re-compilado com REQ-10 e todas as secoes!")
+    print("PDF Documentacao_Acompanhamento_2026-09-08.pdf RE-GERADO COM AS 4 NOVAS CAPTURAS DE TELA!")
 
 if __name__ == '__main__':
     build_pdf()
