@@ -332,66 +332,44 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
 
               {/* VIEW MODE 1: DRIVE FOLDER TREE NAVIGATION */}
               {viewMode === 'folders' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                  
-                  {/* Root Folder 1: ENMG Modelos */}
-                  <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-                    <button
-                      onClick={() => toggleFolder('enmg_root')}
-                      className="w-full flex items-center justify-between text-left text-xs font-bold text-cyan-300 hover:text-cyan-200"
-                    >
-                      <span className="flex items-center gap-2">
-                        {expandedFolders['enmg_root'] ? <FolderOpen className="w-4 h-4 text-amber-400" /> : <Folder className="w-4 h-4 text-amber-400" />}
-                        📁 ENMG Modelos (Drive Oficial)
-                      </span>
-                      {expandedFolders['enmg_root'] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                    </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 max-h-64 overflow-y-auto pr-1">
+                  {EXAM_CATEGORIES.map(cat => {
+                    const catTemplates = ALL_EXAM_TEMPLATES.filter(t => t.categoryId === cat.id);
+                    if (catTemplates.length === 0) return null;
+                    const isExpanded = expandedFolders[cat.id] !== false; // expanded by default or toggled
+                    return (
+                      <div key={cat.id} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                        <button
+                          onClick={() => toggleFolder(cat.id)}
+                          className="w-full flex items-center justify-between text-left text-xs font-bold text-cyan-300 hover:text-cyan-200"
+                        >
+                          <span className="flex items-center gap-2">
+                            {isExpanded ? <FolderOpen className="w-4 h-4 text-amber-400" /> : <Folder className="w-4 h-4 text-amber-400" />}
+                            <span>📁 {cat.name}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] text-slate-400 font-mono">
+                              {catTemplates.length} modelos
+                            </span>
+                          </span>
+                          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        </button>
 
-                    {expandedFolders['enmg_root'] && (
-                      <div className="pl-4 space-y-1.5 border-l border-slate-800 mt-2">
-                        {ALL_EXAM_TEMPLATES.filter(t => t.categoryId === 'enmg').map(tmpl => (
-                          <button
-                            key={tmpl.id}
-                            onClick={() => handleSelectTemplate(tmpl)}
-                            className={`w-full p-2.5 rounded-lg border text-left text-xs transition flex items-center justify-between ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white font-bold' : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'}`}
-                          >
-                            <span className="truncate pr-2">{tmpl.title}</span>
-                            {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
-                          </button>
-                        ))}
+                        {isExpanded && (
+                          <div className="pl-4 space-y-1.5 border-l border-slate-800 mt-2 max-h-40 overflow-y-auto pr-1">
+                            {catTemplates.map(tmpl => (
+                              <button
+                                key={tmpl.id}
+                                onClick={() => handleSelectTemplate(tmpl)}
+                                className={`w-full p-2 rounded-lg border text-left text-xs transition flex items-center justify-between ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white font-bold' : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'}`}
+                              >
+                                <span className="truncate pr-2">{tmpl.title}</span>
+                                {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Root Folder 2: EEG MAP MODELOS */}
-                  <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-                    <button
-                      onClick={() => toggleFolder('eeg_root')}
-                      className="w-full flex items-center justify-between text-left text-xs font-bold text-purple-300 hover:text-purple-200"
-                    >
-                      <span className="flex items-center gap-2">
-                        {expandedFolders['eeg_root'] ? <FolderOpen className="w-4 h-4 text-purple-400" /> : <Folder className="w-4 h-4 text-purple-400" />}
-                        📁 EEG MAP MODELOS (Drive Oficial)
-                      </span>
-                      {expandedFolders['eeg_root'] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                    </button>
-
-                    {expandedFolders['eeg_root'] && (
-                      <div className="pl-4 space-y-1.5 border-l border-slate-800 mt-2">
-                        {ALL_EXAM_TEMPLATES.filter(t => t.categoryId !== 'enmg').map(tmpl => (
-                          <button
-                            key={tmpl.id}
-                            onClick={() => handleSelectTemplate(tmpl)}
-                            className={`w-full p-2.5 rounded-lg border text-left text-xs transition flex items-center justify-between ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white font-bold' : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'}`}
-                          >
-                            <span className="truncate pr-2">{tmpl.title}</span>
-                            {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
+                    );
+                  })}
                 </div>
               )}
 
