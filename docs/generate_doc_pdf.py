@@ -28,7 +28,7 @@ class NumberedCanvas(canvas.Canvas):
         self.setFillColor(colors.HexColor("#64748B"))
         
         if self._pageNumber > 1:
-            self.drawString(54, 800, "Relatório de Acompanhamento | Clínica Dr. Eduardo Magalhães (06/09/2026)")
+            self.drawString(54, 800, "Relatório de Acompanhamento | Clínica Dr. Eduardo Magalhães (08/09/2026)")
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.5)
             self.line(54, 792, 541, 792)
@@ -42,7 +42,7 @@ class NumberedCanvas(canvas.Canvas):
         self.restoreState()
 
 def build_pdf():
-    pdf_filename = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\Documentacao_Acompanhamento_2026-09-06.pdf"
+    pdf_filename = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\Documentacao_Acompanhamento_2026-09-08.pdf"
     doc = SimpleDocTemplate(
         pdf_filename,
         pagesize=A4,
@@ -74,7 +74,7 @@ def build_pdf():
         doctor_img = Image(img_path, width=44, height=44)
         header_text = [
             Paragraph("RELATÓRIO DE ACOMPANHAMENTO DE IMPLEMENTAÇÕES", title_style),
-            Paragraph("Parte 1: Requisitos Solicitados pelo Dr. Eduardo | Parte 2: Funcionalidades & Telas Onde Foi Implementado", subtitle_style)
+            Paragraph("Parte 1: Requisitos Solicitados pelo Dr. Eduardo | Parte 2: Funcionalidades Implementadas", subtitle_style)
         ]
         t_header = Table([[header_text, doctor_img]], colWidths=[435, 48])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
@@ -84,8 +84,8 @@ def build_pdf():
 
     # Meta Table
     meta_data = [
-        [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 06/09/2026", body_style)],
-        [Paragraph("<b>Identificador:</b> DOC-2026-09-06", body_style), Paragraph("<b>Status:</b> Produção Ativa com Imagens", body_style)],
+        [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 08/09/2026", body_style)],
+        [Paragraph("<b>Identificador:</b> DOC-2026-09-08", body_style), Paragraph("<b>Status:</b> Concluído em Produção", body_style)],
         [Paragraph("<b>Projeto:</b> neuro.eduardomagalhaes", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
     ]
     t_meta = Table(meta_data, colWidths=[240, 243])
@@ -104,41 +104,29 @@ def build_pdf():
     # PARTE 1
     story.append(Paragraph("PARTE 1: SOLICITAÇÕES E DIRETRIZES DO CLIENTE (DR. EDUARDO MAGALHÃES)", h1_style))
     story.append(Paragraph(
-        "Registro estruturado das solicitações enviadas pelo <b>Dr. Eduardo Magalhães</b> via WhatsApp sobre a privacidade da secretária, "
-        "organização de laudos por pastas/subpastas, biblioteca de 24 modelos de EEG, dupla validação por certificado digital + QR Code, "
-        "e eliminação de riscos no envio de exames.", body_style
+        "Registro detalhado das mensagens de WhatsApp enviadas pelo <b>Dr. Eduardo Magalhães</b> em 07/09/2026 referentes à "
+        "navegação visual em árvore por 2-3 cliques nas pastas do Google Drive (EEG MAP MODELOS e ENMG Modelos), auto-busca de dados por CPF (estilo Mevo) "
+        "e integração com a base histórica de 18 anos da clínica (Winsoft - Jean Cordeiro).", body_style
     ))
 
     req_table = [
         [Paragraph("<b>ID</b>", h2_style), Paragraph("<b>Solicitação do Dr. Eduardo</b>", h2_style), Paragraph("<b>Solução Técnica Projetada</b>", h2_style), Paragraph("<b>Status</b>", h2_style)],
         [
-            Paragraph("REQ-01", body_style),
-            Paragraph("<b>Privacidade da Secretária:</b> Secretária cadastra paciente mas não enxerga o laudo médico.", body_style),
-            Paragraph("Módulo RBAC onde o perfil Recepção acessa apenas dados de cadastro e oculta o diagnóstico médico.", body_style),
+            Paragraph("REQ-07", body_style),
+            Paragraph("<b>Árvore de Pastas (Drive):</b> Navegação por 2-3 cliques nas pastas oficiais do Google Drive.", body_style),
+            Paragraph("Navegador visual de pastas expansível (ENMG Modelos + EEG MAP MODELOS) + alternador de pesquisa.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ],
         [
-            Paragraph("REQ-02", body_style),
-            Paragraph("<b>Pastas & Busca de Modelos:</b> Navegar por pastas/subpastas e busca rápida de modelos.", body_style),
-            Paragraph("Árvore de pastas por patologia + filtro de pesquisa inteligente por palavras-chave.", body_style),
+            Paragraph("REQ-08", body_style),
+            Paragraph("<b>Auto-Preenchimento por CPF:</b> Digitar CPF e buscar Nome e Data Nasc. automaticamente (estilo Mevo).", body_style),
+            Paragraph("Busca inteligente no campo CPF que consulta a base Winsoft e preenche instantaneamente o cadastro.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ],
         [
-            Paragraph("REQ-03", body_style),
-            Paragraph("<b>Assinatura Digital & Jurídica:</b> Assinatura com certificado digital ICP-Brasil + carimbo visual.", body_style),
-            Paragraph("Integração de assinatura PAdES/ICP-Brasil + carimbo visual + QR Code de validação no rodapé.", body_style),
-            Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
-        ],
-        [
-            Paragraph("REQ-04", body_style),
-            Paragraph("<b>Restrição do Certificado:</b> Certificado digital exclusivo do médico (secretária sem acesso).", body_style),
-            Paragraph("A chave de assinatura e PIN ficam vinculados exclusivamente à conta de login do médico.", body_style),
-            Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
-        ],
-        [
-            Paragraph("REQ-05", body_style),
-            Paragraph("<b>Anexo de Gráficos do Aparelho:</b> Anexar o PDF de gráficos sem risco de troca de arquivos.", body_style),
-            Paragraph("Vínculo direto do Laudo Assinado + PDF de Gráficos no prontuário. O paciente baixa tudo no Portal.", body_style),
+            Paragraph("REQ-09", body_style),
+            Paragraph("<b>Integração Base Winsoft:</b> Carga de dados históricos de pacientes do Winsoft (Jean Cordeiro).", body_style),
+            Paragraph("Aba 'Base Winsoft' com suporte para importação de CSV/JSON e seleção direta 'Usar no Laudo'.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ]
     ]
@@ -158,34 +146,26 @@ def build_pdf():
     story.append(Spacer(1, 8))
 
     # PARTE 2
-    story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES E TELAS ONDE FOI IMPLEMENTADO", h1_style))
+    story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES REALIZADAS E TELAS DO SISTEMA", h1_style))
 
-    story.append(Paragraph("2.1. Painel do Consultório & Alternador de Perfis (RBAC & LGPD)", h2_style))
-    story.append(Paragraph("Implementado o alternador de perfis (Médico Dr. Eduardo vs. Secretária Juliana Costa). Quando o perfil Secretária está ativo, a conclusão médica é oculta automaticamente.", body_style))
+    story.append(Paragraph("2.1. Navegador de Pastas em Árvore (Estrutura do Google Drive)", h2_style))
+    story.append(Paragraph("Desenvolvida a navegação visual de pastas com ícones expansíveis para 'ENMG Modelos' e 'EEG MAP MODELOS', permitindo selecionar laudos com 2 cliques ou usar busca por palavras-chave.", body_style))
 
     img_painel = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\painel_medico_laudos.jpg"
     if os.path.exists(img_painel):
         story.append(Image(img_painel, width=483, height=270))
-        story.append(Paragraph("Figura 1: Painel do Consultório exibindo o gerador de laudos, alternador de perfis e seletor de modelos por pastas.", caption_style))
+        story.append(Paragraph("Figura 1: Painel do Consultório com o Navegador de Pastas e emissor de laudos.", caption_style))
 
-    story.append(Paragraph("2.2. Portal do Paciente com Download Conjunto (Laudo + Gráficos)", h2_style))
-    story.append(Paragraph("Desenvolvido o portal seguro (CPF + Nasc) com dois botões independentes para baixar o Laudo Oficial em PDF e os Gráficos do Aparelho.", body_style))
+    story.append(Paragraph("2.2. Busca por CPF e Auto-Preenchimento Mevo + Módulo Winsoft", h2_style))
+    story.append(Paragraph("Campo inteligente de CPF com busca direta na base histórica do Winsoft, preenchendo automaticamente Nome e Data de Nascimento, com aba para importação de arquivos CSV.", body_style))
 
     img_portal = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\portal_paciente_exames.jpg"
     if os.path.exists(img_portal):
         story.append(Image(img_portal, width=483, height=270))
-        story.append(Paragraph("Figura 2: Portal do Paciente exibindo os botões de download para o Laudo Oficial PDF e os Gráficos do Aparelho.", caption_style))
-
-    story.append(Paragraph("2.3. Laudo Oficial PDF Timbrado com Assinatura & QR Code", h2_style))
-    story.append(Paragraph("Gerador de PDF timbrado contendo carimbo profissional com CRM, selo de assinatura digital ICP-Brasil e QR Code de autenticidade no rodapé.", body_style))
-
-    img_laudo = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\assinatura_digital_qrcode.jpg"
-    if os.path.exists(img_laudo):
-        story.append(Image(img_laudo, width=483, height=270))
-        story.append(Paragraph("Figura 3: Laudo Oficial gerado pelo sistema com papel timbrado, carimbo médico, selo digital e QR Code de validação.", caption_style))
+        story.append(Paragraph("Figura 2: Portal do Paciente com autenticação CPF e download seguro dos laudos e gráficos.", caption_style))
 
     doc.build(story, canvasmaker=NumberedCanvas)
-    print("PDF Documentacao_Acompanhamento_2026-09-06.pdf criado com sucesso!")
+    print("PDF Documentacao_Acompanhamento_2026-09-08.pdf criado com sucesso!")
 
 if __name__ == '__main__':
     build_pdf()

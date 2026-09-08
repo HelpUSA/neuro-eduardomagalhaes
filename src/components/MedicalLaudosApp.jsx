@@ -1,17 +1,32 @@
 import React, { useState } from 'react';
-import { X, Search, PlusCircle, FileText, Send, UserPlus, ShieldCheck, Lock, Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw } from 'lucide-react';
+import { 
+  X, Search, PlusCircle, FileText, Send, UserPlus, ShieldCheck, Lock, 
+  Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, ChevronDown, 
+  Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw, Upload, Database
+} from 'lucide-react';
 import jsPDF from 'jspdf';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
+import { INITIAL_PATIENT_DATABASE, formatCPF, findPatientByCPF } from '../data/patientDatabase';
 
 export const MedicalLaudosApp = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState('generator'); // 'generator' | 'search' | 'users'
+  const [activeTab, setActiveTab] = useState('generator'); // 'generator' | 'search' | 'users' | 'winsoft'
   
   // User Authentication State (Dr. Eduardo vs Secretária)
   const [currentUserRole, setCurrentUserRole] = useState('doctor'); // 'doctor' | 'reception'
   const [currentUserName, setCurrentUserName] = useState('Dr. Eduardo Magalhães');
 
-  // Selected Category / Template
+  // Patient Database State (Winsoft + New Patients)
+  const [patientDb, setPatientDb] = useState(INITIAL_PATIENT_DATABASE);
+  const [cpfSearchStatus, setCpfSearchStatus] = useState(null); // null | 'found' | 'not_found'
+
+  // Selected Category / Folder View / Template
+  const [viewMode, setViewMode] = useState('folders'); // 'folders' | 'search'
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedFolder, setSelectedFolder] = useState(null); // e.g. 'ENMG / Neuropatias'
+  const [expandedFolders, setExpandedFolders] = useState({
+    'enmg_root': true,
+    'eeg_root': true
+  });
   const [selectedTemplateId, setSelectedTemplateId] = useState('enmg_stc_grau2');
   const [templateSearchText, setTemplateSearchText] = useState('');
 
@@ -40,12 +55,47 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  // Filter templates by selected category or search text
+  // Toggle Folder Expansion
+  const toggleFolder = (folderKey) => {
+    setExpandedFolders(prev => ({
+      ...prev,
+      [folderKey]: !prev[folderKey]
+    }));
+  };
+
+  // Handle CPF Change and Auto-fill (Mevo style)
+  const handleCpfChange = (val) => {
+    const formatted = formatCPF(val);
+    setCpf(formatted);
+
+    // If full CPF typed (14 chars like 000.000.000-00), attempt lookup
+    if (formatted.length === 14) {
+      performCpfLookup(formatted);
+    } else {
+      setCpfSearchStatus(null);
+    }
+  };
+
+  // Perform CPF Lookup in Patient Database (Winsoft)
+  const performCpfLookup = (targetCpf = cpf) => {
+    const found = findPatientByCPF(patientDb, targetCpf);
+    if (found) {
+      setPatientName(found.name);
+      setBirthDate(found.birthDate);
+      if (found.requestingDoctor) setRequestingDoctor(found.requestingDoctor);
+      setCpfSearchStatus('found');
+    } else {
+      setCpfSearchStatus('not_found');
+    }
+  };
+
+  // Filter templates by selected category, folder or search text
   const filteredTemplates = ALL_EXAM_TEMPLATES.filter(tmpl => {
     const matchCategory = selectedCategory === 'all' || tmpl.categoryId === selectedCategory;
+    const matchFolder = !selectedFolder || tmpl.folderName === selectedFolder;
     const q = templateSearchText.toLowerCase();
     const matchSearch = !q || tmpl.title.toLowerCase().includes(q) || tmpl.keywords.some(kw => kw.toLowerCase().includes(q));
-    return matchCategory && matchSearch;
+    return matchCategory && matchFolder && matchSearch;
   });
 
   // Handle selecting a template
@@ -210,10 +260,10 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
               <FileText className="w-4 h-4 inline mr-1.5" /> Emissão de Laudos
             </button>
             <button
-              onClick={() => setActiveTab('search')}
-              className={`px-4 py-2 rounded-xl transition ${activeTab === 'search' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+              onClick={() => setActiveTab('winsoft')}
+              className={`px-4 py-2 rounded-xl transition ${activeTab === 'winsoft' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
             >
-              <Search className="w-4 h-4 inline mr-1.5" /> Busca Inteligente
+              <Database className="w-4 h-4 inline mr-1.5" /> Base Winsoft ({patientDb.length} Pacientes)
             </button>
             {currentUserRole === 'doctor' && (
               <button
@@ -241,27 +291,27 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
             {/* Category Folders & Search Selector */}
             <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
               <div className="flex justify-between items-center flex-wrap gap-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
-                  <Folder className="w-4 h-4" /> Selecione a Pasta do Exame / Template:
-                </label>
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="w-4 h-4 text-cyan-400" />
+                  <label className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                    Biblioteca de Modelos (Google Drive Structure):
+                  </label>
+                </div>
 
-                {/* Category Filter Pills */}
-                <div className="flex flex-wrap gap-1.5">
+                {/* View Mode Switcher (Tree Folders vs Direct Search) */}
+                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
                   <button
-                    onClick={() => setSelectedCategory('all')}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${selectedCategory === 'all' ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-950 text-slate-400 hover:text-white'}`}
+                    onClick={() => setViewMode('folders')}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${viewMode === 'folders' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
                   >
-                    Todas ({ALL_EXAM_TEMPLATES.length})
+                    <Folder className="w-3.5 h-3.5" /> Navegador de Pastas (Drive)
                   </button>
-                  {EXAM_CATEGORIES.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => setSelectedCategory(cat.id)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${selectedCategory === cat.id ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-950 text-slate-400 hover:text-white'}`}
-                    >
-                      {cat.name}
-                    </button>
-                  ))}
+                  <button
+                    onClick={() => setViewMode('search')}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${viewMode === 'search' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <Search className="w-3.5 h-3.5" /> Busca por Palavras
+                  </button>
                 </div>
               </div>
 
@@ -270,54 +320,157 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
                 <input
                   type="text"
                   value={templateSearchText}
-                  onChange={(e) => setTemplateSearchText(e.target.value)}
+                  onChange={(e) => {
+                    setTemplateSearchText(e.target.value);
+                    if (e.target.value) setViewMode('search');
+                  }}
                   placeholder="Pesquisar modelo por palavra-chave... (ex: 'STC', 'grau 2', 'paroxismo', 'normal', 'ritmos lentos')"
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:border-cyan-400 focus:outline-none"
                 />
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               </div>
 
-              {/* Grid of Templates */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1">
-                {filteredTemplates.map(tmpl => (
-                  <button
-                    key={tmpl.id}
-                    onClick={() => handleSelectTemplate(tmpl)}
-                    className={`p-3 rounded-xl border text-left text-xs transition space-y-1 ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono text-cyan-400">{tmpl.folderName}</span>
-                      {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400" />}
-                    </div>
-                    <strong className="block text-slate-200 text-xs font-bold leading-snug">{tmpl.title}</strong>
-                  </button>
-                ))}
-              </div>
+              {/* VIEW MODE 1: DRIVE FOLDER TREE NAVIGATION */}
+              {viewMode === 'folders' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  
+                  {/* Root Folder 1: ENMG Modelos */}
+                  <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                    <button
+                      onClick={() => toggleFolder('enmg_root')}
+                      className="w-full flex items-center justify-between text-left text-xs font-bold text-cyan-300 hover:text-cyan-200"
+                    >
+                      <span className="flex items-center gap-2">
+                        {expandedFolders['enmg_root'] ? <FolderOpen className="w-4 h-4 text-amber-400" /> : <Folder className="w-4 h-4 text-amber-400" />}
+                        📁 ENMG Modelos (Drive Oficial)
+                      </span>
+                      {expandedFolders['enmg_root'] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </button>
+
+                    {expandedFolders['enmg_root'] && (
+                      <div className="pl-4 space-y-1.5 border-l border-slate-800 mt-2">
+                        {ALL_EXAM_TEMPLATES.filter(t => t.categoryId === 'enmg').map(tmpl => (
+                          <button
+                            key={tmpl.id}
+                            onClick={() => handleSelectTemplate(tmpl)}
+                            className={`w-full p-2.5 rounded-lg border text-left text-xs transition flex items-center justify-between ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white font-bold' : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'}`}
+                          >
+                            <span className="truncate pr-2">{tmpl.title}</span>
+                            {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Root Folder 2: EEG MAP MODELOS */}
+                  <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                    <button
+                      onClick={() => toggleFolder('eeg_root')}
+                      className="w-full flex items-center justify-between text-left text-xs font-bold text-purple-300 hover:text-purple-200"
+                    >
+                      <span className="flex items-center gap-2">
+                        {expandedFolders['eeg_root'] ? <FolderOpen className="w-4 h-4 text-purple-400" /> : <Folder className="w-4 h-4 text-purple-400" />}
+                        📁 EEG MAP MODELOS (Drive Oficial)
+                      </span>
+                      {expandedFolders['eeg_root'] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </button>
+
+                    {expandedFolders['eeg_root'] && (
+                      <div className="pl-4 space-y-1.5 border-l border-slate-800 mt-2">
+                        {ALL_EXAM_TEMPLATES.filter(t => t.categoryId !== 'enmg').map(tmpl => (
+                          <button
+                            key={tmpl.id}
+                            onClick={() => handleSelectTemplate(tmpl)}
+                            className={`w-full p-2.5 rounded-lg border text-left text-xs transition flex items-center justify-between ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white font-bold' : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'}`}
+                          >
+                            <span className="truncate pr-2">{tmpl.title}</span>
+                            {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                </div>
+              )}
+
+              {/* VIEW MODE 2: DIRECT SEARCH GRID */}
+              {viewMode === 'search' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1">
+                  {filteredTemplates.map(tmpl => (
+                    <button
+                      key={tmpl.id}
+                      onClick={() => handleSelectTemplate(tmpl)}
+                      className={`p-3 rounded-xl border text-left text-xs transition space-y-1 ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono text-cyan-400">{tmpl.folderName}</span>
+                        {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                      </div>
+                      <strong className="block text-slate-200 text-xs font-bold leading-snug">{tmpl.title}</strong>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Patient Credentials Form */}
+            {/* Patient Credentials Form with CPF Auto-Lookup (Mevo Style) */}
             <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Dados Cadastrais do Paciente & Atendimento:</h4>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                  <User className="w-4 h-4 text-cyan-400" />
+                  <span>Dados Cadastrais do Paciente (Busca Inteligente por CPF):</span>
+                </h4>
+
+                {/* CPF Lookup Toast Indicator */}
+                {cpfSearchStatus === 'found' && (
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
+                    <Check className="w-3.5 h-3.5" /> Paciente Localizado na Base Winsoft!
+                  </span>
+                )}
+                {cpfSearchStatus === 'not_found' && (
+                  <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Novo Paciente (Preencha os dados abaixo)
+                  </span>
+                )}
+              </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nome do Paciente</label>
+                {/* CPF Input with Instant Lookup Button */}
+                <div className="sm:col-span-1">
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
+                    <span>CPF do Paciente</span>
+                    <span className="text-[10px] text-cyan-400 font-mono">Estilo Mevo</span>
+                  </label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={cpf}
+                      onChange={(e) => handleCpfChange(e.target.value)}
+                      placeholder="000.000.000-00"
+                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono font-bold"
+                    />
+                    <button
+                      onClick={() => performCpfLookup()}
+                      title="Buscar dados no Winsoft"
+                      className="px-2.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs"
+                    >
+                      <Search className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="sm:col-span-1">
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nome Completo</label>
                   <input
                     type="text"
                     value={patientName}
                     onChange={(e) => setPatientName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
                   />
                 </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">CPF do Paciente</label>
-                  <input
-                    type="text"
-                    value={cpf}
-                    onChange={(e) => setCpf(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
-                  />
-                </div>
+
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Nasc.</label>
                   <input
@@ -327,6 +480,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
                   />
                 </div>
+
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-400 mb-1">Médico Solicitante</label>
                   <input
@@ -399,7 +553,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
                     onClick={handleGeneratePdf}
                     className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20"
                   >
-                    <Printer className="w-4 h-4" /> Finalizar & Assinar Laudo (PDF)
+                    <Printer className="w-4 h-4" /> Assinar & Gerar PDF Timbrado
                   </button>
                 )}
               </div>
@@ -408,106 +562,124 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
           </div>
         )}
 
-        {/* TAB 2: BUSCA INTELIGENTE POR PALAVRAS-CHAVE */}
-        {activeTab === 'search' && (
-          <div className="pt-4 space-y-6">
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
-              <label className="block text-xs font-bold uppercase tracking-wider text-cyan-400">
-                Pesquisar Histórico de Laudos por Palavras-Chave, Diagnóstico, Nome ou CPF:
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={templateSearchText}
-                  onChange={(e) => setTemplateSearchText(e.target.value)}
-                  placeholder="Ex: 'Túnel do Carpo', 'Grau 2', 'Paroxismo', 'Clelia', '07/05/1967'..."
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm focus:border-cyan-400 focus:outline-none"
-                />
-                <Search className="w-5 h-5 text-slate-400 absolute left-3 top-3.5" />
+        {/* TAB 2: BASE WINSOFT DE PACIENTES */}
+        {activeTab === 'winsoft' && (
+          <div className="pt-4 space-y-4">
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Database className="w-5 h-5 text-indigo-400" />
+                  <span>Base de Dados de Pacientes (Winsoft - Jean Cordeiro)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Cadastros sincronizados para busca instantânea por CPF (Estilo Mevo).
+                </p>
               </div>
+
+              <button
+                onClick={() => alert("Módulo de Carga CSV: Selecione o arquivo exportado do sistema Winsoft (.csv ou .json) para atualizar a base de pacientes.")}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" /> Importar Lista do Winsoft (CSV)
+              </button>
             </div>
 
-            <div className="space-y-3">
-              <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2">
-                <div className="flex justify-between items-center flex-wrap gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-cyan-400" />
-                    <strong className="text-white text-sm">{patientName}</strong>
-                    <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px]">ENMG / EEG</span>
-                  </div>
-                  <span className="text-slate-400 text-[11px]">Exame: {examDate} | Nasc: {birthDate}</span>
-                </div>
-
-                {currentUserRole === 'doctor' ? (
-                  <p className="text-xs text-slate-300 bg-slate-950/60 p-3 rounded-xl border border-slate-800 font-medium">
-                    {conclusion}
-                  </p>
-                ) : (
-                  <p className="text-xs text-slate-500 bg-slate-950/60 p-3 rounded-xl border border-slate-800 italic">
-                    [ Conteúdo Diagnóstico Oculto para o Perfil Recepção ]
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between text-[11px] pt-1">
-                  <span className="text-slate-400">Status: <strong className="text-emerald-400">Assinado Digitalmente por Dr. Eduardo Magalhães</strong></span>
-                  <button onClick={handleGeneratePdf} className="text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1">
-                    <Eye className="w-3.5 h-3.5" /> Abrir PDF
-                  </button>
-                </div>
-              </div>
+            {/* Patients Table */}
+            <div className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="p-3">CPF</th>
+                    <th className="p-3">Nome Completo</th>
+                    <th className="p-3">Data Nasc.</th>
+                    <th className="p-3">Último Exame</th>
+                    <th className="p-3 text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {patientDb.map(p => (
+                    <tr key={p.cpf} className="hover:bg-slate-800/40 transition">
+                      <td className="p-3 font-mono text-cyan-400 font-bold">{p.cpf}</td>
+                      <td className="p-3 font-semibold text-white">{p.name}</td>
+                      <td className="p-3">{p.birthDate}</td>
+                      <td className="p-3 text-slate-400">{p.lastExam || '03/10/2025'}</td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => {
+                            setCpf(p.cpf);
+                            setPatientName(p.name);
+                            setBirthDate(p.birthDate);
+                            if (p.requestingDoctor) setRequestingDoctor(p.requestingDoctor);
+                            setCpfSearchStatus('found');
+                            setActiveTab('generator');
+                          }}
+                          className="px-3 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 font-bold text-[11px]"
+                        >
+                          Usar no Laudo
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
         {/* TAB 3: GESTÃO DE EQUIPE (RBAC) */}
         {activeTab === 'users' && currentUserRole === 'doctor' && (
-          <div className="pt-4 space-y-6">
-            <div className="flex justify-between items-center">
+          <div className="pt-4 space-y-4">
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-white">Equipe & Permissões do Consultório</h3>
-                <p className="text-xs text-slate-400">Controle rigoroso de acessos por perfil para a clínica Dr. Eduardo Magalhães (LGPD).</p>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-amber-400" />
+                  <span>Gestão de Usuários & Níveis de Acesso (RBAC)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Defina quais funcionários possuem acesso ao diagnóstico e laudos médicos (LGPD).
+                </p>
               </div>
+
               <button
-                onClick={() => setEmployees([...employees, { id: Date.now(), name: 'Nova Secretária', email: 'secretaria@clinica.com.br', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' }])}
-                className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5"
+                onClick={() => alert("Simulação: Modal para cadastrar nova secretária/funcionário adicionado.")}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2"
               >
-                <UserPlus className="w-4 h-4" /> + Adicionar Funcionário
+                <UserPlus className="w-4 h-4" /> Cadastrar Novo Usuário
               </button>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden">
               <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-900 text-slate-400 uppercase text-[10px]">
+                <thead className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
                   <tr>
-                    <th className="p-3">Nome do Colaborador</th>
-                    <th className="p-3">E-mail de Acesso</th>
-                    <th className="p-3">Perfil / Nível de Acesso</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3 text-right">Ação</th>
+                    <th className="p-3">Nome</th>
+                    <th className="p-3">E-mail</th>
+                    <th className="p-3">Perfil de Acesso</th>
+                    <th className="p-3">Acesso ao Laudo (LGPD)</th>
+                    <th className="p-3 text-right">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {employees.map((emp) => (
-                    <tr key={emp.id} className="hover:bg-slate-900/50">
-                      <td className="p-3 font-bold text-white">{emp.name}</td>
+                <tbody className="divide-y divide-slate-800/60">
+                  {employees.map(emp => (
+                    <tr key={emp.id} className="hover:bg-slate-800/40 transition">
+                      <td className="p-3 font-semibold text-white">{emp.name}</td>
                       <td className="p-3 text-slate-400">{emp.email}</td>
+                      <td className="p-3 font-bold text-cyan-300">{emp.roleTitle}</td>
                       <td className="p-3">
-                        <span className={`px-2 py-1 rounded-md text-[10px] font-bold ${emp.role === 'doctor' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'}`}>
-                          {emp.roleTitle}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
-                          ● {emp.status}
-                        </span>
+                        {emp.role === 'doctor' ? (
+                          <span className="text-emerald-400 font-bold flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5" /> Total (Médico)
+                          </span>
+                        ) : (
+                          <span className="text-amber-400 font-bold flex items-center gap-1">
+                            <Lock className="w-3.5 h-3.5" /> Oculto (Secretária)
+                          </span>
+                        )}
                       </td>
                       <td className="p-3 text-right">
-                        <button
-                          onClick={() => handleSwitchUser(emp.role, emp.name)}
-                          className="text-cyan-400 hover:text-cyan-300 text-[11px] font-bold"
-                        >
-                          Simular Acesso
-                        </button>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
+                          {emp.status}
+                        </span>
                       </td>
                     </tr>
                   ))}
