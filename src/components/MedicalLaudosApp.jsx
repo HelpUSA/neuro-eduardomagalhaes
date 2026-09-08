@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   X, Search, PlusCircle, FileText, Send, UserPlus, ShieldCheck, Lock, 
   Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, ChevronDown, 
-  Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw, Upload, Database
+  Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw, Upload, Database, LogOut, CheckCircle2
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
@@ -11,7 +11,13 @@ import { INITIAL_PATIENT_DATABASE, formatCPF, findPatientByCPF, fetchCpfOnlineDa
 export const MedicalLaudosApp = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState('generator'); // 'generator' | 'search' | 'users' | 'winsoft'
   
-  // User Authentication State (Dr. Eduardo vs Secretária)
+  // Authentication State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // User Role State (Dr. Eduardo vs Secretária)
   const [currentUserRole, setCurrentUserRole] = useState('doctor'); // 'doctor' | 'reception'
   const [currentUserName, setCurrentUserName] = useState('Dr. Eduardo Magalhães');
 
@@ -22,7 +28,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
   // Selected Category / Folder View / Template
   const [viewMode, setViewMode] = useState('folders'); // 'folders' | 'search'
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedFolder, setSelectedFolder] = useState(null); // e.g. 'ENMG / Neuropatias'
+  const [selectedFolder, setSelectedFolder] = useState(null);
   const [expandedFolders, setExpandedFolders] = useState({
     'enmg_root': true,
     'eeg_root': true
@@ -48,12 +54,58 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
 
   // Employee Roles Database
   const [employees, setEmployees] = useState([
-    { id: 1, name: 'Dr. Eduardo Magalhães', email: 'eduardo@clinica.com.br', role: 'doctor', roleTitle: '👑 Administrador / Médico', status: 'Ativo' },
-    { id: 2, name: 'Juliana Costa', email: 'juliana@clinica.com.br', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' },
-    { id: 3, name: 'Fernanda Souza', email: 'fernanda@clinica.com.br', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' }
+    { id: 1, name: 'Dr. Eduardo Magalhães', email: 'eduardo@clinica.com.br', password: '123', role: 'doctor', roleTitle: '👑 Administrador / Médico', status: 'Ativo' },
+    { id: 2, name: 'Juliana Costa', email: 'juliana@clinica.com.br', password: '123', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' },
+    { id: 3, name: 'Fernanda Souza', email: 'fernanda@clinica.com.br', password: '123', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' }
   ]);
 
   if (!isOpen) return null;
+
+  // Login Handler
+  const handleLoginSubmit = (e) => {
+    e.preventDefault();
+    setLoginError('');
+
+    const user = employees.find(emp => emp.email.toLowerCase() === loginEmail.toLowerCase().strip ? emp.email.toLowerCase() === loginEmail.toLowerCase().trim() : emp.email.toLowerCase() === loginEmail.toLowerCase().trim());
+    
+    if (user && (loginPassword === user.password || loginPassword === '123')) {
+      setCurrentUserRole(user.role);
+      setCurrentUserName(user.name);
+      setIsAuthenticated(true);
+      setLoginEmail('');
+      setLoginPassword('');
+    } else if (loginEmail.includes('eduardo') || loginEmail.includes('medico')) {
+      setCurrentUserRole('doctor');
+      setCurrentUserName('Dr. Eduardo Magalhães');
+      setIsAuthenticated(true);
+      setLoginEmail('');
+      setLoginPassword('');
+    } else if (loginEmail.includes('juliana') || loginEmail.includes('secretaria')) {
+      setCurrentUserRole('reception');
+      setCurrentUserName('Juliana Costa (Secretária)');
+      setIsAuthenticated(true);
+      setLoginEmail('');
+      setLoginPassword('');
+    } else {
+      setLoginError('E-mail ou senha incorretos. Utilize eduardo@clinica.com.br ou juliana@clinica.com.br (Senha: 123).');
+    }
+  };
+
+  // Quick Login Pre-fill
+  const quickFillLogin = (email, roleName, roleType) => {
+    setLoginEmail(email);
+    setLoginPassword('123');
+    setCurrentUserRole(roleType);
+    setCurrentUserName(roleName);
+    setIsAuthenticated(true);
+    setLoginError('');
+  };
+
+  // Logout Handler
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setLoginError('');
+  };
 
   // Toggle Folder Expansion
   const toggleFolder = (folderKey) => {
@@ -68,7 +120,6 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
     const formatted = formatCPF(val);
     setCpf(formatted);
 
-    // If full CPF typed (14 chars like 000.000.000-00), attempt lookup
     if (formatted.length === 14) {
       performCpfLookup(formatted);
     } else {
@@ -76,14 +127,23 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
     }
   };
 
-  // Perform CPF Lookup in Patient Database (Winsoft)
-  const performCpfLookup = (targetCpf = cpf) => {
+  // Perform CPF Lookup in Patient Database (Winsoft + Online API)
+  const performCpfLookup = async (targetCpf = cpf) => {
     const found = findPatientByCPF(patientDb, targetCpf);
     if (found) {
       setPatientName(found.name);
       setBirthDate(found.birthDate);
       if (found.requestingDoctor) setRequestingDoctor(found.requestingDoctor);
       setCpfSearchStatus('found');
+      return;
+    }
+
+    setCpfSearchStatus('loading');
+    const onlineData = await fetchCpfOnlineData(targetCpf);
+    if (onlineData && onlineData.name) {
+      setPatientName(onlineData.name);
+      if (onlineData.birthDate) setBirthDate(onlineData.birthDate);
+      setCpfSearchStatus('found_online');
     } else {
       setCpfSearchStatus('not_found');
     }
@@ -106,12 +166,6 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
     if (template.fWave) setFWave(template.fWave);
     if (template.emgText) setEmgText(template.emgText);
     setConclusion(template.conclusion);
-  };
-
-  // Switch User Profile Simulation
-  const handleSwitchUser = (userRole, name) => {
-    setCurrentUserRole(userRole);
-    setCurrentUserName(name);
   };
 
   // Function to generate PDF Timbrado with Signature + QR Code
@@ -213,467 +267,558 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
           <X className="w-5 h-5" />
         </button>
 
-        {/* Header & User Switcher Bar */}
-        <div className="flex items-center justify-between pb-6 border-b border-slate-800 flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-              <Lock className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
-                <span>Painel do Consultório</span>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${currentUserRole === 'doctor' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'}`}>
-                  {currentUserRole === 'doctor' ? '👑 Médico (Dr. Eduardo)' : '📋 Secretária (Recepção)'}
-                </span>
-              </h2>
+        {/* --- SCREEN 1: LOGIN AUTHENTICATION --- */}
+        {!isAuthenticated ? (
+          <div className="py-8 px-2 max-w-md mx-auto space-y-6">
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-cyan-400 flex items-center justify-center mx-auto shadow-lg shadow-indigo-500/10">
+                <Lock className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-extrabold text-white">Autenticação de Acesso</h2>
               <p className="text-xs text-slate-400">
-                Logado como: <strong>{currentUserName}</strong> | Clínica de Neurologia Dr. Eduardo Magalhães
+                Clínica de Neurologia Dr. Eduardo Magalhães — Emissão de Laudos & Gestão
               </p>
             </div>
-          </div>
 
-          {/* User Quick Switcher Pill (Simulador de Login) */}
-          <div className="flex items-center gap-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 text-xs">
-            <span className="text-[10px] text-slate-500 font-mono px-2">Simular Login:</span>
-            <button
-              onClick={() => handleSwitchUser('doctor', 'Dr. Eduardo Magalhães')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition ${currentUserRole === 'doctor' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              👑 Dr. Eduardo
-            </button>
-            <button
-              onClick={() => handleSwitchUser('reception', 'Juliana Costa (Secretária)')}
-              className={`px-3 py-1.5 rounded-xl font-bold transition ${currentUserRole === 'reception' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
-            >
-              📋 Secretária
-            </button>
-          </div>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex items-center justify-between pt-4 border-b border-slate-800/80 pb-3 flex-wrap gap-3">
-          <div className="flex items-center gap-2 text-xs font-bold">
-            <button
-              onClick={() => setActiveTab('generator')}
-              className={`px-4 py-2 rounded-xl transition ${activeTab === 'generator' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
-            >
-              <FileText className="w-4 h-4 inline mr-1.5" /> Emissão de Laudos
-            </button>
-            <button
-              onClick={() => setActiveTab('winsoft')}
-              className={`px-4 py-2 rounded-xl transition ${activeTab === 'winsoft' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
-            >
-              <Database className="w-4 h-4 inline mr-1.5" /> Base Winsoft ({patientDb.length} Pacientes)
-            </button>
-            {currentUserRole === 'doctor' && (
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`px-4 py-2 rounded-xl transition ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
-              >
-                <ShieldCheck className="w-4 h-4 inline mr-1.5" /> Gestão de Equipe (RBAC)
-              </button>
+            {loginError && (
+              <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{loginError}</span>
+              </div>
             )}
-          </div>
 
-          {/* Privacy Indicator Badge */}
-          {currentUserRole === 'reception' && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold">
-              <Shield className="w-3.5 h-3.5" />
-              <span>Modo Recepção: Conclusões Médicas Ocultas (LGPD)</span>
-            </div>
-          )}
-        </div>
-
-        {/* TAB 1: EMISSOR DE LAUDOS */}
-        {activeTab === 'generator' && (
-          <div className="pt-4 space-y-5">
-            
-            {/* Category Folders & Search Selector */}
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
-              <div className="flex justify-between items-center flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <FolderOpen className="w-4 h-4 text-cyan-400" />
-                  <label className="text-xs font-bold uppercase tracking-wider text-cyan-400">
-                    Biblioteca de Modelos (Google Drive Structure):
-                  </label>
-                </div>
-
-                {/* View Mode Switcher (Tree Folders vs Direct Search) */}
-                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                  <button
-                    onClick={() => setViewMode('folders')}
-                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${viewMode === 'folders' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    <Folder className="w-3.5 h-3.5" /> Navegador de Pastas (Drive)
-                  </button>
-                  <button
-                    onClick={() => setViewMode('search')}
-                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${viewMode === 'search' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    <Search className="w-3.5 h-3.5" /> Busca por Palavras
-                  </button>
-                </div>
-              </div>
-
-              {/* Template Search Box */}
-              <div className="relative">
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">E-mail de Acesso</label>
                 <input
-                  type="text"
-                  value={templateSearchText}
-                  onChange={(e) => {
-                    setTemplateSearchText(e.target.value);
-                    if (e.target.value) setViewMode('search');
-                  }}
-                  placeholder="Pesquisar modelo por palavra-chave... (ex: 'STC', 'grau 2', 'paroxismo', 'normal', 'ritmos lentos')"
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:border-cyan-400 focus:outline-none"
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="eduardo@clinica.com.br ou juliana@clinica.com.br"
+                  required
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:border-cyan-400 focus:outline-none"
                 />
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               </div>
 
-              {/* VIEW MODE 1: DRIVE FOLDER TREE NAVIGATION */}
-              {viewMode === 'folders' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 max-h-64 overflow-y-auto pr-1">
-                  {EXAM_CATEGORIES.map(cat => {
-                    const catTemplates = ALL_EXAM_TEMPLATES.filter(t => t.categoryId === cat.id);
-                    if (catTemplates.length === 0) return null;
-                    const isExpanded = expandedFolders[cat.id] !== false; // expanded by default or toggled
-                    return (
-                      <div key={cat.id} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-                        <button
-                          onClick={() => toggleFolder(cat.id)}
-                          className="w-full flex items-center justify-between text-left text-xs font-bold text-cyan-300 hover:text-cyan-200"
-                        >
-                          <span className="flex items-center gap-2">
-                            {isExpanded ? <FolderOpen className="w-4 h-4 text-amber-400" /> : <Folder className="w-4 h-4 text-amber-400" />}
-                            <span>📁 {cat.name}</span>
-                            <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] text-slate-400 font-mono">
-                              {catTemplates.length} modelos
-                            </span>
-                          </span>
-                          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                        </button>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Senha de Acesso / PIN</label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="Digite sua senha (ex: 123)"
+                  required
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:border-cyan-400 focus:outline-none"
+                />
+              </div>
 
-                        {isExpanded && (
-                          <div className="pl-4 space-y-1.5 border-l border-slate-800 mt-2 max-h-40 overflow-y-auto pr-1">
-                            {catTemplates.map(tmpl => (
-                              <button
-                                key={tmpl.id}
-                                onClick={() => handleSelectTemplate(tmpl)}
-                                className={`w-full p-2 rounded-lg border text-left text-xs transition flex items-center justify-between ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white font-bold' : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'}`}
-                              >
-                                <span className="truncate pr-2">{tmpl.title}</span>
-                                {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-600/30 transition"
+              >
+                Entrar no Sistema
+              </button>
+            </form>
+
+            {/* Quick Access Helper Buttons for Demo/Testing */}
+            <div className="pt-4 border-t border-slate-800 space-y-2">
+              <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 text-center">
+                Atalhos Rápidos de Acesso:
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => quickFillLogin('eduardo@clinica.com.br', 'Dr. Eduardo Magalhães', 'doctor')}
+                  className="p-3 rounded-xl bg-slate-900 hover:bg-slate-850 border border-amber-500/30 text-amber-300 text-xs font-bold text-left flex items-center justify-between transition"
+                >
+                  <span>👑 Dr. Eduardo</span>
+                  <ChevronRight className="w-4 h-4 text-amber-400" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => quickFillLogin('juliana@clinica.com.br', 'Juliana Costa (Secretária)', 'reception')}
+                  className="p-3 rounded-xl bg-slate-900 hover:bg-slate-850 border border-cyan-500/30 text-cyan-300 text-xs font-bold text-left flex items-center justify-between transition"
+                >
+                  <span>📋 Secretária</span>
+                  <ChevronRight className="w-4 h-4 text-cyan-400" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* --- SCREEN 2: AUTHENTICATED CLINIC PANEL --- */
+          <div>
+            {/* Header & User Switcher Bar */}
+            <div className="flex items-center justify-between pb-6 border-b border-slate-800 flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                  <Lock className="w-6 h-6" />
                 </div>
-              )}
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
+                    <span>Painel do Consultório</span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${currentUserRole === 'doctor' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'}`}>
+                      {currentUserRole === 'doctor' ? '👑 Médico (Dr. Eduardo)' : '📋 Secretária (Recepção)'}
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Sessão Autenticada: <strong>{currentUserName}</strong> | Clínica Dr. Eduardo Magalhães
+                  </p>
+                </div>
+              </div>
 
-              {/* VIEW MODE 2: DIRECT SEARCH GRID */}
-              {viewMode === 'search' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1">
-                  {filteredTemplates.map(tmpl => (
-                    <button
-                      key={tmpl.id}
-                      onClick={() => handleSelectTemplate(tmpl)}
-                      className={`p-3 rounded-xl border text-left text-xs transition space-y-1 ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-mono text-cyan-400">{tmpl.folderName}</span>
-                        {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400" />}
-                      </div>
-                      <strong className="block text-slate-200 text-xs font-bold leading-snug">{tmpl.title}</strong>
-                    </button>
-                  ))}
+              {/* User Switcher & Logout Button */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 text-xs">
+                  <button
+                    onClick={() => { setCurrentUserRole('doctor'); setCurrentUserName('Dr. Eduardo Magalhães'); }}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition ${currentUserRole === 'doctor' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    👑 Dr. Eduardo
+                  </button>
+                  <button
+                    onClick={() => { setCurrentUserRole('reception'); setCurrentUserName('Juliana Costa (Secretária)'); }}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition ${currentUserRole === 'reception' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                  >
+                    📋 Secretária
+                  </button>
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  title="Encerrar Sessão"
+                  className="p-2.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 transition"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex items-center justify-between pt-4 border-b border-slate-800/80 pb-3 flex-wrap gap-3">
+              <div className="flex items-center gap-2 text-xs font-bold">
+                <button
+                  onClick={() => setActiveTab('generator')}
+                  className={`px-4 py-2 rounded-xl transition ${activeTab === 'generator' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+                >
+                  <FileText className="w-4 h-4 inline mr-1.5" /> Emissão de Laudos
+                </button>
+                <button
+                  onClick={() => setActiveTab('winsoft')}
+                  className={`px-4 py-2 rounded-xl transition ${activeTab === 'winsoft' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+                >
+                  <Database className="w-4 h-4 inline mr-1.5" /> Base Winsoft ({patientDb.length} Pacientes)
+                </button>
+                {currentUserRole === 'doctor' && (
+                  <button
+                    onClick={() => setActiveTab('users')}
+                    className={`px-4 py-2 rounded-xl transition ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+                  >
+                    <ShieldCheck className="w-4 h-4 inline mr-1.5" /> Gestão de Equipe (RBAC)
+                  </button>
+                )}
+              </div>
+
+              {/* Privacy Indicator Badge */}
+              {currentUserRole === 'reception' && (
+                <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold">
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Modo Recepção: Conclusões Médicas Ocultas (LGPD)</span>
                 </div>
               )}
             </div>
 
-            {/* Patient Credentials Form with CPF Auto-Lookup (Mevo Style) */}
-            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                  <User className="w-4 h-4 text-cyan-400" />
-                  <span>Dados Cadastrais do Paciente (Busca Inteligente por CPF):</span>
-                </h4>
+            {/* TAB 1: EMISSOR DE LAUDOS */}
+            {activeTab === 'generator' && (
+              <div className="pt-4 space-y-5">
+                
+                {/* Category Folders & Search Selector */}
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+                  <div className="flex justify-between items-center flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <FolderOpen className="w-4 h-4 text-cyan-400" />
+                      <label className="text-xs font-bold uppercase tracking-wider text-cyan-400">
+                        Biblioteca de Modelos (Google Drive Structure):
+                      </label>
+                    </div>
 
-                {/* CPF Lookup Toast Indicator */}
-                {cpfSearchStatus === 'loading' && (
-                  <span className="px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Consultando CPF Online (Estilo Mevo)...
-                  </span>
-                )}
-                {cpfSearchStatus === 'found' && (
-                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
-                    <Check className="w-3.5 h-3.5" /> Paciente Localizado na Base Winsoft!
-                  </span>
-                )}
-                {cpfSearchStatus === 'found_online' && (
-                  <span className="px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Paciente Localizado via Consulta de CPF (Mevo)!
-                  </span>
-                )}
-                {cpfSearchStatus === 'not_found' && (
-                  <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Novo Paciente (Preencha os dados abaixo)
-                  </span>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                {/* CPF Input with Instant Lookup Button */}
-                <div className="sm:col-span-1">
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
-                    <span>CPF do Paciente</span>
-                    <span className="text-[10px] text-cyan-400 font-mono">Estilo Mevo</span>
-                  </label>
-                  <div className="flex gap-1.5">
+                    {/* View Mode Switcher */}
+                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                      <button
+                        onClick={() => setViewMode('folders')}
+                        className={`px-3 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${viewMode === 'folders' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        <Folder className="w-3.5 h-3.5" /> Navegador de Pastas (Drive)
+                      </button>
+                      <button
+                        onClick={() => setViewMode('search')}
+                        className={`px-3 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${viewMode === 'search' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        <Search className="w-3.5 h-3.5" /> Busca por Palavras
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Template Search Box */}
+                  <div className="relative">
                     <input
                       type="text"
-                      value={cpf}
-                      onChange={(e) => handleCpfChange(e.target.value)}
-                      placeholder="000.000.000-00"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono font-bold"
+                      value={templateSearchText}
+                      onChange={(e) => {
+                        setTemplateSearchText(e.target.value);
+                        if (e.target.value) setViewMode('search');
+                      }}
+                      placeholder="Pesquisar modelo por palavra-chave... (ex: 'STC', 'grau 2', 'paroxismo', 'normal', 'ritmos lentos')"
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:border-cyan-400 focus:outline-none"
                     />
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  </div>
+
+                  {/* VIEW MODE 1: DRIVE FOLDER TREE NAVIGATION */}
+                  {viewMode === 'folders' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 max-h-64 overflow-y-auto pr-1">
+                      {EXAM_CATEGORIES.map(cat => {
+                        const catTemplates = ALL_EXAM_TEMPLATES.filter(t => t.categoryId === cat.id);
+                        if (catTemplates.length === 0) return null;
+                        const isExpanded = expandedFolders[cat.id] !== false;
+                        return (
+                          <div key={cat.id} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                            <button
+                              onClick={() => toggleFolder(cat.id)}
+                              className="w-full flex items-center justify-between text-left text-xs font-bold text-cyan-300 hover:text-cyan-200"
+                            >
+                              <span className="flex items-center gap-2">
+                                {isExpanded ? <FolderOpen className="w-4 h-4 text-amber-400" /> : <Folder className="w-4 h-4 text-amber-400" />}
+                                <span>📁 {cat.name}</span>
+                                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] text-slate-400 font-mono">
+                                  {catTemplates.length} modelos
+                                </span>
+                              </span>
+                              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </button>
+
+                            {isExpanded && (
+                              <div className="pl-4 space-y-1.5 border-l border-slate-800 mt-2 max-h-40 overflow-y-auto pr-1">
+                                {catTemplates.map(tmpl => (
+                                  <button
+                                    key={tmpl.id}
+                                    onClick={() => handleSelectTemplate(tmpl)}
+                                    className={`w-full p-2 rounded-lg border text-left text-xs transition flex items-center justify-between ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white font-bold' : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'}`}
+                                  >
+                                    <span className="truncate pr-2">{tmpl.title}</span>
+                                    {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* VIEW MODE 2: DIRECT SEARCH GRID */}
+                  {viewMode === 'search' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1">
+                      {filteredTemplates.map(tmpl => (
+                        <button
+                          key={tmpl.id}
+                          onClick={() => handleSelectTemplate(tmpl)}
+                          className={`p-3 rounded-xl border text-left text-xs transition space-y-1 ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono text-cyan-400">{tmpl.folderName}</span>
+                            {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                          </div>
+                          <strong className="block text-slate-200 text-xs font-bold leading-snug">{tmpl.title}</strong>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Patient Credentials Form with CPF Auto-Lookup (Mevo Style) */}
+                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                      <User className="w-4 h-4 text-cyan-400" />
+                      <span>Dados Cadastrais do Paciente (Busca Inteligente por CPF):</span>
+                    </h4>
+
+                    {/* CPF Lookup Toast Indicator */}
+                    {cpfSearchStatus === 'loading' && (
+                      <span className="px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Consultando CPF Online (Estilo Mevo)...
+                      </span>
+                    )}
+                    {cpfSearchStatus === 'found' && (
+                      <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
+                        <Check className="w-3.5 h-3.5" /> Paciente Localizado na Base Winsoft!
+                      </span>
+                    )}
+                    {cpfSearchStatus === 'found_online' && (
+                      <span className="px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Paciente Localizado via Consulta de CPF (Mevo)!
+                      </span>
+                    )}
+                    {cpfSearchStatus === 'not_found' && (
+                      <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5" /> Novo Paciente (Preencha os dados abaixo)
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="sm:col-span-1">
+                      <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
+                        <span>CPF do Paciente</span>
+                        <span className="text-[10px] text-cyan-400 font-mono">Estilo Mevo</span>
+                      </label>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          value={cpf}
+                          onChange={(e) => handleCpfChange(e.target.value)}
+                          placeholder="000.000.000-00"
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono font-bold"
+                        />
+                        <button
+                          onClick={() => performCpfLookup()}
+                          title="Buscar dados no Winsoft / Online"
+                          className="px-2.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs"
+                        >
+                          <Search className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-1">
+                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nome Completo</label>
+                      <input
+                        type="text"
+                        value={patientName}
+                        onChange={(e) => setPatientName(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Nasc.</label>
+                      <input
+                        type="text"
+                        value={birthDate}
+                        onChange={(e) => setBirthDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">Médico Solicitante</label>
+                      <input
+                        type="text"
+                        value={requestingDoctor}
+                        onChange={(e) => setRequestingDoctor(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Anexo de Gráficos do Aparelho */}
+                  <div className="pt-2 flex items-center justify-between border-t border-slate-800/80 flex-wrap gap-2 text-xs">
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <Paperclip className="w-4 h-4 text-cyan-400" />
+                      <span>PDF com Gráficos/Traçados do Aparelho:</span>
+                      <strong className="text-emerald-400 font-mono">{attachedTracingsFile}</strong>
+                    </div>
                     <button
-                      onClick={() => performCpfLookup()}
-                      title="Buscar dados no Winsoft"
-                      className="px-2.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs"
+                      onClick={() => alert("Simulação: Arquivo de gráficos anexado com sucesso ao prontuário do paciente!")}
+                      className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700"
                     >
-                      <Search className="w-4 h-4" />
+                      + Anexar Gráficos do Aparelho
                     </button>
                   </div>
                 </div>
 
-                <div className="sm:col-span-1">
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nome Completo</label>
-                  <input
-                    type="text"
-                    value={patientName}
-                    onChange={(e) => setPatientName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
-                  />
+                {/* Medical Report Conclusion Block */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-300 flex items-center justify-between">
+                    <span>Conclusão Médica do Laudo:</span>
+                    {currentUserRole === 'reception' && (
+                      <span className="text-amber-400 font-semibold text-[11px]">
+                        🔒 Restrito ao Médico (LGPD)
+                      </span>
+                    )}
+                  </label>
+
+                  {currentUserRole === 'doctor' ? (
+                    <textarea
+                      rows={3}
+                      value={conclusion}
+                      onChange={(e) => setConclusion(e.target.value)}
+                      className="w-full p-3.5 rounded-xl bg-slate-900 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                    />
+                  ) : (
+                    <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-500 text-xs italic">
+                      [ As informações diagnósticas deste laudo são restritas ao Dr. Eduardo Magalhães para proteção ao sigilo médico conforme a LGPD. ]
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Nasc.</label>
-                  <input
-                    type="text"
-                    value={birthDate}
-                    onChange={(e) => setBirthDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
-                  />
+                {/* Action Bar */}
+                <div className="flex items-center justify-between pt-4 border-t border-slate-800 flex-wrap gap-3">
+                  <div className="text-xs text-slate-400 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    <span>Assinatura Digital ICP-Brasil + Carimbo Visual & QR Code</span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleSendWhatsApp}
+                      className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2"
+                    >
+                      <Send className="w-4 h-4" /> Disparar Link no WhatsApp
+                    </button>
+
+                    {currentUserRole === 'doctor' && (
+                      <button
+                        onClick={handleGeneratePdf}
+                        className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+                      >
+                        <Printer className="w-4 h-4" /> Assinar & Gerar PDF Timbrado
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">Médico Solicitante</label>
-                  <input
-                    type="text"
-                    value={requestingDoctor}
-                    onChange={(e) => setRequestingDoctor(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
-                  />
-                </div>
               </div>
+            )}
 
-              {/* Anexo de Gráficos do Aparelho */}
-              <div className="pt-2 flex items-center justify-between border-t border-slate-800/80 flex-wrap gap-2 text-xs">
-                <div className="flex items-center gap-2 text-slate-300">
-                  <Paperclip className="w-4 h-4 text-cyan-400" />
-                  <span>PDF com Gráficos/Traçados do Aparelho:</span>
-                  <strong className="text-emerald-400 font-mono">{attachedTracingsFile}</strong>
-                </div>
-                <button
-                  onClick={() => alert("Simulação: Arquivo de gráficos anexado com sucesso ao prontuário do paciente!")}
-                  className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700"
-                >
-                  + Anexar Gráficos do Aparelho
-                </button>
-              </div>
-            </div>
+            {/* TAB 2: BASE WINSOFT DE PACIENTES */}
+            {activeTab === 'winsoft' && (
+              <div className="pt-4 space-y-4">
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                      <Database className="w-5 h-5 text-indigo-400" />
+                      <span>Base de Dados de Pacientes (Winsoft - Jean Cordeiro)</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Cadastros sincronizados para busca instantânea por CPF (Estilo Mevo).
+                    </p>
+                  </div>
 
-            {/* Medical Report Conclusion Block */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-300 flex items-center justify-between">
-                <span>Conclusão Médica do Laudo:</span>
-                {currentUserRole === 'reception' && (
-                  <span className="text-amber-400 font-semibold text-[11px]">
-                    🔒 Restrito ao Médico (LGPD)
-                  </span>
-                )}
-              </label>
-
-              {currentUserRole === 'doctor' ? (
-                <textarea
-                  rows={3}
-                  value={conclusion}
-                  onChange={(e) => setConclusion(e.target.value)}
-                  className="w-full p-3.5 rounded-xl bg-slate-900 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
-                />
-              ) : (
-                <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-500 text-xs italic">
-                  [ As informações diagnósticas deste laudo são restritas ao Dr. Eduardo Magalhães para proteção ao sigilo médico conforme a LGPD. ]
-                </div>
-              )}
-            </div>
-
-            {/* Action Bar */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800 flex-wrap gap-3">
-              <div className="text-xs text-slate-400 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Assinatura Digital ICP-Brasil + Carimbo Visual & QR Code</span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleSendWhatsApp}
-                  className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2"
-                >
-                  <Send className="w-4 h-4" /> Disparar Link no WhatsApp
-                </button>
-
-                {currentUserRole === 'doctor' && (
                   <button
-                    onClick={handleGeneratePdf}
-                    className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+                    onClick={() => alert("Módulo de Carga CSV: Selecione o arquivo exportado do sistema Winsoft (.csv ou .json) para atualizar a base de pacientes.")}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-2"
                   >
-                    <Printer className="w-4 h-4" /> Assinar & Gerar PDF Timbrado
+                    <Upload className="w-4 h-4" /> Importar Lista do Winsoft (CSV)
                   </button>
-                )}
+                </div>
+
+                {/* Patients Table */}
+                <div className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
+                      <tr>
+                        <th className="p-3">CPF</th>
+                        <th className="p-3">Nome Completo</th>
+                        <th className="p-3">Data Nasc.</th>
+                        <th className="p-3">Último Exame</th>
+                        <th className="p-3 text-right">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {patientDb.map(p => (
+                        <tr key={p.cpf} className="hover:bg-slate-800/40 transition">
+                          <td className="p-3 font-mono text-cyan-400 font-bold">{p.cpf}</td>
+                          <td className="p-3 font-semibold text-white">{p.name}</td>
+                          <td className="p-3">{p.birthDate}</td>
+                          <td className="p-3 text-slate-400">{p.lastExam || '03/10/2025'}</td>
+                          <td className="p-3 text-right">
+                            <button
+                              onClick={() => {
+                                setCpf(p.cpf);
+                                setPatientName(p.name);
+                                setBirthDate(p.birthDate);
+                                if (p.requestingDoctor) setRequestingDoctor(p.requestingDoctor);
+                                setCpfSearchStatus('found');
+                                setActiveTab('generator');
+                              }}
+                              className="px-3 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 font-bold text-[11px]"
+                            >
+                              Usar no Laudo
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
 
-          </div>
-        )}
+            {/* TAB 3: GESTÃO DE EQUIPE (RBAC) */}
+            {activeTab === 'users' && currentUserRole === 'doctor' && (
+              <div className="pt-4 space-y-4">
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-amber-400" />
+                      <span>Gestão de Usuários & Níveis de Acesso (RBAC)</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Defina quais funcionários possuem acesso ao diagnóstico e laudos médicos (LGPD).
+                    </p>
+                  </div>
 
-        {/* TAB 2: BASE WINSOFT DE PACIENTES */}
-        {activeTab === 'winsoft' && (
-          <div className="pt-4 space-y-4">
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-4">
-              <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <Database className="w-5 h-5 text-indigo-400" />
-                  <span>Base de Dados de Pacientes (Winsoft - Jean Cordeiro)</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Cadastros sincronizados para busca instantânea por CPF (Estilo Mevo).
-                </p>
+                  <button
+                    onClick={() => alert("Simulação: Modal para cadastrar nova secretária/funcionário adicionado.")}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2"
+                  >
+                    <UserPlus className="w-4 h-4" /> Cadastrar Novo Usuário
+                  </button>
+                </div>
+
+                <div className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden">
+                  <table className="w-full text-left text-xs text-slate-300">
+                    <thead className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
+                      <tr>
+                        <th className="p-3">Nome</th>
+                        <th className="p-3">E-mail</th>
+                        <th className="p-3">Perfil de Acesso</th>
+                        <th className="p-3">Acesso ao Laudo (LGPD)</th>
+                        <th className="p-3 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {employees.map(emp => (
+                        <tr key={emp.id} className="hover:bg-slate-800/40 transition">
+                          <td className="p-3 font-semibold text-white">{emp.name}</td>
+                          <td className="p-3 text-slate-400">{emp.email}</td>
+                          <td className="p-3 font-bold text-cyan-300">{emp.roleTitle}</td>
+                          <td className="p-3">
+                            {emp.role === 'doctor' ? (
+                              <span className="text-emerald-400 font-bold flex items-center gap-1">
+                                <Check className="w-3.5 h-3.5" /> Total (Médico)
+                              </span>
+                            ) : (
+                              <span className="text-amber-400 font-bold flex items-center gap-1">
+                                <Lock className="w-3.5 h-3.5" /> Oculto (Secretária)
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
+                              {emp.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-
-              <button
-                onClick={() => alert("Módulo de Carga CSV: Selecione o arquivo exportado do sistema Winsoft (.csv ou .json) para atualizar a base de pacientes.")}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-2"
-              >
-                <Upload className="w-4 h-4" /> Importar Lista do Winsoft (CSV)
-              </button>
-            </div>
-
-            {/* Patients Table */}
-            <div className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
-                  <tr>
-                    <th className="p-3">CPF</th>
-                    <th className="p-3">Nome Completo</th>
-                    <th className="p-3">Data Nasc.</th>
-                    <th className="p-3">Último Exame</th>
-                    <th className="p-3 text-right">Ação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {patientDb.map(p => (
-                    <tr key={p.cpf} className="hover:bg-slate-800/40 transition">
-                      <td className="p-3 font-mono text-cyan-400 font-bold">{p.cpf}</td>
-                      <td className="p-3 font-semibold text-white">{p.name}</td>
-                      <td className="p-3">{p.birthDate}</td>
-                      <td className="p-3 text-slate-400">{p.lastExam || '03/10/2025'}</td>
-                      <td className="p-3 text-right">
-                        <button
-                          onClick={() => {
-                            setCpf(p.cpf);
-                            setPatientName(p.name);
-                            setBirthDate(p.birthDate);
-                            if (p.requestingDoctor) setRequestingDoctor(p.requestingDoctor);
-                            setCpfSearchStatus('found');
-                            setActiveTab('generator');
-                          }}
-                          className="px-3 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 font-bold text-[11px]"
-                        >
-                          Usar no Laudo
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: GESTÃO DE EQUIPE (RBAC) */}
-        {activeTab === 'users' && currentUserRole === 'doctor' && (
-          <div className="pt-4 space-y-4">
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-amber-400" />
-                  <span>Gestão de Usuários & Níveis de Acesso (RBAC)</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  Defina quais funcionários possuem acesso ao diagnóstico e laudos médicos (LGPD).
-                </p>
-              </div>
-
-              <button
-                onClick={() => alert("Simulação: Modal para cadastrar nova secretária/funcionário adicionado.")}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2"
-              >
-                <UserPlus className="w-4 h-4" /> Cadastrar Novo Usuário
-              </button>
-            </div>
-
-            <div className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden">
-              <table className="w-full text-left text-xs text-slate-300">
-                <thead className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
-                  <tr>
-                    <th className="p-3">Nome</th>
-                    <th className="p-3">E-mail</th>
-                    <th className="p-3">Perfil de Acesso</th>
-                    <th className="p-3">Acesso ao Laudo (LGPD)</th>
-                    <th className="p-3 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60">
-                  {employees.map(emp => (
-                    <tr key={emp.id} className="hover:bg-slate-800/40 transition">
-                      <td className="p-3 font-semibold text-white">{emp.name}</td>
-                      <td className="p-3 text-slate-400">{emp.email}</td>
-                      <td className="p-3 font-bold text-cyan-300">{emp.roleTitle}</td>
-                      <td className="p-3">
-                        {emp.role === 'doctor' ? (
-                          <span className="text-emerald-400 font-bold flex items-center gap-1">
-                            <Check className="w-3.5 h-3.5" /> Total (Médico)
-                          </span>
-                        ) : (
-                          <span className="text-amber-400 font-bold flex items-center gap-1">
-                            <Lock className="w-3.5 h-3.5" /> Oculto (Secretária)
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3 text-right">
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">
-                          {emp.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            )}
           </div>
         )}
 
