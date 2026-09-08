@@ -28,7 +28,7 @@ class NumberedCanvas(canvas.Canvas):
         self.setFillColor(colors.HexColor("#64748B"))
         
         if self._pageNumber > 1:
-            self.drawString(54, 800, "Relatório de Acompanhamento | Clínica Dr. Eduardo Magalhães (08/09/2026)")
+            self.drawString(54, 800, "Relatório de Acompanhamento & Roteiro de Uso | Clínica Dr. Eduardo Magalhães")
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.5)
             self.line(54, 792, 541, 792)
@@ -60,10 +60,10 @@ def build_pdf():
     ACCENT = colors.HexColor("#0369A1")
 
     title_style = ParagraphStyle('DocTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=13, leading=17, textColor=PRIMARY, spaceAfter=4)
-    subtitle_style = ParagraphStyle('DocSubtitle', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=12, textColor=SECONDARY, spaceAfter=8)
-    h1_style = ParagraphStyle('SectionH1', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=PRIMARY, spaceBefore=10, spaceAfter=4)
+    subtitle_style = ParagraphStyle('DocSubtitle', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=11.5, textColor=SECONDARY, spaceAfter=8)
+    h1_style = ParagraphStyle('SectionH1', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10.5, leading=13.5, textColor=PRIMARY, spaceBefore=10, spaceAfter=4)
     h2_style = ParagraphStyle('SectionH2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, leading=12, textColor=ACCENT, spaceBefore=6, spaceAfter=3)
-    body_style = ParagraphStyle('BodyDark', parent=styles['Normal'], fontName='Helvetica', fontSize=8, leading=11.5, textColor=TEXT_DARK, spaceAfter=3)
+    body_style = ParagraphStyle('BodyDark', parent=styles['Normal'], fontName='Helvetica', fontSize=8, leading=11, textColor=TEXT_DARK, spaceAfter=3)
     caption_style = ParagraphStyle('Caption', parent=styles['Normal'], fontName='Helvetica-Oblique', fontSize=7.5, leading=10, textColor=colors.HexColor("#64748B"), spaceAfter=6, alignment=1)
 
     story = []
@@ -73,8 +73,8 @@ def build_pdf():
     if os.path.exists(img_path):
         doctor_img = Image(img_path, width=44, height=44)
         header_text = [
-            Paragraph("RELATÓRIO DE ACOMPANHAMENTO DE IMPLEMENTAÇÕES", title_style),
-            Paragraph("Parte 1: Requisitos Solicitados pelo Dr. Eduardo | Parte 2: Funcionalidades Implementadas", subtitle_style)
+            Paragraph("RELATÓRIO DE ACOMPANHAMENTO & ROTEIRO DE USO", title_style),
+            Paragraph("Parte 1: Solicitações & Modelos Drive | Parte 2: Funcionalidades | Parte 3: Roteiro Passo a Passo", subtitle_style)
         ]
         t_header = Table([[header_text, doctor_img]], colWidths=[435, 48])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
@@ -85,8 +85,8 @@ def build_pdf():
     # Meta Table
     meta_data = [
         [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 08/09/2026", body_style)],
-        [Paragraph("<b>Identificador:</b> DOC-2026-09-08", body_style), Paragraph("<b>Status:</b> Concluído em Produção", body_style)],
-        [Paragraph("<b>Projeto:</b> neuro.eduardomagalhaes", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
+        [Paragraph("<b>Identificador:</b> DOC-2026-09-08", body_style), Paragraph("<b>Status:</b> Concluído & Publicado em Produção", body_style)],
+        [Paragraph("<b>Plataforma:</b> neuro.eduardomagalhaes.helpusbr.com", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
     ]
     t_meta = Table(meta_data, colWidths=[240, 243])
     t_meta.setStyle(TableStyle([
@@ -102,30 +102,30 @@ def build_pdf():
     story.append(Spacer(1, 6))
 
     # PARTE 1
-    story.append(Paragraph("PARTE 1: SOLICITAÇÕES E DIRETRIZES DO CLIENTE (DR. EDUARDO MAGALHÃES)", h1_style))
+    story.append(Paragraph("PARTE 1: SOLICITAÇÕES E MATERIAIS DISPONIBILIZADOS PELO CLIENTE", h1_style))
     story.append(Paragraph(
-        "Registro detalhado das mensagens de WhatsApp enviadas pelo <b>Dr. Eduardo Magalhães</b> em 07/09/2026 referentes à "
-        "navegação visual em árvore por 2-3 cliques nas pastas do Google Drive (EEG MAP MODELOS e ENMG Modelos), auto-busca de dados por CPF (estilo Mevo) "
-        "e integração com a base histórica de 18 anos da clínica (Winsoft - Jean Cordeiro).", body_style
+        "Registro das solicitações enviadas pelo <b>Dr. Eduardo Magalhães</b> via WhatsApp sobre a navegação visual em árvore por 2-3 cliques nas pastas do Google Drive, "
+        "auto-busca de dados por CPF (estilo Mevo) e integração com a base histórica de 18 anos da clínica (Winsoft - Jean Cordeiro). "
+        "Foram processados e cadastrados <b>126 modelos de laudo em 10 categorias oficiais</b> enviadas nas pastas compartilhadas do Google Drive.", body_style
     ))
 
     req_table = [
         [Paragraph("<b>ID</b>", h2_style), Paragraph("<b>Solicitação do Dr. Eduardo</b>", h2_style), Paragraph("<b>Solução Técnica Projetada</b>", h2_style), Paragraph("<b>Status</b>", h2_style)],
         [
             Paragraph("REQ-07", body_style),
-            Paragraph("<b>Árvore de Pastas (Drive):</b> Navegação por 2-3 cliques nas pastas oficiais do Google Drive.", body_style),
-            Paragraph("Navegador visual de pastas expansível (ENMG Modelos + EEG MAP MODELOS) + alternador de pesquisa.", body_style),
+            Paragraph("<b>Árvore de Pastas (Drive):</b> Navegar por 2-3 cliques de mouse nas 10 pastas oficiais de laudo.", body_style),
+            Paragraph("Navegador visual de pastas expansível (126 modelos em 10 categorias) + alternador de pesquisa.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ],
         [
             Paragraph("REQ-08", body_style),
             Paragraph("<b>Auto-Preenchimento por CPF:</b> Digitar CPF e buscar Nome e Data Nasc. automaticamente (estilo Mevo).", body_style),
-            Paragraph("Busca inteligente no campo CPF que consulta a base Winsoft e preenche instantaneamente o cadastro.", body_style),
+            Paragraph("Busca inteligente por CPF com consulta local no Winsoft + consulta online em tempo real via API pública.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ],
         [
             Paragraph("REQ-09", body_style),
-            Paragraph("<b>Integração Base Winsoft:</b> Carga de dados históricos de pacientes do Winsoft (Jean Cordeiro).", body_style),
+            Paragraph("<b>Integração Base Winsoft:</b> Carga de dados históricos de 18 anos da clínica (Jean Cordeiro).", body_style),
             Paragraph("Aba 'Base Winsoft' com suporte para importação de CSV/JSON e seleção direta 'Usar no Laudo'.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ]
@@ -143,29 +143,50 @@ def build_pdf():
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
     ]))
     story.append(t_req)
-    story.append(Spacer(1, 8))
+    story.append(Spacer(1, 6))
 
     # PARTE 2
-    story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES REALIZADAS E TELAS DO SISTEMA", h1_style))
+    story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES E COMPONENTES DESENVOLVIDOS", h1_style))
+    story.append(Paragraph("<b>2.1. Navegador de Pastas em Árvore (126 Modelos):</b> Implementadas 10 categorias expansíveis espelhando as pastas do Google Drive (STC, STC+Ulnar, Radiculopatias, PNP, Plexo, Miopatias, Radial, Fibular/Facial, Normais e EEG MAP).", body_style))
+    story.append(Paragraph("<b>2.2. Busca Online de CPF (Mevo Style):</b> Consulta em tempo real na base Winsoft + API pública de CPF preenchendo automaticamente Nome e Data de Nascimento.", body_style))
+    story.append(Paragraph("<b>2.3. Módulo Winsoft & Importação CSV:</b> Aba dedicada para visualização e carga de arquivos históricos do sistema Winsoft com preenchimento em 1 clique.", body_style))
+    story.append(Spacer(1, 6))
 
-    story.append(Paragraph("2.1. Navegador de Pastas em Árvore (Estrutura do Google Drive)", h2_style))
-    story.append(Paragraph("Desenvolvida a navegação visual de pastas com ícones expansíveis para 'ENMG Modelos' e 'EEG MAP MODELOS', permitindo selecionar laudos com 2 cliques ou usar busca por palavras-chave.", body_style))
+    # PARTE 3: ROTEIRO PASSO A PASSO
+    story.append(Paragraph("PARTE 3: ROTEIRO PASSO A PASSO DE USO (DR. EDUARDO & SECRETÁRIA)", h1_style))
+
+    story.append(Paragraph("1️⃣ Passo 1: Acesso ao Painel & Alternador de Perfis (Médico vs. Secretária)", h2_style))
+    story.append(Paragraph("Acesse <b>neuro.eduardomagalhaes.helpusbr.com</b> e clique em 'Painel'. Alterne entre os perfis 👑 <b>Dr. Eduardo (Médico)</b> para total acesso aos laudos ou 📋 <b>Juliana Costa (Secretária)</b> com trava de sigilo LGPD.", body_style))
 
     img_painel = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\painel_medico_laudos.jpg"
     if os.path.exists(img_painel):
-        story.append(Image(img_painel, width=483, height=270))
-        story.append(Paragraph("Figura 1: Painel do Consultório com o Navegador de Pastas e emissor de laudos.", caption_style))
+        story.append(Image(img_painel, width=483, height=255))
+        story.append(Paragraph("Figura 1: Tela do Painel do Consultório com o alternador de perfil, árvore de pastas e emissor de laudos.", caption_style))
 
-    story.append(Paragraph("2.2. Busca por CPF e Auto-Preenchimento Mevo + Módulo Winsoft", h2_style))
-    story.append(Paragraph("Campo inteligente de CPF com busca direta na base histórica do Winsoft, preenchendo automaticamente Nome e Data de Nascimento, com aba para importação de arquivos CSV.", body_style))
+    story.append(Paragraph("2️⃣ Passo 2: Seleção de Modelos por Pastas (Drive) ou Busca por Digitação", h2_style))
+    story.append(Paragraph("Clique nas pastas de categorias (ex: ENMG - Síndrome do Túnel do Carpo, EEG - Mapeamento Cerebral) para selecionar qualquer um dos 126 modelos com 2 cliques, ou use a barra de busca por palavra-chave.", body_style))
+
+    story.append(Paragraph("3️⃣ Passo 3: Digitação do CPF e Auto-Preenchimento (Mevo Style + Winsoft)", h2_style))
+    story.append(Paragraph("Digite os 11 números do CPF. O sistema aplica a máscara (000.000.000-00), consulta a base local do Winsoft ou a API online (estilo Mevo) e preenche o Nome e Data Nasc. automaticamente.", body_style))
+
+    story.append(Paragraph("4️⃣ Passo 4: Assinatura Digital & Emissão do PDF Timbrado com QR Code", h2_style))
+    story.append(Paragraph("No perfil do Dr. Eduardo, revise o laudo e clique em 'Assinar & Gerar PDF Timbrado' para produzir o PDF oficial com carimbo profissional, selo ICP-Brasil e QR Code antifraude no rodapé.", body_style))
+
+    img_laudo = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\assinatura_digital_qrcode.jpg"
+    if os.path.exists(img_laudo):
+        story.append(Image(img_laudo, width=483, height=255))
+        story.append(Paragraph("Figura 2: Laudo Oficial gerado pelo sistema com papel timbrado, carimbo médico, selo ICP-Brasil e QR Code de validação.", caption_style))
+
+    story.append(Paragraph("5️⃣ Passo 5: Anexo de Gráficos e Portal do Paciente (Download Seguro)", h2_style))
+    story.append(Paragraph("Anexe os gráficos do aparelho e envie o link via WhatsApp. O paciente acessa o portal digitando CPF + Data Nasc. e baixa o Laudo Oficial PDF e os Gráficos do Aparelho.", body_style))
 
     img_portal = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\portal_paciente_exames.jpg"
     if os.path.exists(img_portal):
-        story.append(Image(img_portal, width=483, height=270))
-        story.append(Paragraph("Figura 2: Portal do Paciente com autenticação CPF e download seguro dos laudos e gráficos.", caption_style))
+        story.append(Image(img_portal, width=483, height=255))
+        story.append(Paragraph("Figura 3: Portal do Paciente com autenticação CPF e download seguro dos laudos e gráficos.", caption_style))
 
     doc.build(story, canvasmaker=NumberedCanvas)
-    print("PDF Documentacao_Acompanhamento_2026-09-08.pdf criado com sucesso!")
+    print("PDF Documentacao_Acompanhamento_2026-09-08.pdf com Roteiro Passo a Passo criado com sucesso!")
 
 if __name__ == '__main__':
     build_pdf()
