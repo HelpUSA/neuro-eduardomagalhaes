@@ -42,7 +42,7 @@ class NumberedCanvas(canvas.Canvas):
         self.restoreState()
 
 def build_pdf():
-    pdf_filename = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\Documentacao_Acompanhamento_2026-09-08.pdf"
+    pdf_filename = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\Documentacao_Acompanhamento_2026-09-15.pdf"
     doc = SimpleDocTemplate(
         pdf_filename,
         pagesize=A4,
@@ -74,7 +74,7 @@ def build_pdf():
         doctor_img = Image(img_path, width=44, height=44)
         header_text = [
             Paragraph("RELATÓRIO DE ACOMPANHAMENTO & ROTEIRO DE USO", title_style),
-            Paragraph("Parte 1: Solicitações & Modelos Drive | Parte 2: Funcionalidades | Parte 3: Roteiro com Telas", subtitle_style)
+            Paragraph("Parte 1: Solicitações do Cliente | Parte 2: Edição do Corpo do Laudo | Parte 3: Roteiro com Telas", subtitle_style)
         ]
         t_header = Table([[header_text, doctor_img]], colWidths=[435, 48])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
@@ -84,8 +84,8 @@ def build_pdf():
 
     # Meta Table
     meta_data = [
-        [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 08/09/2026", body_style)],
-        [Paragraph("<b>Identificador:</b> DOC-2026-09-08", body_style), Paragraph("<b>Status:</b> Concluído & Publicado em Produção", body_style)],
+        [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 15/09/2026", body_style)],
+        [Paragraph("<b>Identificador:</b> DOC-2026-09-15", body_style), Paragraph("<b>Status:</b> Concluído & Publicado em Produção", body_style)],
         [Paragraph("<b>Plataforma:</b> neuro.eduardomagalhaes.helpusbr.com", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
     ]
     t_meta = Table(meta_data, colWidths=[240, 243])
@@ -104,35 +104,17 @@ def build_pdf():
     # PARTE 1
     story.append(Paragraph("PARTE 1: SOLICITAÇÕES E MATERIAIS DISPONIBILIZADOS PELO CLIENTE", h1_style))
     story.append(Paragraph(
-        "Registro detalhado das solicitações enviadas pelo <b>Dr. Eduardo Magalhães</b> via WhatsApp referente à navegação em árvore por 2-3 cliques nas pastas do Google Drive, "
-        "auto-busca de dados por CPF (estilo Mevo), integração com a base histórica de 18 anos da clínica (Winsoft - Jean Cordeiro) e gestão de usuários/senhas. "
-        "Foram extraídos e cadastrados <b>126 modelos de laudo em 10 categorias oficiais</b> disponibilizadas no Google Drive.", body_style
+        "Registro da nova solicitação enviada pelo <b>Dr. Eduardo Magalhães</b> via WhatsApp em 15/09/2026 sobre a necessidade de "
+        "personalizar e editar integralmente não apenas a Conclusão Médica, mas também <b>todas as seções técnicas do corpo do laudo</b> "
+        "(Neurocondução Motora, Neurocondução Sensitiva, Onda F e Eletromiografia / Registro Cerebral).", body_style
     ))
 
     req_table = [
         [Paragraph("<b>ID</b>", h2_style), Paragraph("<b>Solicitação do Dr. Eduardo</b>", h2_style), Paragraph("<b>Solução Técnica Projetada</b>", h2_style), Paragraph("<b>Status</b>", h2_style)],
         [
-            Paragraph("REQ-07", body_style),
-            Paragraph("<b>Árvore de Pastas (Drive):</b> Navegar por 2-3 cliques de mouse nas 10 pastas oficiais de laudo.", body_style),
-            Paragraph("Navegador visual de pastas expansível (126 modelos em 10 categorias) + alternador de pesquisa.", body_style),
-            Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
-        ],
-        [
-            Paragraph("REQ-08", body_style),
-            Paragraph("<b>Auto-Preenchimento por CPF:</b> Digitar CPF e buscar Nome e Data Nasc. automaticamente (estilo Mevo).", body_style),
-            Paragraph("Busca inteligente por CPF com consulta local no Winsoft + consulta online em tempo real via API pública.", body_style),
-            Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
-        ],
-        [
-            Paragraph("REQ-09", body_style),
-            Paragraph("<b>Integração Base Winsoft:</b> Carga de dados históricos de 18 anos da clínica (Jean Cordeiro).", body_style),
-            Paragraph("Aba 'Base Winsoft' com suporte para importação de CSV/JSON e seleção direta 'Usar no Laudo'.", body_style),
-            Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
-        ],
-        [
-            Paragraph("REQ-10", body_style),
-            Paragraph("<b>Gestão de Usuários & Senhas:</b> Cadastro, edição e revogação de acessos de secretárias e médicos.", body_style),
-            Paragraph("Módulo de Gestão de Usuários (CRUD) com seleção de níveis de acesso (Médico, Secretária LGPD, Técnico).", body_style),
+            Paragraph("REQ-11", body_style),
+            Paragraph("<b>Edição Integral do Corpo do Laudo:</b> Poder editar todas as seções do exame além da Conclusão.", body_style),
+            Paragraph("5 caixas de texto editáveis (textarea) no perfil do médico para ajuste irrestrito dos 5 blocos do laudo.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ]
     ]
@@ -153,49 +135,35 @@ def build_pdf():
 
     # PARTE 2
     story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES E COMPONENTES DESENVOLVIDOS", h1_style))
-    story.append(Paragraph("<b>2.1. Tela de Autenticação & Login por Usuário/Senha:</b> Acesso restrito com tela inicial de login e botão de encerramento de sessão (Logout).", body_style))
-    story.append(Paragraph("<b>2.2. Navegador de Pastas em Árvore (126 Modelos):</b> Implementadas 10 categorias expansíveis espelhando as pastas do Google Drive (STC, STC+Ulnar, Radiculopatias, PNP, Plexo, Miopatias, Radial, Fibular/Facial, Normais e EEG MAP).", body_style))
-    story.append(Paragraph("<b>2.3. Busca Online de CPF (Mevo Style):</b> Consulta em tempo real na base Winsoft + API pública de CPF preenchendo automaticamente Nome e Data de Nascimento.", body_style))
-    story.append(Paragraph("<b>2.4. Módulo de Gestão de Usuários & Níveis de Acesso (RBAC):</b> Modal interativo de criação/edição/exclusão de secretárias e médicos pelo Dr. Eduardo.", body_style))
+    story.append(Paragraph("<b>2.1. Liberdade de Edição Integral do Corpo Diagnóstico:</b> Adicionados campos editáveis para Neurocondução Motora, Sensitiva, Onda F, Eletromiografia e Conclusão no perfil 👑 Dr. Eduardo Magalhães.", body_style))
+    story.append(Paragraph("<b>2.2. Manutenção do Sigilo LGPD na Recepção:</b> No perfil 📋 Secretária (Juliana Costa), o corpo do laudo e diagnósticos permanecem devidamente travados e protegidos.", body_style))
+    story.append(Paragraph("<b>2.3. Sincronização em Tempo Real no PDF Assinado:</b> Todas as alterações do corpo são aplicadas instantaneamente no PDF timbrado com carimbo profissional, selo ICP-Brasil PAdES e QR Code.", body_style))
     story.append(Spacer(1, 5))
 
-    # PARTE 3: ROTEIRO PASSO A PASSO COM CAPTURAS ATUALIZADAS
-    story.append(Paragraph("PARTE 3: ROTEIRO PASSO A PASSO DE USO (DR. EDUARDO & SECRETÁRIA)", h1_style))
+    # PARTE 3: ROTEIRO PASSO A PASSO
+    story.append(Paragraph("PARTE 3: ROTEIRO PASSO A PASSO DE USO (EDITION INTEGRAL DO LAUDO)", h1_style))
 
-    story.append(Paragraph("1️⃣ Passo 1: Autenticação de Acesso, Árvore de Pastas & Busca CPF (Mevo Style)", h2_style))
-    story.append(Paragraph("Acesse <b>neuro.eduardomagalhaes.helpusbr.com</b> e clique em 'Painel'. Alterne/Faça login com 👑 <b>Dr. Eduardo</b> (eduardo@clinica.com.br / 123) ou 📋 <b>Secretária</b> (juliana@clinica.com.br / 123). Navegue por 2 cliques nas 10 pastas do Drive e digite o CPF para busca automática.", body_style))
+    story.append(Paragraph("1️⃣ Passo 1: Autenticação & Seleção do Modelo por Pastas", h2_style))
+    story.append(Paragraph("Acesse <b>neuro.eduardomagalhaes.helpusbr.com</b>, faça login com o perfil do 👑 <b>Dr. Eduardo Magalhães</b> e selecione qualquer um dos 126 modelos de exame nas 10 pastas do Drive.", body_style))
 
-    img_painel_novo = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\painel_medico_laudos_novo.jpg"
-    if os.path.exists(img_painel_novo):
-        story.append(Image(img_painel_novo, width=483, height=270))
-        story.append(Paragraph("Figura 1: Novo Painel do Consultório exibindo o Navegador de Pastas do Drive (10 categorias/126 modelos) e a Busca por CPF em tempo real (Mevo Style).", caption_style))
+    story.append(Paragraph("2️⃣ Passo 2: Personalização dos 5 Blocos do Corpo do Laudo", h2_style))
+    story.append(Paragraph("Modifique livremente as caixas de texto de Neurocondução Motora, Sensitiva, Onda F, Eletromiografia e Conclusão Diagnóstica de acordo com os achados do exame do paciente.", body_style))
 
-    story.append(Paragraph("2️⃣ Passo 2: Gestão de Usuários, Senhas & Níveis de Acesso (Exclusivo Dr. Eduardo)", h2_style))
-    story.append(Paragraph("Na aba 'Gestão de Equipe', o Dr. Eduardo pode cadastrar novas secretárias ou médicos clicando em '+ Cadastrar Usuário', definindo e-mails, senhas e Níveis de Acesso (Médico, Secretária LGPD, Técnico).", body_style))
+    img_edicao = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\painel_edicao_corpo_laudo.jpg"
+    if os.path.exists(img_edicao):
+        story.append(Image(img_edicao, width=483, height=270))
+        story.append(Paragraph("Figura 1: Nova Tela do Painel do Consultório com os 5 campos de edição integral do corpo do laudo técnico.", caption_style))
 
-    img_rbac = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\gestao_usuarios_rbac.jpg"
-    if os.path.exists(img_rbac):
-        story.append(Image(img_rbac, width=483, height=270))
-        story.append(Paragraph("Figura 2: Nova Tela de Gestão de Usuários & Níveis de Acesso (RBAC) com o formulário de cadastro e permissões da equipe.", caption_style))
-
-    story.append(Paragraph("3️⃣ Passo 3: Base de Pacientes Winsoft (18 Anos de Histórico) & Carga CSV", h2_style))
-    story.append(Paragraph("Na aba 'Base Winsoft', consulte toda a lista de pacientes cadastrados da clínica, utilize o botão 'Importar Lista (CSV)' para atualizar os dados do Winsoft ou clique em 'Usar no Laudo' para preenchimento em 1 clique.", body_style))
-
-    img_winsoft = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\base_winsoft_pacientes.jpg"
-    if os.path.exists(img_winsoft):
-        story.append(Image(img_winsoft, width=483, height=270))
-        story.append(Paragraph("Figura 3: Nova Tela da Base de Dados Winsoft exibindo a lista de pacientes, botão de importação CSV e atalho 'Usar no Laudo'.", caption_style))
-
-    story.append(Paragraph("4️⃣ Passo 4: Assinatura Digital PAdES, Carimbo & QR Code no Rodapé", h2_style))
-    story.append(Paragraph("No perfil do Dr. Eduardo, revise o laudo e clique em 'Assinar & Gerar PDF Timbrado' para produzir o PDF oficial com carimbo profissional, selo ICP-Brasil e QR Code antifraude no rodapé.", body_style))
+    story.append(Paragraph("3️⃣ Passo 3: Geração do PDF Timbrado com Assinatura Digital & QR Code", h2_style))
+    story.append(Paragraph("Clique em 'Assinar & Gerar PDF Timbrado' para emitir o laudo com todas as alterações personalizadas no corpo, selo ICP-Brasil PAdES e QR Code de autenticidade no rodapé.", body_style))
 
     img_laudo = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\assinatura_digital_qrcode.jpg"
     if os.path.exists(img_laudo):
         story.append(Image(img_laudo, width=483, height=255))
-        story.append(Paragraph("Figura 4: Modelo do Laudo Médico Oficial com papel timbrado, carimbo profissional, selo ICP-Brasil e QR Code de validação.", caption_style))
+        story.append(Paragraph("Figura 2: Laudo Médico Oficial gerado pelo sistema com papel timbrado, carimbo profissional, selo digital e QR Code.", caption_style))
 
     doc.build(story, canvasmaker=NumberedCanvas)
-    print("PDF Documentacao_Acompanhamento_2026-09-08.pdf RE-GERADO COM AS 4 NOVAS CAPTURAS DE TELA!")
+    print("PDF Documentacao_Acompanhamento_2026-09-15.pdf criado com sucesso!")
 
 if __name__ == '__main__':
     build_pdf()

@@ -715,27 +715,90 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
                   </div>
                 </div>
 
-                {/* Medical Report Conclusion Block */}
-                <div className="space-y-2">
-                  <label className="block text-xs font-bold text-slate-300 flex items-center justify-between">
-                    <span>Conclusão Médica do Laudo:</span>
+                {/* Medical Report Body Sections (Full Editing Capability - REQ-11) */}
+                <div className="space-y-4 pt-1">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+                      <Edit3 className="w-4 h-4 text-cyan-400" />
+                      <span>Edição Integral do Corpo do Laudo Técnico & Diagnóstico:</span>
+                    </h4>
                     {currentUserRole === 'reception' && (
-                      <span className="text-amber-400 font-semibold text-[11px]">
-                        🔒 Restrito ao Médico (LGPD)
+                      <span className="text-amber-400 font-semibold text-[11px] flex items-center gap-1">
+                        <Lock className="w-3.5 h-3.5" /> Restrito ao Médico (LGPD)
                       </span>
                     )}
-                  </label>
+                  </div>
 
                   {currentUserRole === 'doctor' ? (
-                    <textarea
-                      rows={3}
-                      value={conclusion}
-                      onChange={(e) => setConclusion(e.target.value)}
-                      className="w-full p-3.5 rounded-xl bg-slate-900 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
-                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {/* Section 1: Neurocondução Motora */}
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-bold text-slate-300">
+                          1. Neurocondução Motora:
+                        </label>
+                        <textarea
+                          rows={2.5}
+                          value={motorConduction}
+                          onChange={(e) => setMotorConduction(e.target.value)}
+                          className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                        />
+                      </div>
+
+                      {/* Section 2: Neurocondução Sensitiva */}
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-bold text-slate-300">
+                          2. Neurocondução Sensitiva:
+                        </label>
+                        <textarea
+                          rows={2.5}
+                          value={sensoryConduction}
+                          onChange={(e) => setSensoryConduction(e.target.value)}
+                          className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                        />
+                      </div>
+
+                      {/* Section 3: Onda F / Registro de Frequências */}
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-bold text-slate-300">
+                          3. Onda F / Resposta Tardia:
+                        </label>
+                        <textarea
+                          rows={2.5}
+                          value={fWave}
+                          onChange={(e) => setFWave(e.target.value)}
+                          className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                        />
+                      </div>
+
+                      {/* Section 4: Eletromiografia / Achados Neurofisiológicos */}
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-bold text-slate-300">
+                          4. Eletromiografia / Registro Cerebral:
+                        </label>
+                        <textarea
+                          rows={2.5}
+                          value={emgText}
+                          onChange={(e) => setEmgText(e.target.value)}
+                          className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                        />
+                      </div>
+
+                      {/* Section 5: Conclusão Médica do Laudo */}
+                      <div className="md:col-span-2 space-y-1">
+                        <label className="block text-[11px] font-bold text-amber-300">
+                          5. Conclusão Médica do Laudo (Sintese Diagnóstica):
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={conclusion}
+                          onChange={(e) => setConclusion(e.target.value)}
+                          className="w-full p-3.5 rounded-xl bg-slate-900 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-bold"
+                        />
+                      </div>
+                    </div>
                   ) : (
                     <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-500 text-xs italic">
-                      [ As informações diagnósticas deste laudo são restritas ao Dr. Eduardo Magalhães para proteção ao sigilo médico conforme a LGPD. ]
+                      [ As informações diagnósticas e o corpo deste laudo são restritos ao Dr. Eduardo Magalhães para proteção ao sigilo médico conforme a LGPD. ]
                     </div>
                   )}
                 </div>
