@@ -49,8 +49,37 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
   const [emgText, setEmgText] = useState('Realizada com agulha monopolar em músculos paracervicais, deltoide, bíceps, extensor comum dos dedos e primeiro interósseo dorsal.');
   const [conclusion, setConclusion] = useState('Exame compatível com neuropatia do mediano ao nível do carpo, com comprometimento parcial de fibras sensitivas, de caráter desmielinizante (grau 2), bilateral.');
 
+  // Free-Form Word Text Importer State (REQ-12 - Dr. Eduardo WhatsApp 19/09/2026)
+  const [wordImportText, setWordImportText] = useState('');
+  const [showWordImporter, setShowWordImporter] = useState(true);
+
   // Attached Tracings File
   const [attachedTracingsFile, setAttachedTracingsFile] = useState('Graficos_Aparelho_ENMG_Clelia.pdf');
+
+  // Handle Importing Raw Text Copied from Word (.docx)
+  const handleApplyWordText = () => {
+    if (!wordImportText.trim()) {
+      alert("Por favor, cole ou digite o texto do seu modelo do Word no campo antes de importar.");
+      return;
+    }
+    const txt = wordImportText.trim();
+    
+    // Check if pasted text contains sections or headers
+    if (txt.toLowerCase().includes('conclusão') || txt.toLowerCase().includes('conclusao')) {
+      const parts = txt.split(/conclusã[o|õ]:?|conclusao:?/i);
+      if (parts.length > 1) {
+        if (parts[0].trim()) {
+          setMotorConduction(parts[0].trim());
+        }
+        setConclusion(parts[1].trim());
+      } else {
+        setConclusion(txt);
+      }
+    } else {
+      setConclusion(txt);
+    }
+    alert("✨ Texto do Word importado com sucesso! As seções do laudo foram atualizadas para sua conferência.");
+  };
 
   // Employee Roles Database (Dinamico)
   const [employees, setEmployees] = useState([
@@ -714,6 +743,63 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
                     </button>
                   </div>
                 </div>
+
+                {/* REQ-12: Área de Copiar & Colar Texto do Word (.docx) - Solicitado pelo Dr. Eduardo em 19/09/2026 */}
+                {currentUserRole === 'doctor' && (
+                  <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-cyan-400" />
+                        <h4 className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                          📋 Copiar & Colar Texto do Word (.docx) / Importador de Texto Livre:
+                        </h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowWordImporter(!showWordImporter)}
+                        className="text-[11px] text-cyan-400 hover:underline font-bold"
+                      >
+                        {showWordImporter ? 'Ocultar Caixa de Colagem ▲' : 'Mostrar Caixa de Colagem ▼'}
+                      </button>
+                    </div>
+
+                    {showWordImporter && (
+                      <div className="space-y-2.5 pt-1">
+                        <p className="text-[11px] text-slate-300">
+                          Cole aqui qualquer texto ou modelo customizado vindo do seu Word (computador ou Google Drive). Você pode revisar e editar livremente nas seções abaixo antes de assinar.
+                        </p>
+                        <textarea
+                          rows={3}
+                          value={wordImportText}
+                          onChange={(e) => setWordImportText(e.target.value)}
+                          placeholder="Cole aqui o texto copiado do seu arquivo .docx no Word (ex: achados de exame, conclusões personalizadas, tabelas de laudo...)"
+                          className="w-full p-3 rounded-xl bg-slate-950 border border-indigo-500/40 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono leading-relaxed"
+                        />
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <span className="text-[10px] text-slate-400 italic">
+                            * Ao clicar em carregar, o texto será preenchido nos campos do laudo para sua validação final.
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setWordImportText('')}
+                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+                            >
+                              Limpar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleApplyWordText}
+                              className="px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-cyan-500/20"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" /> ✨ Carregar no Laudo
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Medical Report Body Sections (Full Editing Capability - REQ-11) */}
                 <div className="space-y-4 pt-1">
