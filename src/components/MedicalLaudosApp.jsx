@@ -49,6 +49,27 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
   const [emgText, setEmgText] = useState('Realizada com agulha monopolar em músculos paracervicais, deltoide, bíceps, extensor comum dos dedos e primeiro interósseo dorsal.');
   const [conclusion, setConclusion] = useState('Exame compatível com neuropatia do mediano ao nível do carpo, com comprometimento parcial de fibras sensitivas, de caráter desmielinizante (grau 2), bilateral.');
 
+  // REQ-15: Unified Full-Text Editor Mode for EEG / ENMG (Dr. Eduardo 22/09/2026)
+  const [editorMode, setEditorMode] = useState('unified'); // 'unified' | 'split'
+  const [fullReportText, setFullReportText] = useState(
+`EXAME DE ELETROMIOGRAFIA E NEUROCONDUÇÃO NERVOSA (ENMG)
+
+NEUROCONDUÇÃO MOTORA:
+Realizada em nervos ulnares e medianos. Observamos amplitudes conservadas, com velocidades de condução normais, e latências distais limítrofes em medianos.
+
+NEUROCONDUÇÃO SENSITIVA:
+Realizada em nervos ulnares, medianos e radiais. Em nervos medianos observamos potenciais de ação com latências prolongadas, velocidades de condução diminuídas e amplitudes normais.
+
+ONDA F / RESPOSTA TARDIA:
+Pesquisada em nervos medianos e ulnares, com latências mínimas normais.
+
+ELETROMIOGRAFIA:
+Realizada com agulha monopolar em músculos paracervicais, deltoide, bíceps, extensor comum dos dedos e primeiro interósseo dorsal.
+
+CONCLUSÃO MÉDICA:
+Exame compatível com neuropatia do mediano ao nível do carpo, com comprometimento parcial de fibras sensitivas, de caráter desmielinizante (grau 2), bilateral.`
+  );
+
   // Free-Form Word Text Importer State (REQ-12 - Dr. Eduardo WhatsApp 19/09/2026)
   const [wordImportText, setWordImportText] = useState('');
   const [showWordImporter, setShowWordImporter] = useState(true);
@@ -63,8 +84,10 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
       return;
     }
     const txt = wordImportText.trim();
-    
-    // Check if pasted text contains sections or headers
+    setFullReportText(txt);
+    setConclusion(txt);
+
+    // Check if pasted text contains sections or headers for split mode fallback
     if (txt.toLowerCase().includes('conclusão') || txt.toLowerCase().includes('conclusao')) {
       const parts = txt.split(/conclusã[o|õ]:?|conclusao:?/i);
       if (parts.length > 1) {
@@ -72,13 +95,9 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
           setMotorConduction(parts[0].trim());
         }
         setConclusion(parts[1].trim());
-      } else {
-        setConclusion(txt);
       }
-    } else {
-      setConclusion(txt);
     }
-    alert("✨ Texto do Word importado com sucesso! As seções do laudo foram atualizadas para sua conferência.");
+    alert("✨ Texto do Word importado com sucesso no Campo Único de Edição! Você pode revisar todo o texto abaixo.");
   };
 
   // Employee Roles Database (Dinamico)
@@ -283,6 +302,16 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
     if (template.fWave) setFWave(template.fWave);
     if (template.emgText) setEmgText(template.emgText);
     setConclusion(template.conclusion);
+
+    // Assemble Unified Text for Single Editor
+    let unified = `MODELO: ${template.title.toUpperCase()}\n\n`;
+    if (template.motorConduction) unified += `NEUROCONDUÇÃO MOTORA:\n${template.motorConduction}\n\n`;
+    if (template.sensoryConduction) unified += `NEUROCONDUÇÃO SENSITIVA:\n${template.sensoryConduction}\n\n`;
+    if (template.fWave) unified += `ONDA F / RESPOSTA TARDIA:\n${template.fWave}\n\n`;
+    if (template.emgText) unified += `ELETROMIOGRAFIA / EEG:\n${template.emgText}\n\n`;
+    unified += `CONCLUSÃO MÉDICA:\n${template.conclusion}`;
+    
+    setFullReportText(unified);
   };
 
   // Function to generate PDF Timbrado with Signature + QR Code
@@ -315,6 +344,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
 
     let y = 80;
     const addBlock = (title, text) => {
+      if (!text) return;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9.5);
       doc.setTextColor(3, 105, 161);
@@ -328,24 +358,28 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
       y += lines.length * 4.5 + 5;
     };
 
-    addBlock('NEUROCONDUÇÃO MOTORA:', motorConduction);
-    addBlock('NEUROCONDUÇÃO SENSITIVA:', sensoryConduction);
-    addBlock('ONDA F:', fWave);
-    addBlock('ELETROMIOGRAFIA / REGISTRO CEREBRAL:', emgText);
+    if (editorMode === 'unified') {
+      addBlock('CORPO TÉCNICO & LAUDO DIAGNÓSTICO:', fullReportText);
+    } else {
+      addBlock('NEUROCONDUÇÃO MOTORA:', motorConduction);
+      addBlock('NEUROCONDUÇÃO SENSITIVA:', sensoryConduction);
+      addBlock('ONDA F:', fWave);
+      addBlock('ELETROMIOGRAFIA / REGISTRO CEREBRAL:', emgText);
 
-    // Conclusion Box
-    doc.setFillColor(240, 249, 255);
-    doc.setDrawColor(2, 132, 199);
-    const concLines = doc.splitTextToSize(conclusion, 174);
-    const bh = concLines.length * 4.5 + 12;
-    doc.rect(14, y, 182, bh, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(2, 132, 199);
-    doc.text('CONCLUSÃO MÉDICA:', 18, y + 7);
-    doc.setTextColor(15, 23, 42);
-    doc.text(concLines, 18, y + 13);
+      // Conclusion Box
+      doc.setFillColor(240, 249, 255);
+      doc.setDrawColor(2, 132, 199);
+      const concLines = doc.splitTextToSize(conclusion, 174);
+      const bh = concLines.length * 4.5 + 12;
+      doc.rect(14, y, 182, bh, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(2, 132, 199);
+      doc.text('CONCLUSÃO MÉDICA:', 18, y + 7);
+      doc.setTextColor(15, 23, 42);
+      doc.text(concLines, 18, y + 13);
 
-    y += bh + 15;
+      y += bh + 15;
+    }
 
     // Doctor Signature Line & QR Code Note
     doc.setDrawColor(148, 163, 184);
@@ -590,54 +624,59 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
                     <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                   </div>
 
-                  {/* Windows Explorer Folder Tree View */}
+                  {/* Windows Explorer Folder Tree View (A-Z Alphabetical Order - REQ-14) */}
                   <div className="flex-1 overflow-y-auto max-h-[640px] pr-1 space-y-2 font-mono text-xs">
-                    {EXAM_CATEGORIES.map(cat => {
-                      const catTemplates = ALL_EXAM_TEMPLATES.filter(t => {
-                        const matchCat = t.categoryId === cat.id;
-                        const q = templateSearchText.toLowerCase();
-                        const matchSearch = !q || t.title.toLowerCase().includes(q) || t.keywords.some(kw => kw.toLowerCase().includes(q));
-                        return matchCat && matchSearch;
-                      });
-                      if (catTemplates.length === 0) return null;
-                      const isExpanded = expandedFolders[cat.id] !== false;
+                    {[...EXAM_CATEGORIES]
+                      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+                      .map(cat => {
+                        const catTemplates = ALL_EXAM_TEMPLATES
+                          .filter(t => {
+                            const matchCat = t.categoryId === cat.id;
+                            const q = templateSearchText.toLowerCase();
+                            const matchSearch = !q || t.title.toLowerCase().includes(q) || t.keywords.some(kw => kw.toLowerCase().includes(q));
+                            return matchCat && matchSearch;
+                          })
+                          .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
 
-                      return (
-                        <div key={cat.id} className="rounded-xl bg-slate-950/70 border border-slate-800/80 p-2.5 space-y-1.5">
-                          <button
-                            onClick={() => toggleFolder(cat.id)}
-                            className="w-full flex items-center justify-between text-left font-bold text-slate-200 hover:text-amber-300 transition"
-                          >
-                            <span className="flex items-center gap-1.5 text-xs truncate">
-                              {isExpanded ? <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" /> : <Folder className="w-4 h-4 text-amber-400 shrink-0" />}
-                              <span className="truncate">{cat.name}</span>
-                            </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">
-                              {catTemplates.length}
-                            </span>
-                          </button>
+                        if (catTemplates.length === 0) return null;
+                        const isExpanded = expandedFolders[cat.id] !== false;
 
-                          {/* Sub-tree of template files */}
-                          {isExpanded && (
-                            <div className="pl-3 border-l-2 border-slate-800 space-y-1 mt-1">
-                              {catTemplates.map(tmpl => (
-                                <button
-                                  key={tmpl.id}
-                                  onClick={() => handleSelectTemplate(tmpl)}
-                                  className={`w-full p-2 rounded-lg border text-left text-[11px] font-sans transition flex items-center justify-between gap-1.5 ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 font-bold shadow-sm' : 'bg-slate-900/60 border-slate-800/80 text-slate-300 hover:border-slate-700 hover:text-white'}`}
-                                >
-                                  <span className="truncate flex items-center gap-1.5">
-                                    <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                    <span className="truncate">{tmpl.title}</span>
-                                  </span>
-                                  {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        return (
+                          <div key={cat.id} className="rounded-xl bg-slate-950/70 border border-slate-800/80 p-2.5 space-y-1.5">
+                            <button
+                              onClick={() => toggleFolder(cat.id)}
+                              className="w-full flex items-center justify-between text-left font-bold text-slate-200 hover:text-amber-300 transition"
+                            >
+                              <span className="flex items-center gap-1.5 text-xs truncate">
+                                {isExpanded ? <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" /> : <Folder className="w-4 h-4 text-amber-400 shrink-0" />}
+                                <span className="truncate">{cat.name}</span>
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">
+                                {catTemplates.length}
+                              </span>
+                            </button>
+
+                            {/* Sub-tree of template files (Sorted A-Z) */}
+                            {isExpanded && (
+                              <div className="pl-3 border-l-2 border-slate-800 space-y-1 mt-1">
+                                {catTemplates.map(tmpl => (
+                                  <button
+                                    key={tmpl.id}
+                                    onClick={() => handleSelectTemplate(tmpl)}
+                                    className={`w-full p-2 rounded-lg border text-left text-[11px] font-sans transition flex items-center justify-between gap-1.5 ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 font-bold shadow-sm' : 'bg-slate-900/60 border-slate-800/80 text-slate-300 hover:border-slate-700 hover:text-white'}`}
+                                  >
+                                    <span className="truncate flex items-center gap-1.5">
+                                      <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                      <span className="truncate">{tmpl.title}</span>
+                                    </span>
+                                    {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
 
@@ -799,13 +838,36 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
                     </div>
                   )}
 
-                  {/* Corpo do Laudo com Edição Integral (REQ-11) */}
+                  {/* Corpo do Laudo com Edição Integral & Campo Único (REQ-15 - Dr. Eduardo 22/09/2026) */}
                   <div className="space-y-3 pt-1">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                      <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2 flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
                         <Edit3 className="w-4 h-4 text-cyan-400" />
-                        <span>Edição Integral do Corpo do Laudo Técnico & Diagnóstico:</span>
-                      </h4>
+                        <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                          Edição Integral do Corpo do Laudo Técnico:
+                        </h4>
+                      </div>
+
+                      {/* Editor Mode Selector Toggle Bar */}
+                      {currentUserRole === 'doctor' && (
+                        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px] font-bold">
+                          <button
+                            type="button"
+                            onClick={() => setEditorMode('unified')}
+                            className={`px-3 py-1 rounded-lg transition flex items-center gap-1 ${editorMode === 'unified' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                          >
+                            📝 Campo Único (Texto Integral EEG/ENMG)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditorMode('split')}
+                            className={`px-3 py-1 rounded-lg transition flex items-center gap-1 ${editorMode === 'split' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                          >
+                            📑 Sub-seções Separadas ENMG
+                          </button>
+                        </div>
+                      )}
+
                       {currentUserRole === 'reception' && (
                         <span className="text-amber-400 font-semibold text-[11px] flex items-center gap-1">
                           <Lock className="w-3.5 h-3.5" /> Restrito ao Médico (LGPD)
@@ -814,67 +876,85 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
                     </div>
 
                     {currentUserRole === 'doctor' ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="block text-[11px] font-bold text-slate-300">
-                            1. Neurocondução Motora:
+                      editorMode === 'unified' ? (
+                        /* REQ-15: SINGLE UNIFIED FULL-TEXT EDITOR FOR EEG & ENMG */
+                        <div className="space-y-1.5">
+                          <label className="block text-[11px] font-bold text-amber-300 flex items-center justify-between">
+                            <span>📄 Texto Integral do Laudo Diagnóstico (Edição Contínua & Livre):</span>
+                            <span className="text-[10px] text-cyan-400 font-mono">* Altere todo o texto diretamente aqui</span>
                           </label>
                           <textarea
-                            rows={2.5}
-                            value={motorConduction}
-                            onChange={(e) => setMotorConduction(e.target.value)}
-                            className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                            rows={11}
+                            value={fullReportText}
+                            onChange={(e) => setFullReportText(e.target.value)}
+                            placeholder="Edite aqui todo o texto do laudo (Achados, tabelas, conclusão diagnóstica...)"
+                            className="w-full p-3.5 rounded-xl bg-slate-950 border border-cyan-500/40 text-white text-xs font-mono focus:outline-none focus:border-cyan-400 leading-relaxed"
                           />
                         </div>
+                      ) : (
+                        /* SPLIT MODE: 5 SUB-SECTIONS (FOR SPECIFIC ENMG EXAMS) */
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="block text-[11px] font-bold text-slate-300">
+                              1. Neurocondução Motora:
+                            </label>
+                            <textarea
+                              rows={2.5}
+                              value={motorConduction}
+                              onChange={(e) => setMotorConduction(e.target.value)}
+                              className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                            />
+                          </div>
 
-                        <div className="space-y-1">
-                          <label className="block text-[11px] font-bold text-slate-300">
-                            2. Neurocondução Sensitiva:
-                          </label>
-                          <textarea
-                            rows={2.5}
-                            value={sensoryConduction}
-                            onChange={(e) => setSensoryConduction(e.target.value)}
-                            className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
-                          />
-                        </div>
+                          <div className="space-y-1">
+                            <label className="block text-[11px] font-bold text-slate-300">
+                              2. Neurocondução Sensitiva:
+                            </label>
+                            <textarea
+                              rows={2.5}
+                              value={sensoryConduction}
+                              onChange={(e) => setSensoryConduction(e.target.value)}
+                              className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                            />
+                          </div>
 
-                        <div className="space-y-1">
-                          <label className="block text-[11px] font-bold text-slate-300">
-                            3. Onda F / Resposta Tardia:
-                          </label>
-                          <textarea
-                            rows={2.5}
-                            value={fWave}
-                            onChange={(e) => setFWave(e.target.value)}
-                            className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
-                          />
-                        </div>
+                          <div className="space-y-1">
+                            <label className="block text-[11px] font-bold text-slate-300">
+                              3. Onda F / Resposta Tardia:
+                            </label>
+                            <textarea
+                              rows={2.5}
+                              value={fWave}
+                              onChange={(e) => setFWave(e.target.value)}
+                              className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                            />
+                          </div>
 
-                        <div className="space-y-1">
-                          <label className="block text-[11px] font-bold text-slate-300">
-                            4. Eletromiografia / Registro Cerebral:
-                          </label>
-                          <textarea
-                            rows={2.5}
-                            value={emgText}
-                            onChange={(e) => setEmgText(e.target.value)}
-                            className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
-                          />
-                        </div>
+                          <div className="space-y-1">
+                            <label className="block text-[11px] font-bold text-slate-300">
+                              4. Eletromiografia / Registro Cerebral:
+                            </label>
+                            <textarea
+                              rows={2.5}
+                              value={emgText}
+                              onChange={(e) => setEmgText(e.target.value)}
+                              className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                            />
+                          </div>
 
-                        <div className="md:col-span-2 space-y-1">
-                          <label className="block text-[11px] font-bold text-amber-300">
-                            5. Conclusão Médica do Laudo (Síntese Diagnóstica):
-                          </label>
-                          <textarea
-                            rows={3}
-                            value={conclusion}
-                            onChange={(e) => setConclusion(e.target.value)}
-                            className="w-full p-3 rounded-xl bg-slate-900 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-bold"
-                          />
+                          <div className="md:col-span-2 space-y-1">
+                            <label className="block text-[11px] font-bold text-amber-300">
+                              5. Conclusão Médica do Laudo (Síntese Diagnóstica):
+                            </label>
+                            <textarea
+                              rows={3}
+                              value={conclusion}
+                              onChange={(e) => setConclusion(e.target.value)}
+                              className="w-full p-3 rounded-xl bg-slate-900 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-bold"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      )
                     ) : (
                       <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-500 text-xs italic">
                         [ As informações diagnósticas e o corpo deste laudo são restritos ao Dr. Eduardo Magalhães para proteção ao sigilo médico conforme a LGPD. ]

@@ -60,7 +60,7 @@ def build_pdf():
     BG_LIGHT = colors.HexColor("#F8FAFC")
     ACCENT = colors.HexColor("#0369A1")
 
-    title_style = ParagraphStyle('DocTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12.5, leading=16.5, textColor=PRIMARY, spaceAfter=4)
+    title_style = ParagraphStyle('DocTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=PRIMARY, spaceAfter=4)
     subtitle_style = ParagraphStyle('DocSubtitle', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=11.5, textColor=SECONDARY, spaceAfter=8)
     h1_style = ParagraphStyle('SectionH1', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9.5, leading=12.5, textColor=PRIMARY, spaceBefore=8, spaceAfter=3)
     h2_style = ParagraphStyle('SectionH2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8.5, leading=11.5, textColor=ACCENT, spaceBefore=4, spaceAfter=2)
@@ -75,7 +75,7 @@ def build_pdf():
         doctor_img = Image(img_path, width=42, height=42)
         header_text = [
             Paragraph("RELATÓRIO DE ACOMPANHAMENTO & ROTEIRO DE USO (22/09/2026)", title_style),
-            Paragraph("Parte 1: Solicitações WhatsApp | Parte 2: Layout 2 Colunas Explorer | Parte 3: Roteiro com Telas", subtitle_style)
+            Paragraph("Campo de Edição Único | Árvore A-Z Default | Responsividade F11 Fullscreen", subtitle_style)
         ]
         t_header = Table([[header_text, doctor_img]], colWidths=[435, 48])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
@@ -87,7 +87,7 @@ def build_pdf():
     meta_data = [
         [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 22/09/2026", body_style)],
         [Paragraph("<b>Identificador:</b> DOC-2026-09-22", body_style), Paragraph("<b>Status:</b> Concluído & Publicado em Produção", body_style)],
-        [Paragraph("<b>Plataforma:</b> neuro.eduardomagalhaes.helpusbr.com", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
+        [Paragraph("<b>Plataforma:</b> neuroeduardomagalhaes.vercel.app", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
     ]
     t_meta = Table(meta_data, colWidths=[240, 243])
     t_meta.setStyle(TableStyle([
@@ -105,23 +105,35 @@ def build_pdf():
     # PARTE 1
     story.append(Paragraph("PARTE 1: SOLICITAÇÕES E MATERIAIS DISPONIBILIZADOS PELO CLIENTE", h1_style))
     story.append(Paragraph(
-        "Registro das novas solicitações do <b>Dr. Eduardo Magalhães</b> enviadas via WhatsApp na data de hoje (<b>22/09/2026</b>) "
-        "referentes à reestruturação de <b>diagramação em 2 colunas side-by-side</b> (Árvore de modelos estilo Windows Explorer à esquerda "
-        "e formulário completo de laudos à direita), otimizando a visualização sem necessidade de rolagem de tela.", body_style
+        "Registro das novas observações do <b>Dr. Eduardo Magalhães</b> enviadas via WhatsApp na data de hoje (<b>22/09/2026</b>) "
+        "referentes à ordenação alfabética A-Z por padrão na árvore de modelos, criação do Campo de Edição Único para o texto integral "
+        "do laudo (EEG/ENMG) e correção de responsividade do layout em tela cheia (F11).", body_style
     ))
 
     req_table = [
         [Paragraph("<b>ID</b>", h2_style), Paragraph("<b>Solicitação do Dr. Eduardo</b>", h2_style), Paragraph("<b>Solução Técnica Implementada</b>", h2_style), Paragraph("<b>Status</b>", h2_style)],
         [
-            Paragraph("REQ-12", body_style),
-            Paragraph("<b>Copiar & Colar Texto do Word:</b> Importar modelos locais do computador.", body_style),
-            Paragraph("Área de colagem livre com pré-preenchimento automático dos blocos do laudo.", body_style),
+            Paragraph("REQ-13", body_style),
+            Paragraph("<b>Layout 2 Colunas Explorer:</b> Árvore de modelos à esquerda e edição à direita.", body_style),
+            Paragraph("Grid Split-Screen em 2 colunas eliminando necessidade de scroll horizontal.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ],
         [
-            Paragraph("REQ-13", body_style),
-            Paragraph("<b>Layout 2 Colunas (Windows Explorer):</b> Eliminar rolagem de tela e exibir subpastas abertas.", body_style),
-            Paragraph("Grid Split-Screen em 2 colunas com expansão simultânea de todas as pastagens à esquerda.", body_style),
+            Paragraph("REQ-14", body_style),
+            Paragraph("<b>Ordem Alfabética A-Z por Padrão:</b> Pastas e modelos ordenados de A a Z.", body_style),
+            Paragraph("Ordenação alfabética automática em todas as categorias e subpastas de templates.", body_style),
+            Paragraph("<font color='#0d9488'><b>Concluído (22/09)</b></font>", body_style)
+        ],
+        [
+            Paragraph("REQ-15", body_style),
+            Paragraph("<b>Campo de Edição Único:</b> Editar texto integral em caixa de texto única.", body_style),
+            Paragraph("Caixa de texto único de texto amplo para EEG/ENMG com seletor alternável de sub-seções.", body_style),
+            Paragraph("<font color='#0d9488'><b>Concluído (22/09)</b></font>", body_style)
+        ],
+        [
+            Paragraph("REQ-16", body_style),
+            Paragraph("<b>Ajuste de Tela F11:</b> Garantir visibilidade do topo ao entrar/sair de F11.", body_style),
+            Paragraph("Responsividade ajustada com max-h-[92vh] e scroll interno no corpo do modal.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído (22/09)</b></font>", body_style)
         ]
     ]
@@ -142,33 +154,29 @@ def build_pdf():
 
     # PARTE 2
     story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES E COMPONENTES DESENVOLVIDOS", h1_style))
-    story.append(Paragraph("<b>2.1. Diagramação Split-Screen em 2 Colunas (REQ-13):</b> Painel ajustado para exibição lado a lado na tela com expansão do container principal (max-w-7xl).", body_style))
-    story.append(Paragraph("<b>2.2. Árvore de Pastas Estilo Windows Explorer:</b> Todas as subpastas vêm abertas por padrão com botões rápidos de <b>[Tudo]</b> e <b>[Fechar]</b>.", body_style))
-    story.append(Paragraph("<b>2.3. Sincronização do Formulário de Laudos:</b> A seleção de qualquer modelo na árvore carrega instantaneamente no painel direito sem necessidade de rolar a página.", body_style))
-    story.append(Paragraph("<b>2.4. Validação ICP-Brasil & QR Code:</b> Geração do PDF timbrado assinado digitalmente com preservação do sigilo médico LGPD.", body_style))
+    story.append(Paragraph("<b>2.1. Ordenação Alfabética A-Z (REQ-14):</b> Todas as categorias e modelos de laudos organizados alfabeticamente de cima a baixo.", body_style))
+    story.append(Paragraph("<b>2.2. Campo de Edição Único do Laudo (REQ-15):</b> Edição direta do texto completo em uma única caixa de texto contínua, com barra de alternância para sub-seções.", body_style))
+    story.append(Paragraph("<b>2.3. Ajuste de Responsividade F11 (REQ-16):</b> Cabeçalho e botões de fechamento 100% visíveis ao alternar modo tela cheia.", body_style))
     story.append(Spacer(1, 4))
 
     # PARTE 3: ROTEIRO PASSO A PASSO
     story.append(Paragraph("PARTE 3: ROTEIRO PASSO A PASSO DE USO COM CAPTURAS DE TELA ATUALIZADAS", h1_style))
 
-    story.append(Paragraph("Passo 1: Acessar a Nova Interface em 2 Colunas Lado a Lado", h2_style))
-    story.append(Paragraph("Acesse <b>neuro.eduardomagalhaes.helpusbr.com</b> com o perfil do <b>Dr. Eduardo Magalhães</b>. O painel será exibido na nova diagramação de duas colunas.", body_style))
+    story.append(Paragraph("Passo 1: Visualização da Árvore de Modelos em Ordem Alfabética A-Z", h2_style))
+    story.append(Paragraph("Acesse <b>neuroeduardomagalhaes.vercel.app</b>. A árvore de modelos à esquerda lista as pastas em ordem A-Z por padrão.", body_style))
 
-    img_layout = os.path.join(docs_dir, "painel_layout_duas_colunas.jpg")
-    if os.path.exists(img_layout):
-        story.append(Image(img_layout, width=483, height=275))
-        story.append(Paragraph("Figura 1: Nova interface em 2 colunas com a árvore estilo Windows Explorer à esquerda e o formulário completo à direita.", caption_style))
+    img_az = os.path.join(docs_dir, "arvore_ordem_alfabetica.jpg")
+    if os.path.exists(img_az):
+        story.append(Image(img_az, width=483, height=220))
+        story.append(Paragraph("Figura 1: Árvore de modelos estilo Windows Explorer com ordenação alfabética A-Z por padrão.", caption_style))
 
-    story.append(Paragraph("Passo 2: Navegar pela Árvore de Pastas Expandida (Esquerda)", h2_style))
-    story.append(Paragraph("Localize a pasta desejada (STC, Radiculopatias, Polineuropatias, EEG) e clique no modelo para carregar no laudo.", body_style))
+    story.append(Paragraph("Passo 2: Seleção do Modelo e Edição em Campo Único", h2_style))
+    story.append(Paragraph("Ao clicar em qualquer modelo, o texto integral do laudo é carregado na caixa de texto única do lado direito.", body_style))
 
-    story.append(Paragraph("Passo 3: Assinatura Digital & PDF Timbrado (Direita)", h2_style))
-    story.append(Paragraph("Após conferir o laudo no lado direito ou colar textos do Word, clique em 'Assinar & Gerar PDF Timbrado' para emitir o documento oficial com QR Code de validação.", body_style))
-
-    img_word = os.path.join(docs_dir, "painel_copiar_colar_word.jpg")
-    if os.path.exists(img_word):
-        story.append(Image(img_word, width=483, height=225))
-        story.append(Paragraph("Figura 2: Detalhe da funcionalidade de importação de texto livre do Word e acionamento da assinatura digital.", caption_style))
+    img_unic = os.path.join(docs_dir, "painel_campo_unico_edicao.jpg")
+    if os.path.exists(img_unic):
+        story.append(Image(img_unic, width=483, height=255))
+        story.append(Paragraph("Figura 2: Novo painel de laudos em 2 colunas com o Campo Único de Edição de Texto Integral.", caption_style))
 
     doc.build(story, canvasmaker=NumberedCanvas)
     print("PDF Documentacao_Acompanhamento_2026-09-22.pdf criado com sucesso!")
