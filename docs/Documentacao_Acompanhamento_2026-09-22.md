@@ -67,6 +67,9 @@ No lado direito, digite o CPF do paciente para buscar no banco Winsoft/Mevo ou c
 ### 4️⃣ Passo 4: Assinatura Digital ICP-Brasil & Emissão do PDF
 Revise os 5 blocos do laudo e clique no botão azul **"🖨️ Assinar & Gerar PDF Timbrado"** para emitir o documento oficial com papel timbrado da clínica, carimbo médico e QR Code.
 
+![Importador do Word e Assinatura Digital](file:///d:/AntiG/neuro.eduardomagalhaes/docs/painel_copiar_colar_word.jpg)
+*Figura 2: Funcionalidade de importação de texto livre do Word e acionamento da assinatura digital.*
+
 ---
 
 ## CONCLUSÃO & PRÓXIMOS PASSOS

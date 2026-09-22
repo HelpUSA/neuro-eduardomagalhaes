@@ -163,12 +163,12 @@ def build_pdf():
     story.append(Paragraph("Localize a pasta desejada (STC, Radiculopatias, Polineuropatias, EEG) e clique no modelo para carregar no laudo.", body_style))
 
     story.append(Paragraph("3️⃣ Passo 3: Assinatura Digital & PDF Timbrado (Direita)", h2_style))
-    story.append(Paragraph("Após conferir o laudo, clique em 'Assinar & Gerar PDF Timbrado' para emitir o documento oficial com QR Code de validação.", body_style))
+    story.append(Paragraph("Após conferir o laudo no lado direito ou colar textos do Word, clique em 'Assinar & Gerar PDF Timbrado' para emitir o documento oficial com QR Code de validação.", body_style))
 
-    img_laudo = os.path.join(docs_dir, "assinatura_digital_qrcode.jpg")
-    if os.path.exists(img_laudo):
-        story.append(Image(img_laudo, width=483, height=215))
-        story.append(Paragraph("Figura 2: Laudo Médico Oficial gerado pelo sistema com papel timbrado, carimbo profissional e QR Code.", caption_style))
+    img_word = os.path.join(docs_dir, "painel_copiar_colar_word.jpg")
+    if os.path.exists(img_word):
+        story.append(Image(img_word, width=483, height=225))
+        story.append(Paragraph("Figura 2: Detalhe da funcionalidade de importação de texto livre do Word e acionamento da assinatura digital.", caption_style))
 
     doc.build(story, canvasmaker=NumberedCanvas)
     print("PDF Documentacao_Acompanhamento_2026-09-22.pdf criado com sucesso!")
