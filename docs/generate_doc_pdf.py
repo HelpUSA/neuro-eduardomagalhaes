@@ -142,8 +142,8 @@ def build_pdf():
 
     # PARTE 2
     story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES E COMPONENTES DESENVOLVIDOS", h1_style))
-    story.append(Paragraph("<b>2.1. Diagramação Split-Screen em 2 Colunas (REQ-13):</b> Painel ajustado para exibição lado a lado na tela com expansão do container principal (`max-w-7xl`).", body_style))
-    story.append(Paragraph("<b>2.2. Árvore de Pastas Estilo Windows Explorer:</b> Todas as subpastas vêm abertas por padrão com botões rápidos de '📂 Tudo' e '📁 Fechar'.", body_style))
+    story.append(Paragraph("<b>2.1. Diagramação Split-Screen em 2 Colunas (REQ-13):</b> Painel ajustado para exibição lado a lado na tela com expansão do container principal (max-w-7xl).", body_style))
+    story.append(Paragraph("<b>2.2. Árvore de Pastas Estilo Windows Explorer:</b> Todas as subpastas vêm abertas por padrão com botões rápidos de <b>[Tudo]</b> e <b>[Fechar]</b>.", body_style))
     story.append(Paragraph("<b>2.3. Sincronização do Formulário de Laudos:</b> A seleção de qualquer modelo na árvore carrega instantaneamente no painel direito sem necessidade de rolar a página.", body_style))
     story.append(Paragraph("<b>2.4. Validação ICP-Brasil & QR Code:</b> Geração do PDF timbrado assinado digitalmente com preservação do sigilo médico LGPD.", body_style))
     story.append(Spacer(1, 4))
@@ -151,18 +151,18 @@ def build_pdf():
     # PARTE 3: ROTEIRO PASSO A PASSO
     story.append(Paragraph("PARTE 3: ROTEIRO PASSO A PASSO DE USO COM CAPTURAS DE TELA ATUALIZADAS", h1_style))
 
-    story.append(Paragraph("1️⃣ Passo 1: Acessar a Nova Interface em 2 Colunas Lado a Lado", h2_style))
-    story.append(Paragraph("Acesse <b>neuro.eduardomagalhaes.helpusbr.com</b> com o perfil do 👑 <b>Dr. Eduardo Magalhães</b>. O painel será exibido na nova diagramação de duas colunas.", body_style))
+    story.append(Paragraph("Passo 1: Acessar a Nova Interface em 2 Colunas Lado a Lado", h2_style))
+    story.append(Paragraph("Acesse <b>neuro.eduardomagalhaes.helpusbr.com</b> com o perfil do <b>Dr. Eduardo Magalhães</b>. O painel será exibido na nova diagramação de duas colunas.", body_style))
 
     img_layout = os.path.join(docs_dir, "painel_layout_duas_colunas.jpg")
     if os.path.exists(img_layout):
         story.append(Image(img_layout, width=483, height=275))
         story.append(Paragraph("Figura 1: Nova interface em 2 colunas com a árvore estilo Windows Explorer à esquerda e o formulário completo à direita.", caption_style))
 
-    story.append(Paragraph("2️⃣ Passo 2: Navegar pela Árvore de Pastas Expandida (Esquerda)", h2_style))
+    story.append(Paragraph("Passo 2: Navegar pela Árvore de Pastas Expandida (Esquerda)", h2_style))
     story.append(Paragraph("Localize a pasta desejada (STC, Radiculopatias, Polineuropatias, EEG) e clique no modelo para carregar no laudo.", body_style))
 
-    story.append(Paragraph("3️⃣ Passo 3: Assinatura Digital & PDF Timbrado (Direita)", h2_style))
+    story.append(Paragraph("Passo 3: Assinatura Digital & PDF Timbrado (Direita)", h2_style))
     story.append(Paragraph("Após conferir o laudo no lado direito ou colar textos do Word, clique em 'Assinar & Gerar PDF Timbrado' para emitir o documento oficial com QR Code de validação.", body_style))
 
     img_word = os.path.join(docs_dir, "painel_copiar_colar_word.jpg")
