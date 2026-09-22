@@ -212,12 +212,24 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
     }
   };
 
-  // Toggle Folder Expansion
+  // Toggle Folder Expansion (Windows Explorer style)
   const toggleFolder = (folderKey) => {
     setExpandedFolders(prev => ({
       ...prev,
-      [folderKey]: !prev[folderKey]
+      [folderKey]: prev[folderKey] === false ? true : false
     }));
+  };
+
+  const expandAllFolders = () => {
+    const all = {};
+    EXAM_CATEGORIES.forEach(cat => { all[cat.id] = true; });
+    setExpandedFolders(all);
+  };
+
+  const collapseAllFolders = () => {
+    const none = {};
+    EXAM_CATEGORIES.forEach(cat => { none[cat.id] = false; });
+    setExpandedFolders(none);
   };
 
   // Handle CPF Change and Auto-fill (Mevo style)
@@ -361,8 +373,8 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-5xl glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl border border-indigo-500/30 my-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+      <div className="relative w-full max-w-[96vw] xl:max-w-7xl glass-panel rounded-3xl p-4 sm:p-6 shadow-2xl border border-indigo-500/30 my-3">
         
         {/* Close Button */}
         <button
@@ -533,386 +545,369 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
               )}
             </div>
 
-            {/* TAB 1: EMISSOR DE LAUDOS */}
+            {/* TAB 1: EMISSOR DE LAUDOS - LAYOUT DUAL COLUMN (REQ-13 - 22/09/2026) */}
             {activeTab === 'generator' && (
-              <div className="pt-4 space-y-5">
+              <div className="pt-4 grid grid-cols-1 lg:grid-cols-12 gap-5">
                 
-                {/* Category Folders & Search Selector */}
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
-                  <div className="flex justify-between items-center flex-wrap gap-2">
+                {/* ESQUERDA (lg:col-span-4): ÁRVORE DE MODELOS ESTILO WINDOWS EXPLORER */}
+                <div className="lg:col-span-4 p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 flex flex-col">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <FolderOpen className="w-4 h-4 text-cyan-400" />
-                      <label className="text-xs font-bold uppercase tracking-wider text-cyan-400">
-                        Biblioteca de Modelos (Google Drive Structure):
-                      </label>
+                      <FolderOpen className="w-4 h-4 text-amber-400" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-300">
+                        Árvore de Modelos (Explorer)
+                      </h3>
                     </div>
-
-                    {/* View Mode Switcher */}
-                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <div className="flex items-center gap-1">
                       <button
-                        onClick={() => setViewMode('folders')}
-                        className={`px-3 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${viewMode === 'folders' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+                        type="button"
+                        onClick={expandAllFolders}
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-bold text-cyan-400"
+                        title="Expandir todas as pastas"
                       >
-                        <Folder className="w-3.5 h-3.5" /> Navegador de Pastas (Drive)
+                        📂 Tudo
                       </button>
                       <button
-                        onClick={() => setViewMode('search')}
-                        className={`px-3 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${viewMode === 'search' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-white'}`}
+                        type="button"
+                        onClick={collapseAllFolders}
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-bold text-slate-400"
+                        title="Recolher todas as pastas"
                       >
-                        <Search className="w-3.5 h-3.5" /> Busca por Palavras
+                        📁 Fechar
                       </button>
                     </div>
                   </div>
 
-                  {/* Template Search Box */}
+                  {/* Search box for models */}
                   <div className="relative">
                     <input
                       type="text"
                       value={templateSearchText}
-                      onChange={(e) => {
-                        setTemplateSearchText(e.target.value);
-                        if (e.target.value) setViewMode('search');
-                      }}
-                      placeholder="Pesquisar modelo por palavra-chave... (ex: 'STC', 'grau 2', 'paroxismo', 'normal', 'ritmos lentos')"
-                      className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:border-cyan-400 focus:outline-none"
+                      onChange={(e) => setTemplateSearchText(e.target.value)}
+                      placeholder="Buscar modelo na árvore... (ex: STC, EMG...)"
+                      className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white text-xs focus:border-cyan-400 focus:outline-none"
                     />
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                   </div>
 
-                  {/* VIEW MODE 1: DRIVE FOLDER TREE NAVIGATION */}
-                  {viewMode === 'folders' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 max-h-64 overflow-y-auto pr-1">
-                      {EXAM_CATEGORIES.map(cat => {
-                        const catTemplates = ALL_EXAM_TEMPLATES.filter(t => t.categoryId === cat.id);
-                        if (catTemplates.length === 0) return null;
-                        const isExpanded = expandedFolders[cat.id] !== false;
-                        return (
-                          <div key={cat.id} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-                            <button
-                              onClick={() => toggleFolder(cat.id)}
-                              className="w-full flex items-center justify-between text-left text-xs font-bold text-cyan-300 hover:text-cyan-200"
-                            >
-                              <span className="flex items-center gap-2">
-                                {isExpanded ? <FolderOpen className="w-4 h-4 text-amber-400" /> : <Folder className="w-4 h-4 text-amber-400" />}
-                                <span>📁 {cat.name}</span>
-                                <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] text-slate-400 font-mono">
-                                  {catTemplates.length} modelos
-                                </span>
-                              </span>
-                              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                            </button>
+                  {/* Windows Explorer Folder Tree View */}
+                  <div className="flex-1 overflow-y-auto max-h-[640px] pr-1 space-y-2 font-mono text-xs">
+                    {EXAM_CATEGORIES.map(cat => {
+                      const catTemplates = ALL_EXAM_TEMPLATES.filter(t => {
+                        const matchCat = t.categoryId === cat.id;
+                        const q = templateSearchText.toLowerCase();
+                        const matchSearch = !q || t.title.toLowerCase().includes(q) || t.keywords.some(kw => kw.toLowerCase().includes(q));
+                        return matchCat && matchSearch;
+                      });
+                      if (catTemplates.length === 0) return null;
+                      const isExpanded = expandedFolders[cat.id] !== false;
 
-                            {isExpanded && (
-                              <div className="pl-4 space-y-1.5 border-l border-slate-800 mt-2 max-h-40 overflow-y-auto pr-1">
-                                {catTemplates.map(tmpl => (
-                                  <button
-                                    key={tmpl.id}
-                                    onClick={() => handleSelectTemplate(tmpl)}
-                                    className={`w-full p-2 rounded-lg border text-left text-xs transition flex items-center justify-between ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white font-bold' : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700'}`}
-                                  >
-                                    <span className="truncate pr-2">{tmpl.title}</span>
-                                    {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                      return (
+                        <div key={cat.id} className="rounded-xl bg-slate-950/70 border border-slate-800/80 p-2.5 space-y-1.5">
+                          <button
+                            onClick={() => toggleFolder(cat.id)}
+                            className="w-full flex items-center justify-between text-left font-bold text-slate-200 hover:text-amber-300 transition"
+                          >
+                            <span className="flex items-center gap-1.5 text-xs truncate">
+                              {isExpanded ? <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" /> : <Folder className="w-4 h-4 text-amber-400 shrink-0" />}
+                              <span className="truncate">{cat.name}</span>
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">
+                              {catTemplates.length}
+                            </span>
+                          </button>
 
-                  {/* VIEW MODE 2: DIRECT SEARCH GRID */}
-                  {viewMode === 'search' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1">
-                      {filteredTemplates.map(tmpl => (
-                        <button
-                          key={tmpl.id}
-                          onClick={() => handleSelectTemplate(tmpl)}
-                          className={`p-3 rounded-xl border text-left text-xs transition space-y-1 ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/20 border-cyan-400 text-white' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-mono text-cyan-400">{tmpl.folderName}</span>
-                            {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400" />}
-                          </div>
-                          <strong className="block text-slate-200 text-xs font-bold leading-snug">{tmpl.title}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                          {/* Sub-tree of template files */}
+                          {isExpanded && (
+                            <div className="pl-3 border-l-2 border-slate-800 space-y-1 mt-1">
+                              {catTemplates.map(tmpl => (
+                                <button
+                                  key={tmpl.id}
+                                  onClick={() => handleSelectTemplate(tmpl)}
+                                  className={`w-full p-2 rounded-lg border text-left text-[11px] font-sans transition flex items-center justify-between gap-1.5 ${selectedTemplateId === tmpl.id ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200 font-bold shadow-sm' : 'bg-slate-900/60 border-slate-800/80 text-slate-300 hover:border-slate-700 hover:text-white'}`}
+                                >
+                                  <span className="truncate flex items-center gap-1.5">
+                                    <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <span className="truncate">{tmpl.title}</span>
+                                  </span>
+                                  {selectedTemplateId === tmpl.id && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Patient Credentials Form with CPF Auto-Lookup (Mevo Style) */}
-                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                      <User className="w-4 h-4 text-cyan-400" />
-                      <span>Dados Cadastrais do Paciente (Busca Inteligente por CPF):</span>
-                    </h4>
-
-                    {/* CPF Lookup Toast Indicator */}
-                    {cpfSearchStatus === 'loading' && (
-                      <span className="px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Consultando CPF Online (Estilo Mevo)...
-                      </span>
-                    )}
-                    {cpfSearchStatus === 'found' && (
-                      <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
-                        <Check className="w-3.5 h-3.5" /> Paciente Localizado na Base Winsoft!
-                      </span>
-                    )}
-                    {cpfSearchStatus === 'found_online' && (
-                      <span className="px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Paciente Localizado via Consulta de CPF (Mevo)!
-                      </span>
-                    )}
-                    {cpfSearchStatus === 'not_found' && (
-                      <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5" /> Novo Paciente (Preencha os dados abaixo)
-                      </span>
-                    )}
-                  </div>
+                {/* DIREITA (lg:col-span-8): FORMULÁRIO COMPLETO DO LAUDO */}
+                <div className="lg:col-span-8 space-y-4">
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div className="sm:col-span-1">
-                      <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
-                        <span>CPF do Paciente</span>
-                        <span className="text-[10px] text-cyan-400 font-mono">Estilo Mevo</span>
-                      </label>
-                      <div className="flex gap-1.5">
-                        <input
-                          type="text"
-                          value={cpf}
-                          onChange={(e) => handleCpfChange(e.target.value)}
-                          placeholder="000.000.000-00"
-                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono font-bold"
-                        />
-                        <button
-                          onClick={() => performCpfLookup()}
-                          title="Buscar dados no Winsoft / Online"
-                          className="px-2.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs"
-                        >
-                          <Search className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+                  {/* Dados do Paciente (CPF Mevo) */}
+                  <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                        <User className="w-4 h-4 text-cyan-400" />
+                        <span>Dados Cadastrais do Paciente (Busca por CPF):</span>
+                      </h4>
 
-                    <div className="sm:col-span-1">
-                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nome Completo</label>
-                      <input
-                        type="text"
-                        value={patientName}
-                        onChange={(e) => setPatientName(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
-                      />
+                      {cpfSearchStatus === 'loading' && (
+                        <span className="px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Consultando CPF Online (Mevo)...
+                        </span>
+                      )}
+                      {cpfSearchStatus === 'found' && (
+                        <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5" /> Paciente Localizado no Winsoft!
+                        </span>
+                      )}
+                      {cpfSearchStatus === 'found_online' && (
+                        <span className="px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Paciente Localizado (Mevo)!
+                        </span>
+                      )}
+                      {cpfSearchStatus === 'not_found' && (
+                        <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5" /> Novo Paciente
+                        </span>
+                      )}
                     </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Nasc.</label>
-                      <input
-                        type="text"
-                        value={birthDate}
-                        onChange={(e) => setBirthDate(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">Médico Solicitante</label>
-                      <input
-                        type="text"
-                        value={requestingDoctor}
-                        onChange={(e) => setRequestingDoctor(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Anexo de Gráficos do Aparelho */}
-                  <div className="pt-2 flex items-center justify-between border-t border-slate-800/80 flex-wrap gap-2 text-xs">
-                    <div className="flex items-center gap-2 text-slate-300">
-                      <Paperclip className="w-4 h-4 text-cyan-400" />
-                      <span>PDF com Gráficos/Traçados do Aparelho:</span>
-                      <strong className="text-emerald-400 font-mono">{attachedTracingsFile}</strong>
-                    </div>
-                    <button
-                      onClick={() => alert("Simulação: Arquivo de gráficos anexado com sucesso ao prontuário do paciente!")}
-                      className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700"
-                    >
-                      + Anexar Gráficos do Aparelho
-                    </button>
-                  </div>
-                </div>
-
-                {/* REQ-12: Área de Copiar & Colar Texto do Word (.docx) - Solicitado pelo Dr. Eduardo em 19/09/2026 */}
-                {currentUserRole === 'doctor' && (
-                  <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-cyan-400" />
-                        <h4 className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
-                          📋 Copiar & Colar Texto do Word (.docx) / Importador de Texto Livre:
-                        </h4>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowWordImporter(!showWordImporter)}
-                        className="text-[11px] text-cyan-400 hover:underline font-bold"
-                      >
-                        {showWordImporter ? 'Ocultar Caixa de Colagem ▲' : 'Mostrar Caixa de Colagem ▼'}
-                      </button>
-                    </div>
-
-                    {showWordImporter && (
-                      <div className="space-y-2.5 pt-1">
-                        <p className="text-[11px] text-slate-300">
-                          Cole aqui qualquer texto ou modelo customizado vindo do seu Word (computador ou Google Drive). Você pode revisar e editar livremente nas seções abaixo antes de assinar.
-                        </p>
-                        <textarea
-                          rows={3}
-                          value={wordImportText}
-                          onChange={(e) => setWordImportText(e.target.value)}
-                          placeholder="Cole aqui o texto copiado do seu arquivo .docx no Word (ex: achados de exame, conclusões personalizadas, tabelas de laudo...)"
-                          className="w-full p-3 rounded-xl bg-slate-950 border border-indigo-500/40 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono leading-relaxed"
-                        />
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <span className="text-[10px] text-slate-400 italic">
-                            * Ao clicar em carregar, o texto será preenchido nos campos do laudo para sua validação final.
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setWordImportText('')}
-                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
-                            >
-                              Limpar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleApplyWordText}
-                              className="px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-cyan-500/20"
-                            >
-                              <Sparkles className="w-3.5 h-3.5" /> ✨ Carregar no Laudo
-                            </button>
-                          </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                      <div className="sm:col-span-1">
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
+                          <span>CPF do Paciente</span>
+                          <span className="text-[10px] text-cyan-400 font-mono">Mevo</span>
+                        </label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            value={cpf}
+                            onChange={(e) => handleCpfChange(e.target.value)}
+                            placeholder="000.000.000-00"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono font-bold"
+                          />
+                          <button
+                            onClick={() => performCpfLookup()}
+                            title="Buscar dados no Winsoft / Online"
+                            className="px-2.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0"
+                          >
+                            <Search className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
-                    )}
-                  </div>
-                )}
 
-                {/* Medical Report Body Sections (Full Editing Capability - REQ-11) */}
-                <div className="space-y-4 pt-1">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                    <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
-                      <Edit3 className="w-4 h-4 text-cyan-400" />
-                      <span>Edição Integral do Corpo do Laudo Técnico & Diagnóstico:</span>
-                    </h4>
-                    {currentUserRole === 'reception' && (
-                      <span className="text-amber-400 font-semibold text-[11px] flex items-center gap-1">
-                        <Lock className="w-3.5 h-3.5" /> Restrito ao Médico (LGPD)
-                      </span>
-                    )}
-                  </div>
-
-                  {currentUserRole === 'doctor' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                      {/* Section 1: Neurocondução Motora */}
-                      <div className="space-y-1">
-                        <label className="block text-[11px] font-bold text-slate-300">
-                          1. Neurocondução Motora:
-                        </label>
-                        <textarea
-                          rows={2.5}
-                          value={motorConduction}
-                          onChange={(e) => setMotorConduction(e.target.value)}
-                          className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                      <div className="sm:col-span-1">
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nome Completo</label>
+                        <input
+                          type="text"
+                          value={patientName}
+                          onChange={(e) => setPatientName(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
                         />
                       </div>
 
-                      {/* Section 2: Neurocondução Sensitiva */}
-                      <div className="space-y-1">
-                        <label className="block text-[11px] font-bold text-slate-300">
-                          2. Neurocondução Sensitiva:
-                        </label>
-                        <textarea
-                          rows={2.5}
-                          value={sensoryConduction}
-                          onChange={(e) => setSensoryConduction(e.target.value)}
-                          className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Nasc.</label>
+                        <input
+                          type="text"
+                          value={birthDate}
+                          onChange={(e) => setBirthDate(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
                         />
                       </div>
 
-                      {/* Section 3: Onda F / Registro de Frequências */}
-                      <div className="space-y-1">
-                        <label className="block text-[11px] font-bold text-slate-300">
-                          3. Onda F / Resposta Tardia:
-                        </label>
-                        <textarea
-                          rows={2.5}
-                          value={fWave}
-                          onChange={(e) => setFWave(e.target.value)}
-                          className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
-                        />
-                      </div>
-
-                      {/* Section 4: Eletromiografia / Achados Neurofisiológicos */}
-                      <div className="space-y-1">
-                        <label className="block text-[11px] font-bold text-slate-300">
-                          4. Eletromiografia / Registro Cerebral:
-                        </label>
-                        <textarea
-                          rows={2.5}
-                          value={emgText}
-                          onChange={(e) => setEmgText(e.target.value)}
-                          className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
-                        />
-                      </div>
-
-                      {/* Section 5: Conclusão Médica do Laudo */}
-                      <div className="md:col-span-2 space-y-1">
-                        <label className="block text-[11px] font-bold text-amber-300">
-                          5. Conclusão Médica do Laudo (Sintese Diagnóstica):
-                        </label>
-                        <textarea
-                          rows={3}
-                          value={conclusion}
-                          onChange={(e) => setConclusion(e.target.value)}
-                          className="w-full p-3.5 rounded-xl bg-slate-900 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-bold"
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1">Médico Solicitante</label>
+                        <input
+                          type="text"
+                          value={requestingDoctor}
+                          onChange={(e) => setRequestingDoctor(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
                         />
                       </div>
                     </div>
-                  ) : (
-                    <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-500 text-xs italic">
-                      [ As informações diagnósticas e o corpo deste laudo são restritos ao Dr. Eduardo Magalhães para proteção ao sigilo médico conforme a LGPD. ]
+
+                    {/* Anexo de Gráficos do Aparelho */}
+                    <div className="pt-2 flex items-center justify-between border-t border-slate-800/80 flex-wrap gap-2 text-xs">
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Paperclip className="w-4 h-4 text-cyan-400" />
+                        <span>PDF com Gráficos/Traçados do Aparelho:</span>
+                        <strong className="text-emerald-400 font-mono">{attachedTracingsFile}</strong>
+                      </div>
+                      <button
+                        onClick={() => alert("Simulação: Arquivo de gráficos anexado com sucesso ao prontuário do paciente!")}
+                        className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700"
+                      >
+                        + Anexar Gráficos do Aparelho
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* REQ-12: Área de Copiar & Colar Texto do Word (.docx) */}
+                  {currentUserRole === 'doctor' && (
+                    <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-cyan-400" />
+                          <h4 className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                            📋 Copiar & Colar Texto do Word (.docx):
+                          </h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowWordImporter(!showWordImporter)}
+                          className="text-[11px] text-cyan-400 hover:underline font-bold"
+                        >
+                          {showWordImporter ? 'Ocultar ▲' : 'Mostrar Importador ▼'}
+                        </button>
+                      </div>
+
+                      {showWordImporter && (
+                        <div className="space-y-2 pt-1">
+                          <textarea
+                            rows={2.5}
+                            value={wordImportText}
+                            onChange={(e) => setWordImportText(e.target.value)}
+                            placeholder="Cole aqui o texto copiado do seu arquivo .docx no Word para carregar no laudo..."
+                            className="w-full p-2.5 rounded-xl bg-slate-950 border border-indigo-500/40 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono leading-relaxed"
+                          />
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <span className="text-[10px] text-slate-400 italic">
+                              * O texto será preenchido automaticamente nas seções abaixo.
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setWordImportText('')}
+                                className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+                              >
+                                Limpar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleApplyWordText}
+                                className="px-3.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-cyan-500/20"
+                              >
+                                <Sparkles className="w-3.5 h-3.5" /> ✨ Carregar no Laudo
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
 
-                {/* Action Bar */}
-                <div className="flex items-center justify-between pt-4 border-t border-slate-800 flex-wrap gap-3">
-                  <div className="text-xs text-slate-400 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span>Assinatura Digital ICP-Brasil + Carimbo Visual & QR Code</span>
-                  </div>
+                  {/* Corpo do Laudo com Edição Integral (REQ-11) */}
+                  <div className="space-y-3 pt-1">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+                        <Edit3 className="w-4 h-4 text-cyan-400" />
+                        <span>Edição Integral do Corpo do Laudo Técnico & Diagnóstico:</span>
+                      </h4>
+                      {currentUserRole === 'reception' && (
+                        <span className="text-amber-400 font-semibold text-[11px] flex items-center gap-1">
+                          <Lock className="w-3.5 h-3.5" /> Restrito ao Médico (LGPD)
+                        </span>
+                      )}
+                    </div>
 
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={handleSendWhatsApp}
-                      className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2"
-                    >
-                      <Send className="w-4 h-4" /> Disparar Link no WhatsApp
-                    </button>
+                    {currentUserRole === 'doctor' ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-bold text-slate-300">
+                            1. Neurocondução Motora:
+                          </label>
+                          <textarea
+                            rows={2.5}
+                            value={motorConduction}
+                            onChange={(e) => setMotorConduction(e.target.value)}
+                            className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                          />
+                        </div>
 
-                    {currentUserRole === 'doctor' && (
-                      <button
-                        onClick={handleGeneratePdf}
-                        className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20"
-                      >
-                        <Printer className="w-4 h-4" /> Assinar & Gerar PDF Timbrado
-                      </button>
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-bold text-slate-300">
+                            2. Neurocondução Sensitiva:
+                          </label>
+                          <textarea
+                            rows={2.5}
+                            value={sensoryConduction}
+                            onChange={(e) => setSensoryConduction(e.target.value)}
+                            className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-bold text-slate-300">
+                            3. Onda F / Resposta Tardia:
+                          </label>
+                          <textarea
+                            rows={2.5}
+                            value={fWave}
+                            onChange={(e) => setFWave(e.target.value)}
+                            className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-bold text-slate-300">
+                            4. Eletromiografia / Registro Cerebral:
+                          </label>
+                          <textarea
+                            rows={2.5}
+                            value={emgText}
+                            onChange={(e) => setEmgText(e.target.value)}
+                            className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-medium"
+                          />
+                        </div>
+
+                        <div className="md:col-span-2 space-y-1">
+                          <label className="block text-[11px] font-bold text-amber-300">
+                            5. Conclusão Médica do Laudo (Síntese Diagnóstica):
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={conclusion}
+                            onChange={(e) => setConclusion(e.target.value)}
+                            className="w-full p-3 rounded-xl bg-slate-900 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 leading-relaxed font-bold"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-500 text-xs italic">
+                        [ As informações diagnósticas e o corpo deste laudo são restritos ao Dr. Eduardo Magalhães para proteção ao sigilo médico conforme a LGPD. ]
+                      </div>
                     )}
                   </div>
+
+                  {/* Barra de Ações */}
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-800 flex-wrap gap-3">
+                    <div className="text-xs text-slate-400 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>Assinatura Digital ICP-Brasil + Carimbo Visual & QR Code</span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleSendWhatsApp}
+                        className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2"
+                      >
+                        <Send className="w-4 h-4" /> Disparar Link no WhatsApp
+                      </button>
+
+                      {currentUserRole === 'doctor' && (
+                        <button
+                          onClick={handleGeneratePdf}
+                          className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+                        >
+                          <Printer className="w-4 h-4" /> Assinar & Gerar PDF Timbrado
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
 
               </div>

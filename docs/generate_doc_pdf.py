@@ -28,7 +28,7 @@ class NumberedCanvas(canvas.Canvas):
         self.setFillColor(colors.HexColor("#64748B"))
         
         if self._pageNumber > 1:
-            self.drawString(54, 800, "Relatório de Acompanhamento & Roteiro de Uso | Clínica Dr. Eduardo Magalhães (21/09/2026)")
+            self.drawString(54, 800, "Relatório de Acompanhamento & Roteiro de Uso | Clínica Dr. Eduardo Magalhães (22/09/2026)")
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.5)
             self.line(54, 792, 541, 792)
@@ -42,7 +42,8 @@ class NumberedCanvas(canvas.Canvas):
         self.restoreState()
 
 def build_pdf():
-    pdf_filename = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\Documentacao_Acompanhamento_2026-09-21.pdf"
+    docs_dir = os.path.dirname(os.path.abspath(__file__))
+    pdf_filename = os.path.join(docs_dir, "Documentacao_Acompanhamento_2026-09-22.pdf")
     doc = SimpleDocTemplate(
         pdf_filename,
         pagesize=A4,
@@ -69,12 +70,12 @@ def build_pdf():
     story = []
 
     # Header Banner
-    img_path = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\foto eduardo.jpg"
+    img_path = os.path.join(docs_dir, "foto eduardo.jpg")
     if os.path.exists(img_path):
         doctor_img = Image(img_path, width=42, height=42)
         header_text = [
-            Paragraph("RELATÓRIO DE ACOMPANHAMENTO & ROTEIRO DE USO (21/09/2026)", title_style),
-            Paragraph("Parte 1: Solicitações WhatsApp | Parte 2: Importador Word & Edição Livre | Parte 3: Roteiro com Telas", subtitle_style)
+            Paragraph("RELATÓRIO DE ACOMPANHAMENTO & ROTEIRO DE USO (22/09/2026)", title_style),
+            Paragraph("Parte 1: Solicitações WhatsApp | Parte 2: Layout 2 Colunas Explorer | Parte 3: Roteiro com Telas", subtitle_style)
         ]
         t_header = Table([[header_text, doctor_img]], colWidths=[435, 48])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
@@ -84,8 +85,8 @@ def build_pdf():
 
     # Meta Table
     meta_data = [
-        [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 21/09/2026", body_style)],
-        [Paragraph("<b>Identificador:</b> DOC-2026-09-21", body_style), Paragraph("<b>Status:</b> Concluído & Publicado em Produção", body_style)],
+        [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 22/09/2026", body_style)],
+        [Paragraph("<b>Identificador:</b> DOC-2026-09-22", body_style), Paragraph("<b>Status:</b> Concluído & Publicado em Produção", body_style)],
         [Paragraph("<b>Plataforma:</b> neuro.eduardomagalhaes.helpusbr.com", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
     ]
     t_meta = Table(meta_data, colWidths=[240, 243])
@@ -104,23 +105,24 @@ def build_pdf():
     # PARTE 1
     story.append(Paragraph("PARTE 1: SOLICITAÇÕES E MATERIAIS DISPONIBILIZADOS PELO CLIENTE", h1_style))
     story.append(Paragraph(
-        "Registro das novas solicitações do <b>Dr. Eduardo Magalhães</b> enviadas via WhatsApp (vídeo do dia 19/09/2026 e mensagens de 21/09/2026) "
-        "referentes à necessidade de um <b>Importador / Campo de Copiar & Colar Texto Livre do Word (.docx)</b> diretamente no formulário de emissão de laudos.", body_style
+        "Registro das novas solicitações do <b>Dr. Eduardo Magalhães</b> enviadas via WhatsApp na data de hoje (<b>22/09/2026</b>) "
+        "referentes à reestruturação de <b>diagramação em 2 colunas side-by-side</b> (Árvore de modelos estilo Windows Explorer à esquerda "
+        "e formulário completo de laudos à direita), otimizando a visualização sem necessidade de rolagem de tela.", body_style
     ))
 
     req_table = [
         [Paragraph("<b>ID</b>", h2_style), Paragraph("<b>Solicitação do Dr. Eduardo</b>", h2_style), Paragraph("<b>Solução Técnica Implementada</b>", h2_style), Paragraph("<b>Status</b>", h2_style)],
         [
-            Paragraph("REQ-11", body_style),
-            Paragraph("<b>Edição Integral do Corpo do Laudo:</b> Personalizar todas as seções do exame além da Conclusão.", body_style),
-            Paragraph("5 caixas de texto editáveis (textarea) para Neurocondução, Onda F, EMG e Conclusão.", body_style),
+            Paragraph("REQ-12", body_style),
+            Paragraph("<b>Copiar & Colar Texto do Word:</b> Importar modelos locais do computador.", body_style),
+            Paragraph("Área de colagem livre com pré-preenchimento automático dos blocos do laudo.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído</b></font>", body_style)
         ],
         [
-            Paragraph("REQ-12", body_style),
-            Paragraph("<b>Copiar & Colar Texto Livre do Word (.docx):</b> Importar textos de arquivos locais/Drive.", body_style),
-            Paragraph("Área de colagem de texto livre com importação e distribuição automática nos blocos do laudo.", body_style),
-            Paragraph("<font color='#0d9488'><b>Concluído (21/09)</b></font>", body_style)
+            Paragraph("REQ-13", body_style),
+            Paragraph("<b>Layout 2 Colunas (Windows Explorer):</b> Eliminar rolagem de tela e exibir subpastas abertas.", body_style),
+            Paragraph("Grid Split-Screen em 2 colunas com expansão simultânea de todas as pastagens à esquerda.", body_style),
+            Paragraph("<font color='#0d9488'><b>Concluído (22/09)</b></font>", body_style)
         ]
     ]
 
@@ -140,41 +142,36 @@ def build_pdf():
 
     # PARTE 2
     story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES E COMPONENTES DESENVOLVIDOS", h1_style))
-    story.append(Paragraph("<b>2.1. Importador de Texto Livre do Word (REQ-12):</b> Caixa de colagem expansível que permite copiar qualquer texto do Word (`.docx`) e carregá-lo instantaneamente no formulário.", body_style))
-    story.append(Paragraph("<b>2.2. Edição Integral do Corpo Diagnóstico:</b> 5 seções do corpo do laudo (Neurocondução Motora, Sensitiva, Onda F, Eletromiografia e Conclusão) 100% liberadas no perfil médico.", body_style))
-    story.append(Paragraph("<b>2.3. Gestão RBAC & Sigilo LGPD:</b> O perfil de secretária mantém os diagnósticos ocultos e protegidos, conforme normas do CFM e LGPD.", body_style))
-    story.append(Paragraph("<b>2.4. Validação ICP-Brasil & QR Code:</b> Sincronização em tempo real das alterações do texto no PDF timbrado com assinatura digital PAdES e QR Code.", body_style))
+    story.append(Paragraph("<b>2.1. Diagramação Split-Screen em 2 Colunas (REQ-13):</b> Painel ajustado para exibição lado a lado na tela com expansão do container principal (`max-w-7xl`).", body_style))
+    story.append(Paragraph("<b>2.2. Árvore de Pastas Estilo Windows Explorer:</b> Todas as subpastas vêm abertas por padrão com botões rápidos de '📂 Tudo' e '📁 Fechar'.", body_style))
+    story.append(Paragraph("<b>2.3. Sincronização do Formulário de Laudos:</b> A seleção de qualquer modelo na árvore carrega instantaneamente no painel direito sem necessidade de rolar a página.", body_style))
+    story.append(Paragraph("<b>2.4. Validação ICP-Brasil & QR Code:</b> Geração do PDF timbrado assinado digitalmente com preservação do sigilo médico LGPD.", body_style))
     story.append(Spacer(1, 4))
 
     # PARTE 3: ROTEIRO PASSO A PASSO
     story.append(Paragraph("PARTE 3: ROTEIRO PASSO A PASSO DE USO COM CAPTURAS DE TELA ATUALIZADAS", h1_style))
 
-    story.append(Paragraph("1️⃣ Passo 1: Copiar & Colar Texto Livre do Word (.docx)", h2_style))
-    story.append(Paragraph("Acesse <b>neuro.eduardomagalhaes.helpusbr.com</b> com o perfil do 👑 <b>Dr. Eduardo Magalhães</b>. Cole qualquer modelo ou texto do Word na caixa do importador e clique em <b>'✨ Carregar no Laudo'</b>.", body_style))
+    story.append(Paragraph("1️⃣ Passo 1: Acessar a Nova Interface em 2 Colunas Lado a Lado", h2_style))
+    story.append(Paragraph("Acesse <b>neuro.eduardomagalhaes.helpusbr.com</b> com o perfil do 👑 <b>Dr. Eduardo Magalhães</b>. O painel será exibido na nova diagramação de duas colunas.", body_style))
 
-    img_word = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\painel_copiar_colar_word.jpg"
-    if os.path.exists(img_word):
-        story.append(Image(img_word, width=483, height=230))
-        story.append(Paragraph("Figura 1: Nova área de colagem de texto do Word (.docx) e preenchimento automático das seções do laudo.", caption_style))
+    img_layout = os.path.join(docs_dir, "painel_layout_duas_colunas.jpg")
+    if os.path.exists(img_layout):
+        story.append(Image(img_layout, width=483, height=275))
+        story.append(Paragraph("Figura 1: Nova interface em 2 colunas com a árvore estilo Windows Explorer à esquerda e o formulário completo à direita.", caption_style))
 
-    story.append(Paragraph("2️⃣ Passo 2: Edição Integral e Ajuste dos 5 Blocos Técnicos", h2_style))
-    story.append(Paragraph("Revise ou personalize os blocos de Neurocondução Motora, Sensitiva, Onda F, Eletromiografia e Conclusão Diagnóstica.", body_style))
+    story.append(Paragraph("2️⃣ Passo 2: Navegar pela Árvore de Pastas Expandida (Esquerda)", h2_style))
+    story.append(Paragraph("Localize a pasta desejada (STC, Radiculopatias, Polineuropatias, EEG) e clique no modelo para carregar no laudo.", body_style))
 
-    img_edicao = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\painel_edicao_corpo_laudo.jpg"
-    if os.path.exists(img_edicao):
-        story.append(Image(img_edicao, width=483, height=225))
-        story.append(Paragraph("Figura 2: Formulário com os 5 blocos do corpo do laudo liberados para personalização técnica.", caption_style))
+    story.append(Paragraph("3️⃣ Passo 3: Assinatura Digital & PDF Timbrado (Direita)", h2_style))
+    story.append(Paragraph("Após conferir o laudo, clique em 'Assinar & Gerar PDF Timbrado' para emitir o documento oficial com QR Code de validação.", body_style))
 
-    story.append(Paragraph("3️⃣ Passo 3: Geração do PDF Timbrado com Assinatura Digital & QR Code", h2_style))
-    story.append(Paragraph("Clique em 'Assinar & Gerar PDF Timbrado' para emitir o documento oficial com selo ICP-Brasil PAdES e QR Code de verificação.", body_style))
-
-    img_laudo = r"d:\dev\AntiG\neuro.eduardomagalhaes\docs\assinatura_digital_qrcode.jpg"
+    img_laudo = os.path.join(docs_dir, "assinatura_digital_qrcode.jpg")
     if os.path.exists(img_laudo):
         story.append(Image(img_laudo, width=483, height=215))
-        story.append(Paragraph("Figura 3: Laudo Médico Oficial gerado pelo sistema com papel timbrado, carimbo profissional e QR Code.", caption_style))
+        story.append(Paragraph("Figura 2: Laudo Médico Oficial gerado pelo sistema com papel timbrado, carimbo profissional e QR Code.", caption_style))
 
     doc.build(story, canvasmaker=NumberedCanvas)
-    print("PDF Documentacao_Acompanhamento_2026-09-21.pdf criado com sucesso!")
+    print("PDF Documentacao_Acompanhamento_2026-09-22.pdf criado com sucesso!")
 
 if __name__ == '__main__':
     build_pdf()
