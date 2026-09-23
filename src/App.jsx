@@ -61,15 +61,19 @@ export default function App() {
         onOpenDoctorPanel={() => setIsDoctorPanelOpen(true)}
       />
 
-      {/* Modals & Portals */}
+      {/* Modals & Portals with 3-Language i18n support */}
       <PatientPortalModal
         isOpen={isPatientPortalOpen}
         onClose={() => setIsPatientPortalOpen(false)}
+        t={t}
+        lang={lang}
       />
 
       <MedicalLaudosApp
         isOpen={isDoctorPanelOpen}
         onClose={() => setIsDoctorPanelOpen(false)}
+        t={t}
+        lang={lang}
       />
 
     </div>

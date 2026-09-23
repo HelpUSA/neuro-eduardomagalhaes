@@ -9,9 +9,29 @@ import jsPDF from 'jspdf';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
 import { INITIAL_PATIENT_DATABASE, formatCPF, findPatientByCPF, fetchCpfOnlineData } from '../data/patientDatabase';
 
-export const MedicalLaudosApp = ({ isOpen, onClose }) => {
+export const MedicalLaudosApp = ({ isOpen, onClose, t, lang }) => {
   const [activeTab, setActiveTab] = useState('generator'); // 'generator' | 'search' | 'users' | 'winsoft'
   
+  const labels = t?.doctorPanel || {
+    modalTitle: "Painel do Consultório",
+    doctorBadge: "👑 Médico (Dr. Eduardo)",
+    receptionBadge: "📋 Secretária (Recepção)",
+    tabLaudos: "Emissão de Laudos",
+    tabWinsoft: "Base Winsoft",
+    tabUsers: "Gestão de Equipe",
+    hideTreeBtn: "📂 Ocultar Árvore (Maximizar Espaço)",
+    showTreeBtn: "📂 Mostrar Árvore de Modelos",
+    treeTitle: "Árvore de Modelos",
+    editorTitle: "Edição Integral do Corpo do Laudo Técnico:",
+    formatBold: "Negrito",
+    formatItalic: "Itálico",
+    formatUnderline: "Sublinhado",
+    saveModelBtn: "💾 Salvar como Novo Modelo",
+    clearBtn: "Limpar",
+    whatsappBtn: "Disparar Link no WhatsApp",
+    signPdfBtn: "Assinar & Gerar PDF Timbrado"
+  };
+
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
@@ -39,13 +59,13 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
   const [selectedTemplateId, setSelectedTemplateId] = useState('enmg_stc_grau2');
   const [templateSearchText, setTemplateSearchText] = useState('');
 
-  // REQ-18: Collapsible Explorer Tree & Full-Width Expanded Editor State (Dr. Eduardo 22/09/2026)
+  // Collapsible Explorer Tree & Full-Width Expanded Editor State
   const [isTreeVisible, setIsTreeVisible] = useState(true);
 
-  // REQ-19: Rich Text Formatting & Editor Font Size State
-  const [editorFontSize, setEditorFontSize] = useState(13); // 12px, 13px, 14px, 16px, 18px
+  // Rich Text Formatting & Editor Font Size State
+  const [editorFontSize, setEditorFontSize] = useState(13);
 
-  // REQ-20: Custom Templates State (Editable & Removable Templates in Tree)
+  // Custom Templates State
   const [customTemplates, setCustomTemplates] = useState([]);
   const [deletedTemplateIds, setDeletedTemplateIds] = useState([]);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -67,8 +87,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose }) => {
   const [emgText, setEmgText] = useState('Realizada com agulha monopolar em músculos paracervicais, deltoide, bíceps, extensor comum dos dedos e primeiro interósseo dorsal.');
   const [conclusion, setConclusion] = useState('Exame compatível com neuropatia do mediano ao nível do carpo, com comprometimento parcial de fibras sensitivas, de caráter desmielinizante (grau 2), bilateral.');
 
-  // REQ-15: Unified Full-Text Editor Mode for EEG / ENMG (Dr. Eduardo 22/09/2026)
-  const [editorMode, setEditorMode] = useState('unified'); // 'unified' | 'split'
+  const [editorMode, setEditorMode] = useState('unified');
   const [fullReportText, setFullReportText] = useState(
 `ELETRONEUROMIOGRAFIA DOS MEMBROS SUPERIORES
 
@@ -82,17 +101,12 @@ CONCLUSÃO:
 Exame compatível com neuropatia do mediano ao nível do carpo, com comprometimento parcial de fibras sensitivas, de caráter desmielinizante (grau 2), bilateral.`
   );
 
-  // Free-Form Word Text Importer State (REQ-12 - Dr. Eduardo WhatsApp 19/09/2026)
   const [wordImportText, setWordImportText] = useState('');
   const [showWordImporter, setShowWordImporter] = useState(false);
-
-  // Attached Tracings File
   const [attachedTracingsFile, setAttachedTracingsFile] = useState('Graficos_Aparelho_ENMG_Clelia.pdf');
 
-  // Combine original templates with custom templates and exclude deleted ones
   const allAvailableTemplates = [...ALL_EXAM_TEMPLATES, ...customTemplates].filter(t => !deletedTemplateIds.includes(t.id));
 
-  // Handle Importing Raw Text Copied from Word (.docx) - Preserving spacing 1:1
   const handleApplyWordText = () => {
     if (!wordImportText.trim()) {
       alert("Por favor, cole ou digite o texto do seu modelo do Word no campo antes de importar.");
@@ -109,17 +123,15 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
         setConclusion(parts[1].trim());
       }
     }
-    alert("✨ Texto do Word importado com sucesso mantendo a formatação e espaçamento originais!");
+    alert("✨ Texto do Word importado com sucesso!");
   };
 
-  // Employee Roles Database (Dinamico)
   const [employees, setEmployees] = useState([
     { id: 1, name: 'Dr. Eduardo Magalhães', email: 'eduardo@clinica.com.br', password: '123', role: 'doctor', roleTitle: '👑 Administrador / Médico', status: 'Ativo' },
     { id: 2, name: 'Juliana Costa', email: 'juliana@clinica.com.br', password: '123', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' },
     { id: 3, name: 'Fernanda Souza', email: 'fernanda@clinica.com.br', password: '123', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' }
   ]);
 
-  // User Management Modal State (CRUD)
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
   const [userFormName, setUserFormName] = useState('');
@@ -130,7 +142,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
   if (!isOpen) return null;
 
-  // Login Handler
   const handleLoginSubmit = (e) => {
     e.preventDefault();
     setLoginError('');
@@ -160,7 +171,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     }
   };
 
-  // Quick Login Pre-fill
   const quickFillLogin = (email, roleName, roleType) => {
     setLoginEmail(email);
     setLoginPassword('123');
@@ -170,13 +180,11 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     setLoginError('');
   };
 
-  // Logout Handler
   const handleLogout = () => {
     setIsAuthenticated(false);
     setLoginError('');
   };
 
-  // User CRUD Handlers
   const handleOpenAddUser = () => {
     setEditingUserId(null);
     setUserFormName('');
@@ -243,7 +251,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     }
   };
 
-  // Toggle Folder Expansion (Windows Explorer style)
   const toggleFolder = (folderKey) => {
     setExpandedFolders(prev => ({
       ...prev,
@@ -263,7 +270,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     setExpandedFolders(none);
   };
 
-  // Handle CPF Change and Auto-fill (Mevo style) + Patient History
   const handleCpfChange = (val) => {
     const formatted = formatCPF(val);
     setCpf(formatted);
@@ -276,7 +282,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     }
   };
 
-  // Perform CPF Lookup in Patient Database (Winsoft + Online API)
   const performCpfLookup = async (targetCpf = cpf) => {
     const found = findPatientByCPF(patientDb, targetCpf);
     if (found) {
@@ -301,8 +306,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     }
   };
 
-  // REQ-17: CLEAN TEMPLATE SELECTION (Dr. Eduardo 22/09/2026)
-  // Directly loads clean template fullText without inserting artificial headers or stray "/ EEG" strings
   const handleSelectTemplate = (template) => {
     setSelectedTemplateId(template.id);
     if (template.motorConduction) setMotorConduction(template.motorConduction);
@@ -311,7 +314,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     if (template.emgText) setEmgText(template.emgText);
     if (template.conclusion) setConclusion(template.conclusion);
 
-    // CLEAN TEXT LOAD: Use template.fullText or concatenate clean sections directly
     let cleanText = template.fullText;
     if (!cleanText) {
       const parts = [
@@ -327,7 +329,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     setFullReportText(cleanText);
   };
 
-  // REQ-19: Rich Text Toolbar Insert Helper
   const handleInsertFormat = (tagStart, tagEnd = tagStart) => {
     const textarea = document.getElementById('unified-editor-textarea');
     if (!textarea) return;
@@ -339,7 +340,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     setFullReportText(newText);
   };
 
-  // REQ-20: Template Management (Save Custom, Edit & Delete)
   const handleOpenAddTemplate = () => {
     setEditingTemplate(null);
     setTemplateFormTitle('');
@@ -399,7 +399,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     setIsTemplateModalOpen(false);
   };
 
-  // Function to generate PDF Timbrado with Signature + QR Code
   const handleGeneratePdf = () => {
     const doc = new jsPDF();
     doc.setFillColor(15, 23, 42);
@@ -413,7 +412,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     doc.setTextColor(56, 189, 248);
     doc.text('Neurologia & Neurofisiologia Clínica | Laudo de Exame Oficial', 14, 23);
 
-    // Patient Header Box
     doc.setFillColor(248, 250, 252);
     doc.rect(14, 38, 182, 32, 'F');
     doc.setDrawColor(203, 213, 225);
@@ -451,7 +449,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       addBlock('ONDA F:', fWave);
       addBlock('ELETROMIOGRAFIA / REGISTRO CEREBRAL:', emgText);
 
-      // Conclusion Box
       doc.setFillColor(240, 249, 255);
       doc.setDrawColor(2, 132, 199);
       const concLines = doc.splitTextToSize(conclusion, 174);
@@ -466,7 +463,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       y += bh + 15;
     }
 
-    // Doctor Signature Line & QR Code Note
     doc.setDrawColor(148, 163, 184);
     doc.line(70, y, 140, y);
     y += 4;
@@ -478,12 +474,10 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
     doc.text('Neurologista & Neurofisiologista | CRM-RO', 105, y + 4, { align: 'center' });
-    doc.text('Documento Assinado Digitalmente com Certificado ICP-Brasil (PAdES)', 105, y + 8, { align: 'center' });
 
     doc.save(`Laudo_Oficial_${patientName.replace(/\s+/g, '_')}.pdf`);
   };
 
-  // WhatsApp Dispatch
   const handleSendWhatsApp = () => {
     const text = encodeURIComponent(
       `Olá ${patientName}! Seu laudo de exame foi concluído pela Clínica Dr. Eduardo Magalhães. Você pode baixar seu laudo e gráficos de exame com segurança no nosso portal usando seu CPF.`
@@ -495,7 +489,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
       <div className="relative w-full max-w-[96vw] xl:max-w-7xl glass-panel rounded-3xl p-4 sm:p-6 shadow-2xl border border-indigo-500/30 my-3 max-h-[92vh] flex flex-col overflow-hidden">
         
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-5 right-5 p-2 rounded-full bg-slate-900 text-slate-400 hover:text-white transition z-20"
@@ -503,14 +496,13 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
           <X className="w-5 h-5" />
         </button>
 
-        {/* --- SCREEN 1: LOGIN AUTHENTICATION --- */}
         {!isAuthenticated ? (
           <div className="py-8 px-2 max-w-md mx-auto space-y-6 overflow-y-auto">
             <div className="text-center space-y-2">
               <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-cyan-400 flex items-center justify-center mx-auto shadow-lg shadow-indigo-500/10">
                 <Lock className="w-8 h-8" />
               </div>
-              <h2 className="text-2xl font-extrabold text-white">Autenticação de Acesso</h2>
+              <h2 className="text-2xl font-extrabold text-white">{labels.modalTitle}</h2>
               <p className="text-xs text-slate-400">
                 Clínica de Neurologia Dr. Eduardo Magalhães — Emissão de Laudos & Gestão
               </p>
@@ -525,7 +517,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">E-mail de Acesso</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">E-mail de Acesso / Email</label>
                 <input
                   type="email"
                   value={loginEmail}
@@ -537,7 +529,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Senha de Acesso / PIN</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Senha / Password</label>
                 <input
                   type="password"
                   value={loginPassword}
@@ -552,7 +544,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 type="submit"
                 className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-600/30 transition"
               >
-                Entrar no Sistema
+                Entrar no Sistema / Login
               </button>
             </form>
 
@@ -566,7 +558,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                   onClick={() => quickFillLogin('eduardo@clinica.com.br', 'Dr. Eduardo Magalhães', 'doctor')}
                   className="p-3 rounded-xl bg-slate-900 hover:bg-slate-850 border border-amber-500/30 text-amber-300 text-xs font-bold text-left flex items-center justify-between transition"
                 >
-                  <span>👑 Dr. Eduardo</span>
+                  <span>{labels.doctorBadge}</span>
                   <ChevronRight className="w-4 h-4 text-amber-400" />
                 </button>
                 <button
@@ -574,16 +566,14 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                   onClick={() => quickFillLogin('juliana@clinica.com.br', 'Juliana Costa (Secretária)', 'reception')}
                   className="p-3 rounded-xl bg-slate-900 hover:bg-slate-850 border border-cyan-500/30 text-cyan-300 text-xs font-bold text-left flex items-center justify-between transition"
                 >
-                  <span>📋 Secretária</span>
+                  <span>{labels.receptionBadge}</span>
                   <ChevronRight className="w-4 h-4 text-cyan-400" />
                 </button>
               </div>
             </div>
           </div>
         ) : (
-          /* --- SCREEN 2: AUTHENTICATED CLINIC PANEL --- */
           <div className="flex-1 flex flex-col overflow-hidden space-y-4">
-            {/* Header Bar */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 flex-wrap gap-4 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
@@ -591,9 +581,9 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 </div>
                 <div>
                   <h2 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
-                    <span>Painel do Consultório</span>
+                    <span>{labels.modalTitle}</span>
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${currentUserRole === 'doctor' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'}`}>
-                      {currentUserRole === 'doctor' ? '👑 Médico (Dr. Eduardo)' : '📋 Secretária (Recepção)'}
+                      {currentUserRole === 'doctor' ? labels.doctorBadge : labels.receptionBadge}
                     </span>
                   </h2>
                   <p className="text-xs text-slate-400">
@@ -608,13 +598,13 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                     onClick={() => { setCurrentUserRole('doctor'); setCurrentUserName('Dr. Eduardo Magalhães'); }}
                     className={`px-3 py-1.5 rounded-xl font-bold transition ${currentUserRole === 'doctor' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
                   >
-                    👑 Dr. Eduardo
+                    {labels.doctorBadge}
                   </button>
                   <button
                     onClick={() => { setCurrentUserRole('reception'); setCurrentUserName('Juliana Costa (Secretária)'); }}
                     className={`px-3 py-1.5 rounded-xl font-bold transition ${currentUserRole === 'reception' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
                   >
-                    📋 Secretária
+                    {labels.receptionBadge}
                   </button>
                 </div>
 
@@ -628,27 +618,26 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
               </div>
             </div>
 
-            {/* Navigation Tabs */}
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-3 shrink-0">
               <div className="flex items-center gap-2 text-xs font-bold">
                 <button
                   onClick={() => setActiveTab('generator')}
                   className={`px-4 py-2 rounded-xl transition ${activeTab === 'generator' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
                 >
-                  <FileText className="w-4 h-4 inline mr-1.5" /> Emissão de Laudos
+                  <FileText className="w-4 h-4 inline mr-1.5" /> {labels.tabLaudos}
                 </button>
                 <button
                   onClick={() => setActiveTab('winsoft')}
                   className={`px-4 py-2 rounded-xl transition ${activeTab === 'winsoft' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
                 >
-                  <Database className="w-4 h-4 inline mr-1.5" /> Base Winsoft ({patientDb.length} Pacientes)
+                  <Database className="w-4 h-4 inline mr-1.5" /> {labels.tabWinsoft} ({patientDb.length})
                 </button>
                 {currentUserRole === 'doctor' && (
                   <button
                     onClick={() => setActiveTab('users')}
                     className={`px-4 py-2 rounded-xl transition ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
                   >
-                    <ShieldCheck className="w-4 h-4 inline mr-1.5" /> Gestão de Equipe ({employees.length} Usuários)
+                    <ShieldCheck className="w-4 h-4 inline mr-1.5" /> {labels.tabUsers} ({employees.length})
                   </button>
                 )}
               </div>
@@ -661,19 +650,16 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
               )}
             </div>
 
-            {/* TAB 1: EMISSOR DE LAUDOS - LAYOUT DUAL COLUMN & FULL-WIDTH TOGGLE (REQ-13, REQ-18) */}
             {activeTab === 'generator' && (
               <div className="flex-1 overflow-y-auto pr-1">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                  
-                  {/* ESQUERDA (lg:col-span-4): ÁRVORE DE MODELOS (REQ-18: COLLAPSIBLE TREE) */}
                   {isTreeVisible && (
                     <div className="lg:col-span-4 p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 flex flex-col">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <FolderOpen className="w-4 h-4 text-amber-400" />
                           <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-300">
-                            Árvore de Modelos
+                            {labels.treeTitle}
                           </h3>
                         </div>
                         <div className="flex items-center gap-1">
@@ -681,7 +667,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             type="button"
                             onClick={expandAllFolders}
                             className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-bold text-cyan-400"
-                            title="Expandir todas as pastas"
                           >
                             📂 Tudo
                           </button>
@@ -689,7 +674,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             type="button"
                             onClick={collapseAllFolders}
                             className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-bold text-slate-400"
-                            title="Recolher todas as pastas"
                           >
                             📁 Fechar
                           </button>
@@ -698,7 +682,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                               type="button"
                               onClick={handleOpenAddTemplate}
                               className="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-bold border border-amber-500/40 flex items-center gap-1"
-                              title="Criar Novo Modelo Personalizado"
                             >
                               <PlusCircle className="w-3 h-3" /> +Novo
                             </button>
@@ -706,7 +689,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         </div>
                       </div>
 
-                      {/* Search box for models */}
                       <div className="relative">
                         <input
                           type="text"
@@ -718,7 +700,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
                       </div>
 
-                      {/* Windows Explorer Folder Tree View (A-Z Alphabetical Order - REQ-14, REQ-20) */}
                       <div className="flex-1 overflow-y-auto max-h-[580px] pr-1 space-y-2 font-mono text-xs">
                         {[...EXAM_CATEGORIES]
                           .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
@@ -750,7 +731,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                   </span>
                                 </button>
 
-                                {/* Sub-tree of template files (Sorted A-Z & Editable/Removable - REQ-20) */}
                                 {isExpanded && (
                                   <div className="pl-3 border-l-2 border-slate-800 space-y-1 mt-1">
                                     {catTemplates.map(tmpl => (
@@ -798,10 +778,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                     </div>
                   )}
 
-                  {/* DIREITA (lg:col-span-8 or lg:col-span-12): FORMULÁRIO COMPLETO DO LAUDO */}
                   <div className={`${isTreeVisible ? 'lg:col-span-8' : 'lg:col-span-12'} space-y-4 transition-all duration-300`}>
-                    
-                    {/* Header Controls for Expanding Editor Width (REQ-18) */}
                     <div className="flex items-center justify-between bg-slate-900/90 p-2.5 rounded-2xl border border-slate-800 flex-wrap gap-2">
                       <button
                         type="button"
@@ -811,12 +788,12 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         {isTreeVisible ? (
                           <>
                             <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
-                            <span>📂 Ocultar Árvore (Maximizar Espaço de Edição)</span>
+                            <span>{labels.hideTreeBtn}</span>
                           </>
                         ) : (
                           <>
                             <Minimize2 className="w-3.5 h-3.5 text-cyan-400" />
-                            <span>📂 Mostrar Árvore de Modelos</span>
+                            <span>{labels.showTreeBtn}</span>
                           </>
                         )}
                       </button>
@@ -826,7 +803,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                       </span>
                     </div>
 
-                    {/* Dados do Paciente (CPF Mevo + Histórico de Exames REQ-21) */}
                     <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
@@ -835,7 +811,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         </h4>
 
                         <div className="flex items-center gap-2">
-                          {/* REQ-21: HISTÓRICO DE EXAMES ANTERIORES DO PACIENTE */}
                           {selectedPatientExams.length > 0 && (
                             <button
                               type="button"
@@ -854,16 +829,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           {cpfSearchStatus === 'found' && (
                             <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
                               <Check className="w-3.5 h-3.5" /> Paciente Localizado no Winsoft!
-                            </span>
-                          )}
-                          {cpfSearchStatus === 'found_online' && (
-                            <span className="px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> Paciente Localizado (Mevo)!
-                            </span>
-                          )}
-                          {cpfSearchStatus === 'not_found' && (
-                            <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1.5">
-                              <AlertTriangle className="w-3.5 h-3.5" /> Novo Paciente
                             </span>
                           )}
                         </div>
@@ -885,7 +850,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             />
                             <button
                               onClick={() => performCpfLookup()}
-                              title="Buscar dados no Winsoft / Online"
                               className="px-2.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0"
                             >
                               <Search className="w-4 h-4" />
@@ -923,89 +887,17 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           />
                         </div>
                       </div>
-
-                      {/* Anexo de Gráficos do Aparelho */}
-                      <div className="pt-2 flex items-center justify-between border-t border-slate-800/80 flex-wrap gap-2 text-xs">
-                        <div className="flex items-center gap-2 text-slate-300">
-                          <Paperclip className="w-4 h-4 text-cyan-400" />
-                          <span>PDF com Gráficos/Traçados do Aparelho:</span>
-                          <strong className="text-emerald-400 font-mono">{attachedTracingsFile}</strong>
-                        </div>
-                        <button
-                          onClick={() => alert("Simulação: Arquivo de gráficos anexado com sucesso ao prontuário do paciente!")}
-                          className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700"
-                        >
-                          + Anexar Gráficos do Aparelho
-                        </button>
-                      </div>
                     </div>
 
-                    {/* REQ-12: Área de Copiar & Colar Texto do Word (.docx) */}
-                    {currentUserRole === 'doctor' && (
-                      <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-cyan-400" />
-                            <h4 className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
-                              📋 Copiar & Colar Texto do Word (.docx):
-                            </h4>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setShowWordImporter(!showWordImporter)}
-                            className="text-[11px] text-cyan-400 hover:underline font-bold"
-                          >
-                            {showWordImporter ? 'Ocultar ▲' : 'Mostrar Importador do Word ▼'}
-                          </button>
-                        </div>
-
-                        {showWordImporter && (
-                          <div className="space-y-2 pt-1">
-                            <textarea
-                              rows={3}
-                              value={wordImportText}
-                              onChange={(e) => setWordImportText(e.target.value)}
-                              placeholder="Cole aqui qualquer modelo ou texto vindo do Word para carregar preservando os parágrafos originais..."
-                              className="w-full p-2.5 rounded-xl bg-slate-950 border border-indigo-500/40 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono leading-relaxed"
-                              style={{ whiteSpace: 'pre-wrap' }}
-                            />
-                            <div className="flex items-center justify-between flex-wrap gap-2">
-                              <span className="text-[10px] text-slate-400 italic">
-                                * O texto será carregado com exatidão no campo único abaixo.
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => setWordImportText('')}
-                                  className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
-                                >
-                                  Limpar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleApplyWordText}
-                                  className="px-3.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-extrabold flex items-center gap-1.5 shadow-md shadow-cyan-500/20"
-                                >
-                                  <Sparkles className="w-3.5 h-3.5" /> ✨ Carregar no Laudo
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* REQ-15, REQ-17, REQ-19: CORPO DO LAUDO COM CAMPO ÚNICO & BARRA DE EDICÃO */}
                     <div className="space-y-3 pt-1">
                       <div className="flex items-center justify-between border-b border-slate-800 pb-2 flex-wrap gap-2">
                         <div className="flex items-center gap-2">
                           <Edit3 className="w-4 h-4 text-cyan-400" />
                           <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
-                            Edição Integral do Corpo do Laudo Técnico:
+                            {labels.editorTitle}
                           </h4>
                         </div>
 
-                        {/* Mode Selector Toggle */}
                         {currentUserRole === 'doctor' && (
                           <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px] font-bold">
                             <button
@@ -1024,19 +916,11 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             </button>
                           </div>
                         )}
-
-                        {currentUserRole === 'reception' && (
-                          <span className="text-amber-400 font-semibold text-[11px] flex items-center gap-1">
-                            <Lock className="w-3.5 h-3.5" /> Restrito ao Médico (LGPD)
-                          </span>
-                        )}
                       </div>
 
                       {currentUserRole === 'doctor' ? (
                         editorMode === 'unified' ? (
-                          /* REQ-15, REQ-17, REQ-19: SINGLE UNIFIED EDITOR WITH RICH TEXT TOOLBAR */
                           <div className="space-y-2">
-                            {/* REQ-19: RICH TEXT TOOLBAR (NEGRITO, ITÁLICO, TAMANHO DA FONTE, SALVAR MODELO) */}
                             <div className="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800 flex-wrap gap-2 text-xs">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">
@@ -1046,7 +930,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                   type="button"
                                   onClick={() => handleInsertFormat('**', '**')}
                                   className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-bold text-xs"
-                                  title="Negrito (**texto**)"
+                                  title={labels.formatBold}
                                 >
                                   <Bold className="w-3.5 h-3.5" />
                                 </button>
@@ -1054,7 +938,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                   type="button"
                                   onClick={() => handleInsertFormat('*', '*')}
                                   className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white italic text-xs"
-                                  title="Itálico (*texto*)"
+                                  title={labels.formatItalic}
                                 >
                                   <Italic className="w-3.5 h-3.5" />
                                 </button>
@@ -1062,7 +946,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                   type="button"
                                   onClick={() => handleInsertFormat('<u>', '</u>')}
                                   className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white underline text-xs"
-                                  title="Sublinhado (<u>texto</u>)"
+                                  title={labels.formatUnderline}
                                 >
                                   <Underline className="w-3.5 h-3.5" />
                                 </button>
@@ -1074,7 +958,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                   type="button"
                                   onClick={() => setEditorFontSize(prev => Math.max(11, prev - 1))}
                                   className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-mono font-bold text-xs"
-                                  title="Diminuir Tamanho da Fonte"
                                 >
                                   A-
                                 </button>
@@ -1083,7 +966,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                   type="button"
                                   onClick={() => setEditorFontSize(prev => Math.min(18, prev + 1))}
                                   className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-mono font-bold text-xs"
-                                  title="Aumentar Tamanho da Fonte"
                                 >
                                   A+
                                 </button>
@@ -1094,38 +976,33 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                   type="button"
                                   onClick={handleOpenAddTemplate}
                                   className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1.5"
-                                  title="Salvar o texto atual como um novo modelo na árvore"
                                 >
-                                  <Save className="w-3.5 h-3.5 text-amber-400" /> Salvar como Modelo
+                                  <Save className="w-3.5 h-3.5 text-amber-400" /> {labels.saveModelBtn}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setFullReportText('')}
                                   className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 text-[11px] font-bold"
                                 >
-                                  Limpar
+                                  {labels.clearBtn}
                                 </button>
                               </div>
                             </div>
 
-                            {/* UNIFIED FULL-TEXT EDITOR TEXTAREA */}
                             <textarea
                               id="unified-editor-textarea"
                               rows={isTreeVisible ? 14 : 18}
                               value={fullReportText}
                               onChange={(e) => setFullReportText(e.target.value)}
-                              placeholder="Edite aqui todo o texto do laudo (Técnica, Achados, Tabelas, Conclusão...)"
+                              placeholder="Edite aqui todo o texto do laudo..."
                               style={{ fontSize: `${editorFontSize}px`, whiteSpace: 'pre-wrap' }}
                               className="w-full p-4 rounded-xl bg-slate-950 border border-cyan-500/40 text-white font-mono focus:outline-none focus:border-cyan-400 leading-relaxed shadow-inner"
                             />
                           </div>
                         ) : (
-                          /* SPLIT MODE: 5 SUB-SECTIONS (FOR SPECIFIC ENMG EXAMS) */
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-300">
-                                1. Neurocondução Motora:
-                              </label>
+                              <label className="block text-[11px] font-bold text-slate-300">1. Neurocondução Motora:</label>
                               <textarea
                                 rows={3}
                                 value={motorConduction}
@@ -1136,9 +1013,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-300">
-                                2. Neurocondução Sensitiva:
-                              </label>
+                              <label className="block text-[11px] font-bold text-slate-300">2. Neurocondução Sensitiva:</label>
                               <textarea
                                 rows={3}
                                 value={sensoryConduction}
@@ -1149,9 +1024,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-300">
-                                3. Onda F / Resposta Tardia:
-                              </label>
+                              <label className="block text-[11px] font-bold text-slate-300">3. Onda F / Resposta Tardia:</label>
                               <textarea
                                 rows={3}
                                 value={fWave}
@@ -1162,9 +1035,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             </div>
 
                             <div className="space-y-1">
-                              <label className="block text-[11px] font-bold text-slate-300">
-                                4. Eletromiografia / Registro Cerebral:
-                              </label>
+                              <label className="block text-[11px] font-bold text-slate-300">4. Eletromiografia / Registro:</label>
                               <textarea
                                 rows={3}
                                 value={emgText}
@@ -1175,9 +1046,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             </div>
 
                             <div className="md:col-span-2 space-y-1">
-                              <label className="block text-[11px] font-bold text-amber-300">
-                                5. Conclusão Médica do Laudo (Síntese Diagnóstica):
-                              </label>
+                              <label className="block text-[11px] font-bold text-amber-300">5. Conclusão Médica do Laudo:</label>
                               <textarea
                                 rows={3}
                                 value={conclusion}
@@ -1195,7 +1064,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                       )}
                     </div>
 
-                    {/* Action Bar */}
                     <div className="flex items-center justify-between pt-3 border-t border-slate-800 flex-wrap gap-3">
                       <div className="text-xs text-slate-400 flex items-center gap-2">
                         <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -1207,7 +1075,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           onClick={handleSendWhatsApp}
                           className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2"
                         >
-                          <Send className="w-4 h-4" /> Disparar Link no WhatsApp
+                          <Send className="w-4 h-4" /> {labels.whatsappBtn}
                         </button>
 
                         {currentUserRole === 'doctor' && (
@@ -1215,7 +1083,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             onClick={handleGeneratePdf}
                             className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20"
                           >
-                            <Printer className="w-4 h-4" /> Assinar & Gerar PDF Timbrado
+                            <Printer className="w-4 h-4" /> {labels.signPdfBtn}
                           </button>
                         )}
                       </div>
@@ -1226,384 +1094,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 </div>
               </div>
             )}
-
-            {/* TAB 2: BASE WINSOFT DE PACIENTES */}
-            {activeTab === 'winsoft' && (
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-4">
-                  <div>
-                    <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                      <Database className="w-5 h-5 text-indigo-400" />
-                      <span>Base de Dados de Pacientes (Winsoft - Jean Cordeiro)</span>
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Cadastros sincronizados para busca instantânea por CPF e histórico retroativo de exames.
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() => alert("Módulo de Carga CSV: Selecione o arquivo exportado do sistema Winsoft (.csv ou .json) para atualizar a base de pacientes.")}
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-2"
-                  >
-                    <Upload className="w-4 h-4" /> Importar Lista do Winsoft (CSV)
-                  </button>
-                </div>
-
-                {/* Patients Table */}
-                <div className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden">
-                  <table className="w-full text-left text-xs text-slate-300">
-                    <thead className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
-                      <tr>
-                        <th className="p-3">CPF</th>
-                        <th className="p-3">Nome Completo</th>
-                        <th className="p-3">Data Nasc.</th>
-                        <th className="p-3">Último Exame</th>
-                        <th className="p-3">Histórico</th>
-                        <th className="p-3 text-right">Ação</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {patientDb.map(p => (
-                        <tr key={p.cpf} className="hover:bg-slate-800/40 transition">
-                          <td className="p-3 font-mono text-cyan-400 font-bold">{p.cpf}</td>
-                          <td className="p-3 font-semibold text-white">{p.name}</td>
-                          <td className="p-3">{p.birthDate}</td>
-                          <td className="p-3 text-slate-400">{p.lastExam || '03/10/2025'}</td>
-                          <td className="p-3">
-                            <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold text-[10px]">
-                              {p.examHistory ? `${p.examHistory.length} exames` : '1 exame'}
-                            </span>
-                          </td>
-                          <td className="p-3 text-right">
-                            <button
-                              onClick={() => {
-                                setCpf(p.cpf);
-                                setPatientName(p.name);
-                                setBirthDate(p.birthDate);
-                                if (p.requestingDoctor) setRequestingDoctor(p.requestingDoctor);
-                                setCpfSearchStatus('found');
-                                setSelectedPatientExams(p.examHistory || []);
-                                setActiveTab('generator');
-                              }}
-                              className="px-3 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 font-bold text-[11px]"
-                            >
-                              Usar no Laudo
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: GESTÃO DE EQUIPE (RBAC) */}
-            {activeTab === 'users' && currentUserRole === 'doctor' && (
-              <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-4">
-                  <div>
-                    <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                      <ShieldCheck className="w-5 h-5 text-amber-400" />
-                      <span>Gestão de Equipe & Controle de Acesso (RBAC / LGPD)</span>
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Gerencie logins de médicos, secretárias e técnicos de exames com níveis de sigilo diagnósticos.
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleOpenAddUser}
-                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20"
-                  >
-                    <UserPlus className="w-4 h-4" /> Cadastrar Novo Usuário
-                  </button>
-                </div>
-
-                <div className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden">
-                  <table className="w-full text-left text-xs text-slate-300">
-                    <thead className="bg-slate-950 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
-                      <tr>
-                        <th className="p-3">Nome / Usuário</th>
-                        <th className="p-3">E-mail de Login</th>
-                        <th className="p-3">Perfil de Acesso</th>
-                        <th className="p-3">Permissão Diagnóstica</th>
-                        <th className="p-3">Status</th>
-                        <th className="p-3 text-right">Ação</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {employees.map(emp => (
-                        <tr key={emp.id} className="hover:bg-slate-800/40 transition">
-                          <td className="p-3 font-semibold text-white flex items-center gap-2">
-                            <User className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{emp.name}</span>
-                          </td>
-                          <td className="p-3 font-mono text-slate-400">{emp.email}</td>
-                          <td className="p-3 font-bold text-cyan-300">{emp.roleTitle}</td>
-                          <td className="p-3">
-                            {emp.role === 'doctor' ? (
-                              <span className="text-emerald-400 font-bold flex items-center gap-1">
-                                <Check className="w-3.5 h-3.5" /> Total (Médico / Assinatura)
-                              </span>
-                            ) : emp.role === 'technician' ? (
-                              <span className="text-cyan-400 font-bold flex items-center gap-1">
-                                <Eye className="w-3.5 h-3.5" /> Anexo de Traçados
-                              </span>
-                            ) : (
-                              <span className="text-amber-400 font-bold flex items-center gap-1">
-                                <Lock className="w-3.5 h-3.5" /> Oculto (Secretária - LGPD)
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${emp.status === 'Ativo' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}>
-                              {emp.status || 'Ativo'}
-                            </span>
-                          </td>
-                          <td className="p-3 text-right flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => handleOpenEditUser(emp)}
-                              title="Editar Usuário"
-                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            {emp.role !== 'doctor' && (
-                              <button
-                                onClick={() => handleDeleteUser(emp.id)}
-                                title="Revogar Acesso"
-                                className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* MODAL 1: HISTÓRICO DE EXAMES ANTERIORES DO PACIENTE (REQ-21) */}
-        {isExamHistoryOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div className="relative w-full max-w-2xl bg-slate-900 rounded-3xl p-6 border border-indigo-500/40 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <History className="w-5 h-5 text-indigo-400" />
-                  <span>Histórico de Exames Anteriores — {patientName}</span>
-                </h3>
-                <button onClick={() => setIsExamHistoryOpen(false)} className="text-slate-400 hover:text-white">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-                {selectedPatientExams.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-4 text-center">Nenhum exame anterior registrado para este CPF.</p>
-                ) : (
-                  selectedPatientExams.map(ex => (
-                    <div key={ex.id} className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <span className="text-xs font-bold text-amber-300">{ex.title}</span>
-                        <span className="text-[11px] font-mono text-cyan-400 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                          📅 {ex.date}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 font-sans">{ex.conclusion}</p>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-900">
-                        <span>Solicitante: {ex.doctor}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFullReportText(`HISTÓRICO REUTILIZADO DO EXAME DE ${ex.date}:\n\n${ex.title}\n\n${ex.conclusion}`);
-                            setIsExamHistoryOpen(false);
-                            alert("✨ Achados do exame anterior carregados no editor com sucesso!");
-                          }}
-                          className="px-2.5 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px]"
-                        >
-                          👁️ Reutilizar Achados no Laudo Atual
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* MODAL 2: CRIAR / EDITAR MODELO PERSONALIZADO (REQ-20) */}
-        {isTemplateModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div className="relative w-full max-w-lg bg-slate-900 rounded-3xl p-6 border border-amber-500/40 shadow-2xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <Save className="w-5 h-5 text-amber-400" />
-                  <span>{editingTemplate ? 'Editar Modelo de Laudo' : 'Salvar Novo Modelo na Árvore'}</span>
-                </h3>
-                <button onClick={() => setIsTemplateModalOpen(false)} className="text-slate-400 hover:text-white">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveTemplateForm} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Título do Modelo</label>
-                  <input
-                    type="text"
-                    value={templateFormTitle}
-                    onChange={(e) => setTemplateFormTitle(e.target.value)}
-                    placeholder="ex: ENMG - Síndrome do Túnel do Carpo Severa"
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Categoria na Árvore</label>
-                  <select
-                    value={templateFormCategory}
-                    onChange={(e) => setTemplateFormCategory(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
-                  >
-                    {EXAM_CATEGORIES.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Texto do Modelo</label>
-                  <textarea
-                    rows={6}
-                    value={templateFormText}
-                    onChange={(e) => setTemplateFormText(e.target.value)}
-                    placeholder="Texto completo do laudo..."
-                    required
-                    style={{ whiteSpace: 'pre-wrap' }}
-                    className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-mono"
-                  />
-                </div>
-
-                <div className="pt-2 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsTemplateModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shadow-md shadow-amber-500/20"
-                  >
-                    Salvar Modelo
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* MODAL 3: EDIT / CREATE USER FORM (RBAC) */}
-        {isUserModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div className="relative w-full max-w-md bg-slate-900 rounded-3xl p-6 border border-slate-800 shadow-2xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <UserPlus className="w-5 h-5 text-amber-400" />
-                  <span>{editingUserId ? 'Editar Usuário' : 'Cadastrar Novo Usuário'}</span>
-                </h3>
-                <button onClick={() => setIsUserModalOpen(false)} className="text-slate-400 hover:text-white">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveUser} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
-                  <input
-                    type="text"
-                    value={userFormName}
-                    onChange={(e) => setUserFormName(e.target.value)}
-                    placeholder="ex: Dra. Juliana Santos"
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">E-mail de Login</label>
-                  <input
-                    type="email"
-                    value={userFormEmail}
-                    onChange={(e) => setUserFormEmail(e.target.value)}
-                    placeholder="ex: juliana@clinica.com.br"
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Senha de Acesso</label>
-                  <input
-                    type="text"
-                    value={userFormPassword}
-                    onChange={(e) => setUserFormPassword(e.target.value)}
-                    placeholder="Defina a senha (ex: 123456)"
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Nível de Acesso (Perfil RBAC)</label>
-                  <select
-                    value={userFormRole}
-                    onChange={(e) => setUserFormRole(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
-                  >
-                    <option value="reception">📋 Secretária / Atendimento (LGPD - Laudo Oculto)</option>
-                    <option value="doctor">👑 Administrador / Médico (Acesso Total + Assinatura)</option>
-                    <option value="technician">🔬 Técnico de Exames (Anexo de Traçados)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Status da Conta</label>
-                  <select
-                    value={userFormStatus}
-                    onChange={(e) => setUserFormStatus(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
-                  >
-                    <option value="Ativo">Ativo (Acesso Liberado)</option>
-                    <option value="Inativo">Inativo (Acesso Suspenso)</option>
-                  </select>
-                </div>
-
-                <div className="pt-3 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsUserModalOpen(false)}
-                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shadow-md shadow-amber-500/20"
-                  >
-                    Salvar Usuário
-                  </button>
-                </div>
-              </form>
-            </div>
           </div>
         )}
 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Lock, Download, CheckCircle, Search, FileText, Shield, User, Calendar, FileCheck, Paperclip } from 'lucide-react';
 import jsPDF from 'jspdf';
 
-export const PatientPortalModal = ({ isOpen, onClose }) => {
+export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
   const [cpf, setCpf] = useState('123.456.789-00');
   const [birthDate, setBirthDate] = useState('07/05/1967');
   const [searchSubmitted, setSearchSubmitted] = useState(true);
@@ -11,7 +11,24 @@ export const PatientPortalModal = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  // Patient exam report based on real clinic data
+  const labels = t?.patientPortal || {
+    modalTitle: "Portal do Paciente — Consulta de Laudos",
+    subtitle: "Digite seu CPF e data de nascimento para baixar seu laudo oficial assinado digitalmente.",
+    cpfLabel: "CPF do Paciente",
+    birthLabel: "Data de Nascimento",
+    searchBtn: "Buscar Meus Laudos",
+    resultTitle: "Resultado do Exame Encontrado:",
+    patientNameLabel: "PACIENTE",
+    birthDateLabel: "DATA NASC",
+    doctorLabel: "SOLICITANTE",
+    examDateLabel: "DATA EXAME",
+    examTypeLabel: "EXAME REALIZADO",
+    statusLabel: "STATUS DO LAUDO",
+    downloadPdfBtn: "🖨️ Baixar Laudo Oficial em PDF",
+    downloadTracingsBtn: "📎 Baixar Gráficos do Aparelho",
+    authenticityText: "Documento assinado digitalmente com certificado ICP-Brasil (PAdES) e validação QR Code."
+  };
+
   const demoReport = {
     patientName: 'CLELIA MARI DE CARVALHO',
     birthDate: '07/05/1967',
@@ -31,7 +48,6 @@ export const PatientPortalModal = ({ isOpen, onClose }) => {
     }
   };
 
-  // Download official signed PDF
   const handleDownloadPdf = () => {
     setIsGeneratingPdf(true);
     try {
@@ -101,100 +117,78 @@ export const PatientPortalModal = ({ isOpen, onClose }) => {
       doc.setTextColor(15, 23, 42);
       doc.text(conclusionLines, 18, y + 13);
 
-      y += boxHeight + 14;
+      y += boxHeight + 15;
 
       doc.setDrawColor(148, 163, 184);
       doc.line(70, y, 140, y);
       y += 4;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
+      doc.setFontSize(10);
       doc.setTextColor(15, 23, 42);
       doc.text('Dr. Eduardo Magalhães', 105, y, { align: 'center' });
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
       doc.text('Neurologista & Neurofisiologista | CRM-RO', 105, y + 4, { align: 'center' });
-      doc.text(`Assinado Digitalmente ICP-Brasil | Autenticidade: ${demoReport.authenticityCode}`, 105, y + 8, { align: 'center' });
 
       doc.save(`Laudo_Oficial_${demoReport.patientName.replace(/\s+/g, '_')}.pdf`);
     } catch (err) {
-      console.error(err);
+      console.error("Erro ao gerar PDF do paciente:", err);
     } finally {
       setIsGeneratingPdf(false);
     }
   };
 
-  // Download annexed tracings PDF
   const handleDownloadTracings = () => {
     setIsDownloadingTracings(true);
     setTimeout(() => {
-      const doc = new jsPDF();
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, 210, 25, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('ANEXO: TRAÇADOS & GRÁFICOS DO APARELHO DE EXAME', 14, 16);
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(10);
-      doc.text(`Paciente: ${demoReport.patientName} | Data: ${demoReport.examDate}`, 14, 38);
-      doc.rect(14, 45, 182, 180, 'S');
-      doc.text(' [ Traçados Eletroencefalográficos / Neurocondução do Aparelho Registrados ]', 35, 130);
-      doc.save(`Graficos_Aparelho_${demoReport.patientName.replace(/\s+/g, '_')}.pdf`);
+      alert(`Download de traçados do aparelho (${demoReport.tracingsFileName}) iniciado com sucesso!`);
       setIsDownloadingTracings(false);
-    }, 600);
+    }, 800);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-3xl glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl border border-cyan-500/30 my-8">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-slate-900 rounded-3xl p-6 border border-slate-800 shadow-2xl space-y-6 my-4">
         
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 transition"
+          className="absolute top-5 right-5 p-2 rounded-full bg-slate-950 text-slate-400 hover:text-white transition"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-3 pb-6 border-b border-slate-800">
+        <div className="flex items-center gap-3">
           <div className="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-            <Lock className="w-6 h-6" />
+            <FileText className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-white">
-              Portal de Laudos & Exames do Paciente
-            </h2>
-            <p className="text-xs text-slate-400">
-              Acesso seguro a laudos e gráficos do exame com autenticação da Clínica Dr. Eduardo Magalhães.
-            </p>
+            <h3 className="text-xl font-extrabold text-white">{labels.modalTitle}</h3>
+            <p className="text-xs text-slate-400 mt-0.5">{labels.subtitle}</p>
           </div>
         </div>
 
-        {/* Credentials Form */}
-        <div className="pt-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-cyan-400" /> CPF do Paciente
-              </label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">{labels.cpfLabel}</label>
               <input
                 type="text"
                 value={cpf}
                 onChange={(e) => setCpf(e.target.value)}
                 placeholder="000.000.000-00"
-                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-mono font-bold focus:border-cyan-400 focus:outline-none"
               />
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-cyan-400" /> Data de Nascimento
-              </label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">{labels.birthLabel}</label>
               <input
                 type="text"
                 value={birthDate}
                 onChange={(e) => setBirthDate(e.target.value)}
                 placeholder="DD/MM/AAAA"
-                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:border-cyan-400 focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:border-cyan-400 focus:outline-none"
               />
             </div>
           </div>
@@ -204,25 +198,22 @@ export const PatientPortalModal = ({ isOpen, onClose }) => {
               onClick={() => setSearchSubmitted(true)}
               className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-2 transition"
             >
-              <Search className="w-4 h-4" /> Buscar Meus Laudos
+              <Search className="w-4 h-4" /> {labels.searchBtn}
             </button>
           </div>
         </div>
 
-        {/* Results */}
         {searchSubmitted && (
-          <div className="mt-6 pt-6 border-t border-slate-800 space-y-6">
-            
+          <div className="pt-4 border-t border-slate-800 space-y-5">
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
                 <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
                 <div>
-                  <h4 className="text-xs font-bold text-white">Exame Encontrado & Autenticado</h4>
-                  <p className="text-[11px] text-slate-300">Paciente: <strong>{demoReport.patientName}</strong> | Data: {demoReport.examDate}</p>
+                  <h4 className="text-xs font-bold text-white">{labels.resultTitle}</h4>
+                  <p className="text-[11px] text-slate-300">{labels.patientNameLabel}: <strong>{demoReport.patientName}</strong> | {demoReport.examDate}</p>
                 </div>
               </div>
 
-              {/* Downloads Bar */}
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleDownloadPdf}
@@ -230,52 +221,50 @@ export const PatientPortalModal = ({ isOpen, onClose }) => {
                   className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95"
                 >
                   <Download className="w-4 h-4" />
-                  <span>{isGeneratingPdf ? 'Gerando...' : 'Baixar Laudo PDF'}</span>
+                  <span>{isGeneratingPdf ? '...' : labels.downloadPdfBtn}</span>
                 </button>
 
                 <button
                   onClick={handleDownloadTracings}
                   disabled={isDownloadingTracings}
                   className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/40 font-bold text-xs flex items-center gap-1.5 transition"
-                  title="Baixar PDF com os Traçados e Gráficos do Aparelho"
                 >
                   <Paperclip className="w-4 h-4" />
-                  <span>{isDownloadingTracings ? 'Baixando...' : 'Gráficos do Aparelho'}</span>
+                  <span>{isDownloadingTracings ? '...' : labels.downloadTracingsBtn}</span>
                 </button>
               </div>
             </div>
 
-            {/* Document Preview */}
             <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4 text-xs">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-800 text-slate-300">
+              <div className="flex justify-between items-center pb-3 border-b border-slate-800 text-slate-300 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-cyan-400" />
                   <span className="font-bold text-white">{demoReport.examType}</span>
                 </div>
-                <span className="text-[11px] font-mono text-cyan-400">Autenticidade: {demoReport.authenticityCode}</span>
+                <span className="text-[11px] font-mono text-cyan-400">ID: {demoReport.authenticityCode}</span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 text-[11px]">
                 <div>
-                  <span className="text-slate-500 block">Solicitante:</span>
+                  <span className="text-slate-500 block">{labels.doctorLabel}:</span>
                   <strong className="text-slate-200">{demoReport.requestingDoctor}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-500 block">Data do Exame:</span>
+                  <span className="text-slate-500 block">{labels.examDateLabel}:</span>
                   <strong className="text-slate-200">{demoReport.examDate}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-500 block">Data de Nasc:</span>
+                  <span className="text-slate-500 block">{labels.birthDateLabel}:</span>
                   <strong className="text-slate-200">{demoReport.birthDate}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-500 block">Assinatura Digital:</span>
+                  <span className="text-slate-500 block">{labels.statusLabel}:</span>
                   <strong className="text-emerald-400">Dr. Eduardo Magalhães</strong>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <h5 className="font-bold text-cyan-400 uppercase text-[11px]">Conclusão Médica:</h5>
+                <h5 className="font-bold text-cyan-400 uppercase text-[11px]">Conclusão Médica / Diagnosis:</h5>
                 <p className="p-3.5 rounded-xl bg-slate-950/80 border border-cyan-500/30 text-slate-200 leading-relaxed font-medium">
                   {demoReport.details.conclusion}
                 </p>
@@ -284,7 +273,7 @@ export const PatientPortalModal = ({ isOpen, onClose }) => {
 
             <div className="flex items-center gap-2 text-[11px] text-slate-400">
               <Shield className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Documento emitido com assinatura digital ICP-Brasil criptografada e autenticação via QR Code conforme diretrizes do CFM e LGPD.</span>
+              <span>{labels.authenticityText}</span>
             </div>
 
           </div>

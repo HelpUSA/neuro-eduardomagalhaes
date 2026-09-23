@@ -1,8 +1,8 @@
 import React from 'react';
-import { MapPin, Phone, Clock, Shield, Navigation, ExternalLink, Calendar } from 'lucide-react';
+import { MapPin, Phone, Clock, Navigation, ExternalLink } from 'lucide-react';
 
-export const ClinicLocation = () => {
-  const convenios = ['Unimed', 'Cassi', 'Assefaz', 'Amil', 'Bradesco Saúde', 'SulAmérica', 'Atendimento Particular'];
+export const ClinicLocation = ({ t }) => {
+  const convenios = ['Unimed', 'Cassi', 'Assefaz', 'Amil', 'Bradesco Saúde', 'SulAmérica', 'Particular / Private'];
 
   return (
     <section id="localizacao" className="py-20 relative bg-slate-950/80 border-t border-slate-800">
@@ -15,18 +15,15 @@ export const ClinicLocation = () => {
             
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold uppercase tracking-wider">
               <MapPin className="w-3.5 h-3.5" />
-              <span>Localização & Atendimento</span>
+              <span>{t.location.badge}</span>
             </div>
 
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-              Clínica de Neurologia <br />
-              <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-                Dr. Eduardo Magalhães
-              </span>
+              {t.location.title}
             </h2>
 
             <p className="text-slate-300 text-sm leading-relaxed">
-              Localização privilegiada no centro de Porto Velho - RO, com ambiente climatizado, estacionamento acessível e estrutura pronta para realização de exames neurológicos.
+              {t.location.subtitle}
             </p>
 
             {/* Address & Contact Cards */}
@@ -37,10 +34,9 @@ export const ClinicLocation = () => {
                   <MapPin className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Endereço da Clínica:</h4>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">{t.location.addressTitle}</h4>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    Av. Dom Pedro II, 637 - Sala 07, Centro <br />
-                    Porto Velho - RO, CEP 76801-910
+                    {t.location.addressText}
                   </p>
                 </div>
               </div>
@@ -50,10 +46,9 @@ export const ClinicLocation = () => {
                   <Phone className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Telefone & Agendamento:</h4>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">{t.location.phoneTitle}</h4>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    Telefone Fixo: <strong>(69) 3223-5805</strong> <br />
-                    WhatsApp Corporativo: <strong>(69) 3223-5805</strong>
+                    <strong>{t.location.phoneText}</strong>
                   </p>
                 </div>
               </div>
@@ -63,10 +58,9 @@ export const ClinicLocation = () => {
                   <Clock className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">Horário de Funcionamento:</h4>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider">{t.location.hoursTitle}</h4>
                   <p className="text-xs text-slate-300 mt-0.5">
-                    Segunda a Sexta-feira: 08:00 às 18:00 <br />
-                    (Atendimento com hora marcada)
+                    {t.location.hoursText}
                   </p>
                 </div>
               </div>
@@ -75,7 +69,7 @@ export const ClinicLocation = () => {
 
             {/* Convenios Acceptance */}
             <div className="pt-2">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Convênios Aceitos & Planos:</h4>
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">{t.location.conveniosTitle}</h4>
               <div className="flex flex-wrap gap-2">
                 {convenios.map((conv, i) => (
                   <span key={i} className="px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 text-xs font-semibold">
@@ -87,45 +81,49 @@ export const ClinicLocation = () => {
 
           </div>
 
-          {/* Right Map Placeholder & Directions Card */}
+          {/* Right Directions Card */}
           <div className="lg:col-span-6">
             <div className="glass-panel rounded-3xl p-6 sm:p-8 space-y-6 border border-slate-800 shadow-2xl">
               
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Navigation className="w-5 h-5 text-cyan-400" /> Como Chegar à Clínica
+                  <Navigation className="w-5 h-5 text-cyan-400" /> {t.location.howToGetTitle}
                 </h3>
                 <a
                   href="https://maps.google.com/?q=Av.+Dom+Pedro+II,+637,+Porto+Velho+-+RO"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-bold flex items-center gap-1.5 transition"
                 >
-                  Abrir no Google Maps <ExternalLink className="w-3.5 h-3.5" />
+                  <ExternalLink className="w-3.5 h-3.5" /> Google Maps
                 </a>
               </div>
 
-              {/* Map Graphic Box */}
-              <div className="relative w-full h-64 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900 flex flex-col items-center justify-center p-6 text-center space-y-3">
-                <div className="w-14 h-14 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-lg">
-                  <MapPin className="w-7 h-7 animate-bounce" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-white">Clínica Dr. Eduardo Magalhães</h4>
-                  <p className="text-xs text-slate-400 mt-1">Av. Dom Pedro II, 637 - Sala 07, Centro - Porto Velho/RO</p>
-                </div>
+              {/* Map Preview Frame */}
+              <div className="relative w-full h-64 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900">
+                <iframe
+                  title="Google Maps Location"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3944.380735739343!2d-63.90382348521587!3d-8.759530493708365!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x92325cce12345679%3A0x123456789abcdef0!2sAv.%20Dom%20Pedro%20II%2C%20637%20-%20Centro%2C%20Porto%20Velho%20-%20RO%2C%2076801-910!5e0!3m2!1spt-BR!2sbr!4v1690000000000!5m2!1spt-BR!2sbr"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  allowFullScreen=""
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  className="filter grayscale contrast-125 opacity-80 hover:opacity-100 transition-opacity"
+                />
+              </div>
+
+              <div className="text-center pt-2">
                 <a
                   href="https://maps.google.com/?q=Av.+Dom+Pedro+II,+637,+Porto+Velho+-+RO"
                   target="_blank"
                   rel="noreferrer"
-                  className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/20 transition transform hover:scale-105"
                 >
-                  Traçar Rota no GPS
+                  <Navigation className="w-4 h-4 text-slate-950" />
+                  <span>{t.location.googleMapsBtn}</span>
                 </a>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 text-xs text-slate-400 space-y-1">
-                <p>💡 <strong>Dica de Estacionamento:</strong> Estacionamento fácil ao longo da Av. Dom Pedro II e proximidades do Centro Médico.</p>
               </div>
 
             </div>
