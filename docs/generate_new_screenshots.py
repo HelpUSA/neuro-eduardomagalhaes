@@ -4,6 +4,30 @@ from PIL import Image, ImageDraw, ImageFont
 def draw_rounded_rect(draw, bbox, radius, fill, outline=None, width=1):
     draw.rounded_rectangle(bbox, radius=radius, fill=fill, outline=outline, width=width)
 
+def text_wrap(text, font, max_width, draw):
+    lines = []
+    for line in text.split('\n'):
+        if not line:
+            lines.append('')
+            continue
+        words = line.split(' ')
+        current_line = []
+        for word in words:
+            test_line = ' '.join(current_line + [word])
+            try:
+                bbox = draw.textbbox((0, 0), test_line, font=font)
+                w = bbox[2] - bbox[0]
+            except:
+                w = font.getlength(test_line)
+            if w <= max_width:
+                current_line.append(word)
+            else:
+                lines.append(' '.join(current_line))
+                current_line = [word]
+        if current_line:
+            lines.append(' '.join(current_line))
+    return lines
+
 def generate_screenshots():
     docs_dir = os.path.dirname(os.path.abspath(__file__))
     
@@ -76,10 +100,10 @@ def generate_screenshots():
     draw_rounded_rect(draw1, (820, 247, 1025, 273), 6, fill='#d97706', outline='#f59e0b')
     draw1.text((830, 253), "💾 Salvar como Novo Modelo", fill='#020617', font=font_bold)
 
-    # Section 3: CLEAN FULL TEXT EDITOR AREA (REQ-17, REQ-18)
+    # Section 3: CLEAN FULL TEXT EDITOR AREA WITH AUTO WORD WRAP (REQ-17, REQ-18)
     draw_rounded_rect(draw1, (45, 290, 1035, 600), 10, fill='#020617', outline='#38bdf8', width=2)
     
-    clean_text = (
+    raw_text = (
         "ELETRONEUROMIOGRAFIA DOS MEMBROS SUPERIORES\n\n"
         "Realizada eletroneuromiografia de membros superiores.\n"
         "A neurocondução motora foi realizada em nervos medianos e ulnares. Os potenciais de ação motores apresentaram "
@@ -94,10 +118,14 @@ def generate_screenshots():
         "de caráter desmielinizante (grau 2), bilateral."
     )
     
-    y_text = 305
-    for line in clean_text.split('\n'):
+    wrapped_lines = text_wrap(raw_text, font_medium, 960, draw1)
+    
+    y_text = 302
+    for line in wrapped_lines:
+        if y_text > 585:
+            break
         draw1.text((60, y_text), line, fill='#f8fafc', font=font_medium)
-        y_text += 18
+        y_text += 17
 
     # Action Bar
     draw_rounded_rect(draw1, (45, 608, 1035, 642), 8, fill='#1e293b', outline='#334155')
@@ -106,7 +134,7 @@ def generate_screenshots():
     draw1.text((825, 620), "🖨️ Assinar & Gerar PDF Timbrado", fill='#ffffff', font=font_bold)
 
     img1.save(os.path.join(docs_dir, "painel_editor_expansivel.jpg"))
-    print("painel_editor_expansivel.jpg gerado!")
+    print("painel_editor_expansivel.jpg gerado com quebra de linha perfeita!")
 
     # --- SCREENSHOT 2: HISTÓRICO DE EXAMES ANTERIORES DO PACIENTE (REQ-21) ---
     img2 = Image.new('RGB', (600, 480), color='#090d16')
