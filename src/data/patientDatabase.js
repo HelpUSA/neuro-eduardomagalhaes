@@ -7,7 +7,12 @@ export const INITIAL_PATIENT_DATABASE = [
     birthDate: '07/05/1967',
     phone: '(69) 99234-5678',
     lastExam: '03/10/2025',
-    requestingDoctor: 'DR HEMANOEL FERRO'
+    requestingDoctor: 'DR HEMANOEL FERRO',
+    examHistory: [
+      { id: 'ex_2025_01', date: '03/10/2025', title: 'ENMG - STC Grau 2 (Moderado Bilateral)', doctor: 'DR HEMANOEL FERRO', status: 'Concluído', conclusion: 'Exame compatível com neuropatia do mediano ao nível do carpo (grau 2).' },
+      { id: 'ex_2024_01', date: '14/04/2024', title: 'ENMG - STC Grau 1 (Leve Bilateral)', doctor: 'DR EDUARDO MAGALHÃES', status: 'Concluído', conclusion: 'Exame compatível com neuropatia leve do mediano.' },
+      { id: 'ex_2023_01', date: '10/01/2023', title: 'EEG - Vigília e Sono Normal', doctor: 'DR EDUARDO MAGALHÃES', status: 'Concluído', conclusion: 'Eletroencefalograma dentro dos padrões da normalidade.' }
+    ]
   },
   {
     cpf: '987.654.321-11',
@@ -15,7 +20,10 @@ export const INITIAL_PATIENT_DATABASE = [
     birthDate: '14/11/1975',
     phone: '(69) 98112-3456',
     lastExam: '15/08/2025',
-    requestingDoctor: 'DRA PATRICIA ALBUQUERQUE'
+    requestingDoctor: 'DRA PATRICIA ALBUQUERQUE',
+    examHistory: [
+      { id: 'ex_2025_02', date: '15/08/2025', title: 'ENMG - Radiculopatia Lombar L4-L5', doctor: 'DRA PATRICIA ALBUQUERQUE', status: 'Concluído', conclusion: 'Comprometimento radicular L5 à direita.' }
+    ]
   },
   {
     cpf: '456.789.123-22',
@@ -23,7 +31,10 @@ export const INITIAL_PATIENT_DATABASE = [
     birthDate: '22/03/1982',
     phone: '(69) 99345-6789',
     lastExam: '20/09/2025',
-    requestingDoctor: 'DR EDUARDO MAGALHÃES'
+    requestingDoctor: 'DR EDUARDO MAGALHÃES',
+    examHistory: [
+      { id: 'ex_2025_03', date: '20/09/2025', title: 'EEG - Mapeamento Cerebral Normal', doctor: 'DR EDUARDO MAGALHÃES', status: 'Concluído', conclusion: 'Mapeamento cerebral sem alterações focalizadas.' }
+    ]
   },
   {
     cpf: '333.444.555-66',
@@ -31,7 +42,10 @@ export const INITIAL_PATIENT_DATABASE = [
     birthDate: '03/09/1959',
     phone: '(69) 98456-7890',
     lastExam: '01/09/2025',
-    requestingDoctor: 'DR LUIZ FERNANDO PAIVA'
+    requestingDoctor: 'DR LUIZ FERNANDO PAIVA',
+    examHistory: [
+      { id: 'ex_2025_04', date: '01/09/2025', title: 'ENMG - Polineuropatia Diabética', doctor: 'DR LUIZ FERNANDO PAIVA', status: 'Concluído', conclusion: 'Polineuropatia sensitivo-motora axonal em MMII.' }
+    ]
   },
   {
     cpf: '777.888.999-00',
@@ -39,7 +53,10 @@ export const INITIAL_PATIENT_DATABASE = [
     birthDate: '18/12/1994',
     phone: '(69) 99567-8901',
     lastExam: '05/09/2025',
-    requestingDoctor: 'DRA CARLA VASCONCELOS'
+    requestingDoctor: 'DRA CARLA VASCONCELOS',
+    examHistory: [
+      { id: 'ex_2025_05', date: '05/09/2025', title: 'EEG - Atividade Paroxística Temporal', doctor: 'DRA CARLA VASCONCELOS', status: 'Concluído', conclusion: 'Descargas paroxísticas epileptiformes temporais esquerdas.' }
+    ]
   }
 ];
 
@@ -76,7 +93,6 @@ export const fetchCpfOnlineData = async (cpfStr) => {
   if (digits.length !== 11) return null;
 
   try {
-    // Tenta consulta na API pública de validação de CPF / dados cadastrais
     const response = await fetch(`https://brasilapi.com.br/api/cpf/v1/${digits}`, {
       method: 'GET',
       headers: { 'Accept': 'application/json' }

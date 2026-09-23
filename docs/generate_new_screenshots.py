@@ -20,7 +20,7 @@ def generate_screenshots():
         font_small = ImageFont.load_default()
         font_mono = ImageFont.load_default()
 
-    # --- SCREENSHOT 1: PAINEL COM CAMPO ÚNICO DE EDIÇÃO INTEG-RAL (22/09/2026) ---
+    # --- SCREENSHOT 1: PAINEL DE EDIÇÃO EXPANSÍVEL 100% COM BARRA DE FORMATAÇÃO (REQ-18, REQ-19) ---
     img1 = Image.new('RGB', (1080, 680), color='#090d16')
     draw1 = ImageDraw.Draw(img1)
     
@@ -29,152 +29,178 @@ def generate_screenshots():
     
     # Header Bar
     draw_rounded_rect(draw1, (30, 25, 1050, 75), 12, fill='#1e293b', outline='#334155')
-    draw1.text((45, 33), "Painel do Consultório — Campo Único de Edição de Laudo (EEG / ENMG)", fill='#ffffff', font=font_title)
-    draw1.text((45, 55), "👑 Perfil Dr. Eduardo Magalhães | Árvore A-Z à Esquerda | Campo de Texto Único Editável à Direita", fill='#38bdf8', font=font_small)
+    draw1.text((45, 33), "Painel do Consultório — Modo de Edição Expandido (100% de Largura)", fill='#ffffff', font=font_title)
+    draw1.text((45, 55), "👑 Perfil Dr. Eduardo Magalhães | Árvore Ocultável | Barra de Formatação Rica (Negrito/Itálico/Fonte)", fill='#38bdf8', font=font_small)
+
+    # Top Toggle Bar (REQ-18)
+    draw_rounded_rect(draw1, (30, 85, 1050, 120), 8, fill='#020617', outline='#334155')
+    draw_rounded_rect(draw1, (40, 90, 360, 115), 6, fill='#1e293b', outline='#0284c7')
+    draw1.text((50, 97), "📂 Ocultar Árvore (Maximizar Espaço de Edição)", fill='#fde047', font=font_bold)
+    draw1.text((380, 97), "✨ Área de Edição Expandida em 100% da Tela para Máximo Conforto Visual", fill='#94a3b8', font=font_small)
+
+    # FULL WIDTH REPORT EDITOR (col-span-12)
+    draw_rounded_rect(draw1, (30, 130, 1050, 650), 14, fill='#0f172a', outline='#334155', width=1)
     
-    # LEFT COLUMN: WINDOWS EXPLORER TREE VIEW (A-Z ALPHABETICAL ORDER)
-    draw_rounded_rect(draw1, (30, 88, 350, 650), 14, fill='#020617', outline='#334155', width=1)
-    draw1.text((42, 98), "📂 Árvore de Modelos (Ordem A-Z)", fill='#f59e0b', font=font_bold)
-    draw_rounded_rect(draw1, (265, 96, 340, 116), 6, fill='#1e293b', outline='#475569')
-    draw1.text((272, 100), "📂 Tudo | 📁 Fechar", fill='#38bdf8', font=font_small)
-
-    # Search Box in Tree
-    draw_rounded_rect(draw1, (42, 125, 338, 150), 8, fill='#0f172a', outline='#334155')
-    draw1.text((50, 131), "🔍 Buscar modelo...", fill='#64748b', font=font_small)
-
-    # A-Z Sorted Categories
-    y_tree = 160
-
-    # 1. ELETROENCEFALOGRAMA (EEG)
-    draw_rounded_rect(draw1, (42, y_tree, 338, y_tree + 110), 8, fill='#090d16', outline='#0284c7', width=1)
-    draw1.text((48, y_tree + 5), "📁 ELETROENCEFALOGRAMA (EEG)", fill='#fde047', font=font_bold)
-    draw_rounded_rect(draw1, (55, y_tree + 23, 330, y_tree + 43), 5, fill='#0284c7', outline='#38bdf8')
-    draw1.text((60, y_tree + 27), "✓ EEG Vigília e Sono Normal [Ativo]", fill='#ffffff', font=font_bold)
-    draw1.text((58, y_tree + 48), "📄 EEG Disfunção Cortical Difusa Grau 1", fill='#94a3b8', font=font_small)
-    draw1.text((58, y_tree + 68), "📄 EEG Atividade Paroxística Focal", fill='#94a3b8', font=font_small)
-    draw1.text((58, y_tree + 88), "📄 EEG Com Registro Encefalográfico", fill='#94a3b8', font=font_small)
-
-    y_tree += 118
-    # 2. POLINEUROPATIAS PERIFÉRICAS
-    draw_rounded_rect(draw1, (42, y_tree, 338, y_tree + 85), 8, fill='#090d16', outline='#1e293b')
-    draw1.text((48, y_tree + 5), "📁 POLINEUROPATIAS PERIFÉRICAS", fill='#fde047', font=font_bold)
-    draw1.text((58, y_tree + 25), "📄 Polineuropatia Diabética Simétrica", fill='#94a3b8', font=font_small)
-    draw1.text((58, y_tree + 45), "📄 Polineuropatia Axonal Crônica", fill='#94a3b8', font=font_small)
-    draw1.text((58, y_tree + 65), "📄 Polineuropatia Desmielinizante", fill='#94a3b8', font=font_small)
-
-    y_tree += 93
-    # 3. RADICULOPATIAS CERVICAIS / LOMBARES
-    draw_rounded_rect(draw1, (42, y_tree, 338, y_tree + 85), 8, fill='#090d16', outline='#1e293b')
-    draw1.text((48, y_tree + 5), "📁 RADICULOPATIAS CERVICAIS / LOMBARES", fill='#fde047', font=font_bold)
-    draw1.text((58, y_tree + 25), "📄 Radiculopatia Cervical C5-C6", fill='#94a3b8', font=font_small)
-    draw1.text((58, y_tree + 45), "📄 Radiculopatia Lombar L4-L5-S1", fill='#94a3b8', font=font_small)
-    draw1.text((58, y_tree + 65), "📄 Polirradiculopatia Inflamatória", fill='#94a3b8', font=font_small)
-
-    y_tree += 93
-    # 4. SÍNDROME DO TÚNEL DO CARPO (STC)
-    draw_rounded_rect(draw1, (42, y_tree, 338, y_tree + 85), 8, fill='#090d16', outline='#1e293b')
-    draw1.text((48, y_tree + 5), "📁 SÍNDROME DO TÚNEL DO CARPO (STC)", fill='#fde047', font=font_bold)
-    draw1.text((58, y_tree + 25), "📄 STC Grau 1 (Leve Bilateral)", fill='#94a3b8', font=font_small)
-    draw1.text((58, y_tree + 45), "📄 STC Grau 2 (Moderado Bilateral)", fill='#94a3b8', font=font_small)
-    draw1.text((58, y_tree + 65), "📄 STC Grau 3 (Grave Uni/Bilateral)", fill='#94a3b8', font=font_small)
-
-    # RIGHT COLUMN: UNIFIED SINGLE TEXT EDITOR (col-span-8)
-    draw_rounded_rect(draw1, (365, 88, 1050, 650), 14, fill='#0f172a', outline='#334155', width=1)
+    # Section 1: Patient Credentials + History Badge (REQ-21)
+    draw_rounded_rect(draw1, (45, 142, 1035, 230), 10, fill='#020617', outline='#1e293b')
+    draw1.text((55, 149), "👤 Dados Cadastrais do Paciente (Busca Inteligente por CPF):", fill='#38bdf8', font=font_bold)
+    draw_rounded_rect(draw1, (780, 146, 1025, 168), 6, fill='#4338ca', outline='#818cf8')
+    draw1.text((790, 151), "📜 Exames Anteriores (3 Registros)", fill='#ffffff', font=font_bold)
     
-    # Section 1: Patient Credentials (CPF Mevo)
-    draw_rounded_rect(draw1, (375, 98, 1040, 185), 10, fill='#020617', outline='#1e293b')
-    draw1.text((385, 105), "👤 Dados Cadastrais do Paciente (Busca por CPF):", fill='#38bdf8', font=font_bold)
-    draw1.text((385, 128), "CPF: 123.456.789-00 | PACIENTE: CLELIA MARI DE CARVALHO", fill='#ffffff', font=font_medium)
-    draw1.text((385, 148), "DATA NASC: 07/05/1967 | SOLICITANTE: DR HEMANOEL FERRO | EXAME: 03/10/2025", fill='#cbd5e1', font=font_small)
-    draw1.text((385, 166), "📎 Anexos: Graficos_Aparelho_ENMG_Clelia.pdf", fill='#10b981', font=font_small)
+    draw1.text((55, 172), "CPF: 123.456.789-00 (Mevo) | PACIENTE: CLELIA MARI DE CARVALHO", fill='#ffffff', font=font_medium)
+    draw1.text((55, 192), "DATA NASC: 07/05/1967 | SOLICITANTE: DR HEMANOEL FERRO | EXAME: 03/10/2025", fill='#cbd5e1', font=font_small)
+    draw1.text((55, 210), "📎 Traçados Anexados: Graficos_Aparelho_ENMG_Clelia.pdf", fill='#10b981', font=font_small)
 
-    # Section 2: Mode Toggle Bar (REQ-15)
-    draw_rounded_rect(draw1, (375, 192, 1040, 230), 8, fill='#1e293b', outline='#475569')
-    draw_rounded_rect(draw1, (380, 196, 680, 226), 6, fill='#0284c7', outline='#38bdf8')
-    draw1.text((390, 204), "📝 Campo Único (Texto Integral EEG/ENMG)", fill='#ffffff', font=font_bold)
+    # Section 2: Rich Text Toolbar (REQ-19)
+    draw_rounded_rect(draw1, (45, 240, 1035, 280), 8, fill='#020617', outline='#38bdf8')
+    draw1.text((55, 252), "Formatação:", fill='#94a3b8', font=font_bold)
     
-    draw_rounded_rect(draw1, (690, 196, 1030, 226), 6, fill='#090d16', outline='#334155')
-    draw1.text((700, 204), "📑 Sub-seções Separadas ENMG", fill='#94a3b8', font=font_medium)
+    draw_rounded_rect(draw1, (135, 247, 165, 273), 5, fill='#1e293b', outline='#475569')
+    draw1.text((145, 253), "B", fill='#ffffff', font=font_bold)
+    
+    draw_rounded_rect(draw1, (172, 247, 202, 273), 5, fill='#1e293b', outline='#475569')
+    draw1.text((184, 253), "I", fill='#ffffff', font=font_bold)
 
-    # Section 3: UNIFIED FULL-TEXT BOX
-    draw_rounded_rect(draw1, (375, 238, 1040, 600), 10, fill='#020617', outline='#38bdf8', width=2)
-    draw1.text((385, 246), "📝 Corpo Integral do Laudo Médico (Texto Continuo Totalmente Editável):", fill='#f59e0b', font=font_bold)
+    draw_rounded_rect(draw1, (209, 247, 239, 273), 5, fill='#1e293b', outline='#475569')
+    draw1.text((220, 253), "U", fill='#ffffff', font=font_bold)
+
+    draw1.text((255, 253), "Fonte:", fill='#94a3b8', font=font_bold)
+    draw_rounded_rect(draw1, (295, 247, 325, 273), 5, fill='#1e293b', outline='#475569')
+    draw1.text((303, 253), "A-", fill='#38bdf8', font=font_bold)
+
+    draw1.text((335, 253), "14px", fill='#38bdf8', font=font_mono)
+
+    draw_rounded_rect(draw1, (375, 247, 405, 273), 5, fill='#1e293b', outline='#475569')
+    draw1.text((383, 253), "A+", fill='#38bdf8', font=font_bold)
+
+    draw_rounded_rect(draw1, (820, 247, 1025, 273), 6, fill='#d97706', outline='#f59e0b')
+    draw1.text((830, 253), "💾 Salvar como Novo Modelo", fill='#020617', font=font_bold)
+
+    # Section 3: CLEAN FULL TEXT EDITOR AREA (REQ-17, REQ-18)
+    draw_rounded_rect(draw1, (45, 290, 1035, 600), 10, fill='#020617', outline='#38bdf8', width=2)
     
-    unified_text = (
-        "ELETROENCEFALOGRAMA DE VIGÍLIA E SONO\n\n"
-        "TÉCNICA:\n"
-        "Exame realizado com eletrodos posicionados segundo o Sistema Internacional 10-20, "
-        "com registros em vigília, sonolência e sono espontâneo.\n\n"
-        "DESCRIÇÃO DOS ACHADOS:\n"
-        "- Ritmo de fundo posterior constituído por ondas alfa de 9,5 a 10 Hz, simétrico, "
-        "reativo à abertura e fechamento ocular.\n"
-        "- Durante a sonolência e sono espontâneo, observam-se elementos de sono (ondas agudas do vértex, "
-        "fusos de sono) bem configurados e simétricos.\n"
-        "- Métodos de ativação (Hiperpneia e Fotoestimulação Intermitente) não desencadearam anormalidades.\n\n"
+    clean_text = (
+        "ELETRONEUROMIOGRAFIA DOS MEMBROS SUPERIORES\n\n"
+        "Realizada eletroneuromiografia de membros superiores.\n"
+        "A neurocondução motora foi realizada em nervos medianos e ulnares. Os potenciais de ação motores apresentaram "
+        "velocidades de condução normais, latência distal limítrofe e amplitudes conservadas.\n"
+        "A neurocondução sensitiva foi realizada em nervos medianos, ulnares e radiais. Em nervos medianos observamos "
+        "potenciais de ação com latências prolongadas, velocidades de condução diminuídas e amplitudes normais.\n"
+        "A onda F foi pesquisada em nervos medianos e ulnares, apresentando latências mínimas preservadas.\n"
+        "A eletromiografia realizada com agulha monopolar exibiu potenciais de ação de unidades motoras com recrutamento "
+        "normal e ausência de atividade espontânea.\n\n"
         "CONCLUSÃO:\n"
-        "Eletroencefalograma de vigília e sono dentro dos padrões da normalidade para a faixa etária."
+        "Exame compatível com neuropatia do mediano ao nível do carpo, com comprometimento parcial de fibras sensitivas, "
+        "de caráter desmielinizante (grau 2), bilateral."
     )
     
-    y_text = 270
-    for line in unified_text.split('\n'):
-        draw1.text((385, y_text), line, fill='#f8fafc', font=font_small)
+    y_text = 305
+    for line in clean_text.split('\n'):
+        draw1.text((60, y_text), line, fill='#f8fafc', font=font_medium)
         y_text += 18
 
     # Action Bar
-    draw_rounded_rect(draw1, (375, 608, 1040, 642), 8, fill='#1e293b', outline='#334155')
-    draw1.text((385, 620), "✓ Assinatura Digital ICP-Brasil + Carimbo Visual e QR Code", fill='#10b981', font=font_bold)
-    draw_rounded_rect(draw1, (820, 613, 1030, 637), 6, fill='#0284c7', outline='#38bdf8')
-    draw1.text((830, 620), "🖨️ Assinar & Gerar PDF Timbrado", fill='#ffffff', font=font_bold)
+    draw_rounded_rect(draw1, (45, 608, 1035, 642), 8, fill='#1e293b', outline='#334155')
+    draw1.text((55, 620), "✓ Assinatura Digital ICP-Brasil + Carimbo Visual e QR Code", fill='#10b981', font=font_bold)
+    draw_rounded_rect(draw1, (815, 613, 1025, 637), 6, fill='#0284c7', outline='#38bdf8')
+    draw1.text((825, 620), "🖨️ Assinar & Gerar PDF Timbrado", fill='#ffffff', font=font_bold)
 
-    img1.save(os.path.join(docs_dir, "painel_campo_unico_edicao.jpg"))
-    print("painel_campo_unico_edicao.jpg gerado!")
+    img1.save(os.path.join(docs_dir, "painel_editor_expansivel.jpg"))
+    print("painel_editor_expansivel.jpg gerado!")
 
-    # --- SCREENSHOT 2: ARVORE EM ORDEM ALFABETICA A-Z ---
-    img2 = Image.new('RGB', (500, 600), color='#090d16')
+    # --- SCREENSHOT 2: HISTÓRICO DE EXAMES ANTERIORES DO PACIENTE (REQ-21) ---
+    img2 = Image.new('RGB', (600, 480), color='#090d16')
     draw2 = ImageDraw.Draw(img2)
-    draw_rounded_rect(draw2, (10, 10, 490, 590), 14, fill='#020617', outline='#38bdf8', width=2)
-    draw2.text((25, 22), "📂 Árvore de Modelos — Ordem A-Z (Default)", fill='#38bdf8', font=font_title)
-    draw2.text((25, 48), "Todas as pastas e subpastas organizadas de A a Z", fill='#94a3b8', font=font_small)
+    draw_rounded_rect(draw2, (10, 10, 590, 470), 14, fill='#0f172a', outline='#6366f1', width=2)
+    draw2.text((25, 22), "📜 Histórico de Exames Anteriores do Paciente", fill='#818cf8', font=font_title)
+    draw2.text((25, 48), "Paciente: CLELIA MARI DE CARVALHO (CPF: 123.456.789-00)", fill='#94a3b8', font=font_small)
 
-    y_az = 75
-    # Category 1: ELETROENCEFALOGRAMA
-    draw_rounded_rect(draw2, (25, y_az, 475, y_az + 115), 8, fill='#0f172a', outline='#0284c7')
-    draw2.text((35, y_az + 8), "📁 1. ELETROENCEFALOGRAMA (EEG)", fill='#fde047', font=font_bold)
-    draw2.text((45, y_az + 30), "📄 EEG Atividade Paroxística Temporal", fill='#cbd5e1', font=font_small)
-    draw2.text((45, y_az + 50), "📄 EEG Disfunção Cortical Difusa Grau 1", fill='#cbd5e1', font=font_small)
-    draw2.text((45, y_az + 70), "📄 EEG Vigília/Sono Normal", fill='#cbd5e1', font=font_small)
-    draw2.text((45, y_az + 90), "📄 EEG com Ativação por Hiperpneia", fill='#cbd5e1', font=font_small)
+    y_hist = 75
+    # Exam 1
+    draw_rounded_rect(draw2, (25, y_hist, 575, y_hist + 110), 8, fill='#020617', outline='#334155')
+    draw2.text((35, y_hist + 8), "ENMG - STC Grau 2 (Moderado Bilateral)", fill='#fde047', font=font_bold)
+    draw2.text((450, y_hist + 8), "📅 03/10/2025", fill='#38bdf8', font=font_mono)
+    draw2.text((35, y_hist + 32), "Exame compatível com neuropatia do mediano ao nível do carpo (grau 2).", fill='#f8fafc', font=font_small)
+    draw2.text((35, y_hist + 55), "Solicitante: DR HEMANOEL FERRO | Status: Concluído", fill='#cbd5e1', font=font_small)
+    draw_rounded_rect(draw2, (340, y_hist + 75, 565, y_hist + 100), 6, fill='#4338ca')
+    draw2.text((350, y_hist + 82), "👁️ Reutilizar Achados no Laudo", fill='#ffffff', font=font_bold)
 
-    y_az += 125
-    # Category 2: POLINEUROPATIAS
-    draw_rounded_rect(draw2, (25, y_az, 475, y_az + 95), 8, fill='#0f172a', outline='#1e293b')
-    draw2.text((35, y_az + 8), "📁 2. POLINEUROPATIAS PERIFÉRICAS", fill='#fde047', font=font_bold)
-    draw2.text((45, y_az + 30), "📄 Polineuropatia Axonal Crônica", fill='#cbd5e1', font=font_small)
-    draw2.text((45, y_az + 50), "📄 Polineuropatia Desmielinizante", fill='#cbd5e1', font=font_small)
-    draw2.text((45, y_az + 70), "📄 Polineuropatia Diabética Simétrica", fill='#cbd5e1', font=font_small)
+    y_hist += 120
+    # Exam 2
+    draw_rounded_rect(draw2, (25, y_hist, 575, y_hist + 110), 8, fill='#020617', outline='#334155')
+    draw2.text((35, y_hist + 8), "ENMG - STC Grau 1 (Leve Bilateral)", fill='#fde047', font=font_bold)
+    draw2.text((450, y_hist + 8), "📅 14/04/2024", fill='#38bdf8', font=font_mono)
+    draw2.text((35, y_hist + 32), "Exame compatível com neuropatia leve do mediano ao nível do carpo.", fill='#f8fafc', font=font_small)
+    draw2.text((35, y_hist + 55), "Solicitante: DR EDUARDO MAGALHÃES | Status: Concluído", fill='#cbd5e1', font=font_small)
+    draw_rounded_rect(draw2, (340, y_hist + 75, 565, y_hist + 100), 6, fill='#4338ca')
+    draw2.text((350, y_hist + 82), "👁️ Reutilizar Achados no Laudo", fill='#ffffff', font=font_bold)
 
-    y_az += 105
-    # Category 3: RADICULOPATIAS
-    draw_rounded_rect(draw2, (25, y_az, 475, y_az + 95), 8, fill='#0f172a', outline='#1e293b')
-    draw2.text((35, y_az + 8), "📁 3. RADICULOPATIAS CERVICAIS / LOMBARES", fill='#fde047', font=font_bold)
-    draw2.text((45, y_az + 30), "📄 Polirradiculopatia Inflamatória", fill='#cbd5e1', font=font_small)
-    draw2.text((45, y_az + 50), "📄 Radiculopatia Cervical C5-C6", fill='#cbd5e1', font=font_small)
-    draw2.text((45, y_az + 70), "📄 Radiculopatia Lombar L4-L5-S1", fill='#cbd5e1', font=font_small)
+    y_hist += 120
+    # Exam 3
+    draw_rounded_rect(draw2, (25, y_hist, 575, y_hist + 110), 8, fill='#020617', outline='#334155')
+    draw2.text((35, y_hist + 8), "EEG - Vigília e Sono Normal", fill='#fde047', font=font_bold)
+    draw2.text((450, y_hist + 8), "📅 10/01/2023", fill='#38bdf8', font=font_mono)
+    draw2.text((35, y_hist + 32), "Eletroencefalograma dentro dos padrões da normalidade para a idade.", fill='#f8fafc', font=font_small)
+    draw2.text((35, y_hist + 55), "Solicitante: DR EDUARDO MAGALHÃES | Status: Concluído", fill='#cbd5e1', font=font_small)
+    draw_rounded_rect(draw2, (340, y_hist + 75, 565, y_hist + 100), 6, fill='#4338ca')
+    draw2.text((350, y_hist + 82), "👁️ Reutilizar Achados no Laudo", fill='#ffffff', font=font_bold)
 
-    y_az += 105
-    # Category 4: SÍNDROME DO TÚNEL DO CARPO
-    draw_rounded_rect(draw2, (25, y_az, 475, y_az + 95), 8, fill='#0f172a', outline='#1e293b')
-    draw2.text((35, y_az + 8), "📁 4. SÍNDROME DO TÚNEL DO CARPO (STC)", fill='#fde047', font=font_bold)
-    draw2.text((45, y_az + 30), "📄 STC Grau 1 (Leve Bilateral)", fill='#cbd5e1', font=font_small)
-    draw2.text((45, y_az + 50), "📄 STC Grau 2 (Moderado Bilateral)", fill='#cbd5e1', font=font_small)
-    draw2.text((45, y_az + 70), "📄 STC Grau 3 (Grave Uni/Bilateral)", fill='#cbd5e1', font=font_small)
+    img2.save(os.path.join(docs_dir, "historico_exames_paciente.jpg"))
+    print("historico_exames_paciente.jpg gerado!")
 
-    img2.save(os.path.join(docs_dir, "arvore_ordem_alfabetica.jpg"))
-    print("arvore_ordem_alfabetica.jpg gerado!")
+    # --- SCREENSHOT 3: EDIÇÃO E REMOÇÃO DE MODELOS NA ÁRVORE (REQ-20) ---
+    img3 = Image.new('RGB', (500, 480), color='#090d16')
+    draw3 = ImageDraw.Draw(img3)
+    draw_rounded_rect(draw3, (10, 10, 490, 470), 14, fill='#020617', outline='#f59e0b', width=2)
+    draw3.text((25, 22), "📂 Gestão de Modelos na Árvore", fill='#fde047', font=font_title)
+    draw3.text((25, 48), "Dr. Eduardo pode editar, remover ou criar templates", fill='#94a3b8', font=font_small)
 
-    # Save copy for painel_layout_duas_colunas and arvore_pastas_estilo_windows as fallback
+    y_mod = 75
+    # Category: STC
+    draw_rounded_rect(draw3, (25, y_mod, 475, y_mod + 180), 8, fill='#0f172a', outline='#334155')
+    draw3.text((35, y_mod + 8), "📁 SÍNDROME DO TÚNEL DO CARPO (STC)", fill='#fde047', font=font_bold)
+    
+    # Template item 1 with action buttons
+    draw_rounded_rect(draw3, (35, y_mod + 32, 465, y_mod + 68), 6, fill='#1e293b', outline='#0284c7')
+    draw3.text((45, y_mod + 43), "📄 STC Grau 1 (Leve Bilateral)", fill='#ffffff', font=font_bold)
+    draw_rounded_rect(draw3, (360, y_mod + 40, 405, y_mod + 60), 4, fill='#0284c7')
+    draw3.text((368, y_mod + 44), "✏️ Edit", fill='#ffffff', font=font_small)
+    draw_rounded_rect(draw3, (412, y_mod + 40, 455, y_mod + 60), 4, fill='#991b1b')
+    draw3.text((420, y_mod + 44), "🗑️ Del", fill='#ffffff', font=font_small)
+
+    # Template item 2 with action buttons
+    draw_rounded_rect(draw3, (35, y_mod + 75, 465, y_mod + 111), 6, fill='#1e293b', outline='#334155')
+    draw3.text((45, y_mod + 86), "📄 STC Grau 2 (Moderado Bilateral)", fill='#cbd5e1', font=font_bold)
+    draw_rounded_rect(draw3, (360, y_mod + 83, 405, y_mod + 103), 4, fill='#334155')
+    draw3.text((368, y_mod + 87), "✏️ Edit", fill='#ffffff', font=font_small)
+    draw_rounded_rect(draw3, (412, y_mod + 83, 455, y_mod + 103), 4, fill='#991b1b')
+    draw3.text((420, y_mod + 87), "🗑️ Del", fill='#ffffff', font=font_small)
+
+    # Template item 3 (Custom added)
+    draw_rounded_rect(draw3, (35, y_mod + 118, 465, y_mod + 154), 6, fill='#1e1b4b', outline='#6366f1')
+    draw3.text((45, y_mod + 129), "✨ STC Grau 3 (Modelo Personalizado Dr. Eduardo)", fill='#a5b4fc', font=font_bold)
+    draw_rounded_rect(draw3, (360, y_mod + 126, 405, y_mod + 146), 4, fill='#4338ca')
+    draw3.text((368, y_mod + 130), "✏️ Edit", fill='#ffffff', font=font_small)
+    draw_rounded_rect(draw3, (412, y_mod + 126, 455, y_mod + 146), 4, fill='#991b1b')
+    draw3.text((420, y_mod + 130), "🗑️ Del", fill='#ffffff', font=font_small)
+
+    # Modal Form Preview
+    y_form = 270
+    draw_rounded_rect(draw3, (25, y_form, 475, y_form + 180), 10, fill='#020617', outline='#f59e0b', width=2)
+    draw3.text((35, y_form + 10), "💾 Modal: Salvar / Editar Modelo Personalizado", fill='#f59e0b', font=font_bold)
+    draw3.text((35, y_form + 35), "Título: ENMG - STC Grau 2 com Neuropatia Ulnar", fill='#ffffff', font=font_small)
+    draw3.text((35, y_form + 55), "Categoria: ENMG - Síndrome do Túnel do Carpo (STC)", fill='#cbd5e1', font=font_small)
+    draw_rounded_rect(draw3, (35, y_form + 75, 465, y_form + 140), 6, fill='#0f172a', outline='#334155')
+    draw3.text((42, y_form + 82), "Texto completo do modelo editado pelo Dr. Eduardo...", fill='#94a3b8', font=font_mono)
+    draw_rounded_rect(draw3, (340, y_form + 148, 465, y_form + 170), 6, fill='#f59e0b')
+    draw3.text((350, y_form + 154), "✓ Salvar Modelo", fill='#020617', font=font_bold)
+
+    img3.save(os.path.join(docs_dir, "edicao_remocao_modelos.jpg"))
+    print("edicao_remocao_modelos.jpg gerado!")
+
+    # Maintain copies for fallback compatibility
+    img1.save(os.path.join(docs_dir, "painel_campo_unico_edicao.jpg"))
     img1.save(os.path.join(docs_dir, "painel_layout_duas_colunas.jpg"))
-    img2.save(os.path.join(docs_dir, "arvore_pastas_estilo_windows.jpg"))
 
 if __name__ == '__main__':
     generate_screenshots()
