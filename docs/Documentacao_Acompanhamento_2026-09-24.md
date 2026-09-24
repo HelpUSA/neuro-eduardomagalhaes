@@ -21,6 +21,7 @@ Registro das solicitações enviadas pelo **Dr. Eduardo Magalhães** no dia **24
 1. *"Colocar um botão desfazer, refazer na tela de edição de laudos."*
 2. *"E eu aumentei o tamanho da fonte na edição mas na geração do pdf nao mudou."*
 3. *"Ao abrir um modelo qualquer caso queira fazer uma modificação pontual como por exemplo colocar uma palavra em negrito ou aumentar um espaçamento e manter o modelo na árvore na sua posição original apenas salvando as alterações, sem ter que salvar como um novo modelo."*
+4. *"Ao passar o mouse sem clicar em cima de modelo específico, o título inteiro do modelo poderia aparecer, sem que precisasse clicar. Isso ajuda a selecionar o modelo correto com mais agilidade."*
 
 #### Tabela de Requisitos e Resoluções de 24/09/2026:
 
@@ -29,6 +30,7 @@ Registro das solicitações enviadas pelo **Dr. Eduardo Magalhães** no dia **24
 | **REQ-22** | **Botões Desfazer / Refazer no Editor de Laudos** | Adicionados os botões **[Desfazer]** (↩️) e **[Refazer]** (↪️) na barra de ferramentas do editor de laudos, com suporte completo a histórico e teclas de atalho **Ctrl + Z** e **Ctrl + Y** (ou **Ctrl + Shift + Z**). | **Concluído (24/09)** |
 | **REQ-23** | **Tamanho de Fonte Selecionado Refletido no PDF Timbrado** | Sincronização dinâmica entre a fonte configurada no editor (`editorFontSize` de 11px a 20px) e o tamanho da fonte gerada no PDF oficial (`pdfBodyFontSize` proporcional de 7.2pt a 13.1pt) com altura de linha dinâmica e suporte a quebra automática de páginas (`doc.addPage()`). | **Concluído (24/09)** |
 | **REQ-24** | **Salvar Alterações Pontuais no Modelo Atual da Árvore** | Adicionado o botão **[💾 Salvar no Modelo Atual]** que grava edições pontuais (palavras em negrito, espaçamentos, correções de frases) diretamente no modelo selecionado, mantendo a sua posição original na árvore sem precisar criar um novo modelo. | **Concluído (24/09)** |
+| **REQ-25** | **Visualização do Título Completo ao Passar o Mouse (Hover Tooltip)** | Adicionado balão flutuante inteligente (`Hover Popover Tooltip`) e atributo de acessibilidade nativo (`title`) ao passar o ponteiro do mouse sobre qualquer modelo da árvore, exibindo o título 100% completo do exame sem necessidade de clicar. | **Concluído (24/09)** |
 
 ---
 
@@ -50,41 +52,53 @@ Registro das solicitações enviadas pelo **Dr. Eduardo Magalhães** no dia **24
 - **Atualização In-Place (`templateOverrides`):** Ao fazer alterações no texto do laudo (como colocar palavras em negrito com os botões `B`, `I`, `U` ou ajustar espaçamentos), basta clicar no botão **[💾 Salvar no Modelo Atual]**. As modificações são salvas no modelo em sua posição original na árvore.
 - **Opção de Salvar Como Novo Modelo:** O botão **[➕ Salvar Novo Modelo]** continua disponível caso o médico deseje criar uma cópia ou modelo inédito em vez de sobrescrever o modelo ativo.
 
-#### 2.4. Suporte Completo a Idiomas (PT, EN, ES)
+#### 2.4. Visualização do Título Completo ao Passar o Mouse (REQ-25)
+- **Visualização Instantânea Sem Clicar:** Ao posicionar o cursor sobre qualquer item da árvore de modelos, surge instantaneamente um balão de pré-visualização em destaque exibindo o nome completo do laudo (sem cortes por `...`), permitindo seleção rápida e precisa pelo médico.
+
+#### 2.5. Suporte Completo a Idiomas (PT, EN, ES)
 - Todas as novas funcionalidades e etiquetas da barra de ferramentas foram traduzidas em **Português 🇧🇷**, **English 🇺🇸** e **Español 🇪🇸**.
 
 ---
 
 ### 3. PARTE 3: ROTEIRO PASSO A PASSO DE USO COM CAPTURAS DE TELA
 
-#### Passo 1: Salvar Alterações no Modelo Atual da Árvore (REQ-24)
-1. Selecione um modelo qualquer na árvore (ex: *STC Grau 2 Moderado Bilateral*).
-2. Faça as modificações desejadas no texto (ex: selecione uma palavra e clique em **B** para negrito ou adicione um parágrafo de observação).
-3. Clique no botão verde **[💾 Salvar no Modelo Atual]** na barra de ferramentas.
-4. O sistema exibirá uma confirmação e o modelo permanecerá na mesma pasta e posição na árvore, agora com as suas modificações gravadas!
+#### Passo 1: Visualizar Título Completo do Modelo sem Clicar (REQ-25)
+1. Posicione o cursor do mouse em cima de qualquer modelo na árvore à esquerda.
+2. O balão flutuante exibirá instantaneamente o título 100% completo do exame, facilitando a identificação imediata.
 
-![Salvar no Modelo Atual](salvar_modelo_atual.jpg)
-*Figura 1: Botão [Salvar no Modelo Atual] para atualizar o modelo existente mantendo sua posição original na árvore.*
+![Visualização do Título Completo ao Passar o Mouse](hover_titulo_modelo.jpg)
+*Figura 1: Balão flutuante (Hover Tooltip) exibindo o título completo do modelo ao passar o cursor sem necessidade de clicar.*
 
 ---
 
-#### Passo 2: Como Utilizar os Botões Desfazer e Refazer (Ctrl+Z e Ctrl+Y)
+#### Passo 2: Salvar Alterações no Modelo Atual da Árvore (REQ-24)
+1. Selecione um modelo qualquer na árvore (ex: *STC Grau 2 Moderado Bilateral*).
+2. Faça as modificações desejadas no texto (ex: selecione uma palavra e clique em **B** para negrito ou adicione um parágrafo de observação).
+3. Clique no botão verde **[💾 Salvar no Modelo Atual]** na barra de ferramentas.
+4. O modelo permanecerá na mesma pasta e posição na árvore, agora com as suas modificações gravadas!
+
+![Salvar no Modelo Atual](salvar_modelo_atual.jpg)
+*Figura 2: Botão [Salvar no Modelo Atual] para atualizar o modelo existente mantendo sua posição original na árvore.*
+
+---
+
+#### Passo 3: Como Utilizar os Botões Desfazer e Refazer (Ctrl+Z e Ctrl+Y)
 1. Abra o **Painel do Consultório** e acesse a tela de **Emissão de Laudos**.
 2. Digite ou modifique o texto do laudo. Caso queira reverter uma alteração ou apagamento acidental, clique no botão **[Desfazer]** na barra de ferramentas ou pressione **Ctrl + Z** no seu teclado.
 3. Se quiser restaurar o texto desfeito, clique no botão **[Refazer]** ou pressione **Ctrl + Y** (ou **Ctrl + Shift + Z**).
 
 ![Botões Desfazer e Refazer](desfazer_refazer_editor.jpg)
-*Figura 2: Botões Desfazer (Ctrl+Z) e Refazer (Ctrl+Y) ativos na barra de ferramentas do editor de laudos.*
+*Figura 3: Botões Desfazer (Ctrl+Z) e Refazer (Ctrl+Y) ativos na barra de ferramentas do editor de laudos.*
 
 ---
 
-#### Passo 3: Como Ajustar o Tamanho da Fonte na Edição e Ver o Resultado no PDF
+#### Passo 4: Como Ajustar o Tamanho da Fonte na Edição e Ver o Resultado no PDF
 1. Na barra de ferramentas do editor de laudos, clique nos botões **A-** ou **A+** para ajustar o tamanho da fonte (ex: 14px, 16px, 18px).
 2. Note o indicador em amarelo mostrando o tamanho correspondente no PDF timbrado (ex: `16px (PDF: 10.5pt)`).
 3. Ao clicar em **[Assinar & Gerar PDF Timbrado]**, o laudo em PDF será gerado com o mesmo tamanho de fonte ampliado e com quebra de página automática caso necessário.
 
 ![Sincronização Dinâmica da Fonte no PDF](fonte_dinamica_pdf.jpg)
-*Figura 3: Ajuste de tamanho de fonte no editor refletido instantaneamente na geração do PDF timbrado.*
+*Figura 4: Ajuste de tamanho de fonte no editor refletido instantaneamente na geração do PDF timbrado.*
 
 ---
 

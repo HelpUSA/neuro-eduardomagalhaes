@@ -365,6 +365,35 @@ def generate_screenshots():
     img6.save(os.path.join(docs_dir, "salvar_modelo_atual.jpg"))
     print("salvar_modelo_atual.jpg gerado!")
 
+    # --- SCREENSHOT 7: HOVER TOOLTIP COM TÍTULO COMPLETO DO MODELO (24/09/2026 - REQ-25) ---
+    img7 = Image.new('RGB', (750, 420), color='#090d16')
+    draw7 = ImageDraw.Draw(img7)
+    draw_rounded_rect(draw7, (10, 10, 740, 410), 14, fill='#0f172a', outline='#38bdf8', width=2)
+    draw7.text((25, 22), "🔍 Visualização do Título Completo ao Passar o Mouse (Hover Tooltip)", fill='#38bdf8', font=font_title)
+    draw7.text((25, 48), "Passe o cursor sobre qualquer modelo para visualizar o título completo sem precisar clicar", fill='#94a3b8', font=font_small)
+
+    # Simulated Model Tree Item
+    draw_rounded_rect(draw7, (25, 80, 725, 390), 10, fill='#020617', outline='#334155')
+    draw7.text((35, 95), "📁 NEUROPATIAS PERIFÉRICAS & RADICULOPATIAS", fill='#fde047', font=font_bold)
+
+    # Model item (narrow/truncated view)
+    draw_rounded_rect(draw7, (45, 125, 420, 165), 6, fill='#1e293b', outline='#0284c7', width=2)
+    draw7.text((55, 137), "📄 Radiculopatia Cervical C6-C7 com comprometimento...", fill='#ffffff', font=font_bold)
+
+    # Mouse cursor simulation + HIGHLIGHTED FLOATING TOOLTIP
+    draw_rounded_rect(draw7, (45, 180, 705, 270), 10, fill='#090d16', outline='#38bdf8', width=2)
+    draw7.text((60, 192), "📌 TÍTULO COMPLETO DO MODELO (VISUALIZADO AO PASSAR O MOUSE):", fill='#fde047', font=font_bold)
+    draw7.text((60, 218), "Radiculopatia Cervical C6-C7 com comprometimento axonal e sensitivo de caráter crônico", fill='#ffffff', font=font_title)
+    draw7.text((60, 245), "⚡ Sem necessidade de clicar! Ajuda o Dr. Eduardo a selecionar o modelo correto com máxima agilidade.", fill='#10b981', font=font_bold)
+
+    draw_rounded_rect(draw7, (35, 290, 715, 375), 8, fill='#1e1b4b', outline='#6366f1')
+    draw7.text((45, 300), "💡 Como usar na prática:", fill='#fde047', font=font_bold)
+    draw7.text((45, 320), "• Posicione a seta do mouse em cima de qualquer modelo na árvore à esquerda.", fill='#ffffff', font=font_small)
+    draw7.text((45, 340), "• O balão flutuante exibirá instantaneamente o nome completo e detalhado do exame.", fill='#ffffff', font=font_small)
+
+    img7.save(os.path.join(docs_dir, "hover_titulo_modelo.jpg"))
+    print("hover_titulo_modelo.jpg gerado!")
+
     # Maintain copies for fallback compatibility
     img1.save(os.path.join(docs_dir, "painel_campo_unico_edicao.jpg"))
     img1.save(os.path.join(docs_dir, "painel_layout_duas_colunas.jpg"))

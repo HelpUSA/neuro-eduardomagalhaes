@@ -76,7 +76,7 @@ def build_pdf_2026_09_24():
         doctor_img = Image(img_path, width=42, height=42)
         header_text = [
             Paragraph("RELATÓRIO DE ACOMPANHAMENTO & ROTEIRO DE USO (24/09/2026)", title_style),
-            Paragraph("Botões Desfazer / Refazer (Ctrl+Z/Ctrl+Y) | Salvar Modelo Atual | Fonte Dinâmica PDF", subtitle_style)
+            Paragraph("Botões Desfazer/Refazer | Salvar Modelo Atual | Hover Tooltip Título Completo | Fonte PDF", subtitle_style)
         ]
         t_header = Table([[header_text, doctor_img]], colWidths=[435, 48])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
@@ -107,7 +107,7 @@ def build_pdf_2026_09_24():
     story.append(Paragraph("PARTE 1: NOVAS SOLICITAÇÕES DO DR. EDUARDO MAGALHÃES (24/09/2026)", h1_style))
     story.append(Paragraph(
         "Atendimento às solicitações do <b>Dr. Eduardo Magalhães</b> referentes aos botões de <b>Desfazer e Refazer</b> no editor, "
-        "à sincronização dinâmica do tamanho de fonte no PDF timbrado e à gravação de alterações no <b>próprio modelo da árvore</b> mantendo sua posição original.", body_style
+        "à gravação de alterações no <b>próprio modelo da árvore</b> mantendo sua posição original, à sincronização de fonte no PDF e à <b>visualização do título completo ao passar o mouse</b> sem precisar clicar.", body_style
     ))
 
     req_table = [
@@ -128,6 +128,12 @@ def build_pdf_2026_09_24():
             Paragraph("REQ-24", body_style),
             Paragraph("<b>Salvar no Próprio Modelo da Árvore:</b> Gravar alterações pontuais sem criar novo modelo.", body_style),
             Paragraph("Botão [Salvar no Modelo Atual] atualiza o texto do modelo selecionado na sua posição original da árvore.", body_style),
+            Paragraph("<font color='#0d9488'><b>Concluído (24/09)</b></font>", body_style)
+        ],
+        [
+            Paragraph("REQ-25", body_style),
+            Paragraph("<b>Título Completo ao Passar o Mouse (Hover):</b> Ver o título inteiro sem precisar clicar.", body_style),
+            Paragraph("Adicionado balão flutuante (Hover Tooltip Popover) e atributo title para exibir o nome completo ao passar o mouse.", body_style),
             Paragraph("<font color='#0d9488'><b>Concluído (24/09)</b></font>", body_style)
         ]
     ]
@@ -151,35 +157,36 @@ def build_pdf_2026_09_24():
     story.append(Paragraph("<b>2.1. Botões Desfazer/Refazer com Atalhos (REQ-22):</b> Histórico de edição registrado a cada alteração. Teclas de atalho nativas Ctrl+Z e Ctrl+Y integradas.", body_style))
     story.append(Paragraph("<b>2.2. Fonte Dinâmica no PDF Timbrado (REQ-23):</b> Tamanho da fonte na edição (11px a 20px) repassado proporcionalmente ao PDF com quebra automática de páginas.", body_style))
     story.append(Paragraph("<b>2.3. Gravação de Modificações no Modelo Atual (REQ-24):</b> Atualização in-place (`templateOverrides`) preserva o modelo na sua pasta e posição original na árvore sem criar duplicatas.", body_style))
-    story.append(Paragraph("<b>2.4. Suporte Completo a Idiomas:</b> Novas opções 100% integradas nos idiomas Português 🇧🇷, English 🇺🇸 e Español 🇪🇸.", body_style))
+    story.append(Paragraph("<b>2.4. Balão Flutuante ao Passar o Mouse (REQ-25):</b> Balão flutuante inteligente (`Hover Popover`) exibe o nome do laudo em destaque ao mover o cursor sobre o item na árvore.", body_style))
+    story.append(Paragraph("<b>2.5. Suporte Completo a Idiomas:</b> Novas opções 100% integradas nos idiomas Português 🇧🇷, English 🇺🇸 e Español 🇪🇸.", body_style))
     story.append(Spacer(1, 4))
 
     # PARTE 3: ROTEIRO PASSO A PASSO
     story.append(Paragraph("PARTE 3: ROTEIRO PASSO A PASSO DE USO COM CAPTURAS DE TELA", h1_style))
 
-    story.append(Paragraph("Passo 1: Salvar Alterações Pontuais no Modelo Atual da Árvore (REQ-24)", h2_style))
+    story.append(Paragraph("Passo 1: Visualizar Título Completo do Modelo ao Passar o Mouse (REQ-25)", h2_style))
+    story.append(Paragraph("Posicione a seta do mouse em cima de qualquer modelo na árvore à esquerda. O balão flutuante exibirá instantaneamente o título 100% completo do exame, sem necessidade de clicar.", body_style))
+
+    img_hover = os.path.join(docs_dir, "hover_titulo_modelo.jpg")
+    if os.path.exists(img_hover):
+        story.append(Image(img_hover, width=483, height=270))
+        story.append(Paragraph("Figura 1: Balão flutuante (Hover Tooltip) exibindo o título completo do modelo ao passar o ponteiro do mouse.", caption_style))
+
+    story.append(Paragraph("Passo 2: Salvar Alterações Pontuais no Modelo Atual da Árvore (REQ-24)", h2_style))
     story.append(Paragraph("Ao realizar alterações em um modelo aberto (negrito, espaçamentos, correções de frases), clique no botão verde <b>[Salvar no Modelo Atual]</b> para gravar as modificações mantendo a posição original do modelo na árvore.", body_style))
 
     img_save = os.path.join(docs_dir, "salvar_modelo_atual.jpg")
     if os.path.exists(img_save):
         story.append(Image(img_save, width=483, height=270))
-        story.append(Paragraph("Figura 1: Atualização do modelo selecionado mantendo sua posição original na árvore sem duplicar.", caption_style))
+        story.append(Paragraph("Figura 2: Atualização do modelo selecionado mantendo sua posição original na árvore sem duplicar.", caption_style))
 
-    story.append(Paragraph("Passo 2: Utilizando os Botões Desfazer e Refazer (Ctrl+Z e Ctrl+Y)", h2_style))
+    story.append(Paragraph("Passo 3: Utilizando os Botões Desfazer e Refazer (Ctrl+Z e Ctrl+Y)", h2_style))
     story.append(Paragraph("No editor de laudos, utilize os botões <b>[Desfazer]</b> e <b>[Refazer]</b> ou pressione <b>Ctrl+Z</b> / <b>Ctrl+Y</b> para reverter ou restaurar alterações rapidamente.", body_style))
 
     img_undo = os.path.join(docs_dir, "desfazer_refazer_editor.jpg")
     if os.path.exists(img_undo):
         story.append(Image(img_undo, width=483, height=270))
-        story.append(Paragraph("Figura 2: Botões Desfazer e Refazer na barra de ferramentas do editor de laudos com atalhos Ctrl+Z e Ctrl+Y.", caption_style))
-
-    story.append(Paragraph("Passo 3: Sincronização Dinâmica do Tamanho de Fonte na Edição e no PDF", h2_style))
-    story.append(Paragraph("Ao ajustar a fonte no editor (A- / A+), o indicador mostra a pré-visualização em pt no PDF. O PDF timbrado gerado utilizará exatamente o mesmo tamanho de fonte ampliado.", body_style))
-
-    img_font = os.path.join(docs_dir, "fonte_dinamica_pdf.jpg")
-    if os.path.exists(img_font):
-        story.append(Image(img_font, width=483, height=296))
-        story.append(Paragraph("Figura 3: Ajuste de tamanho de fonte no editor refletido diretamente no laudo em PDF com quebra automática de página.", caption_style))
+        story.append(Paragraph("Figura 3: Botões Desfazer e Refazer na barra de ferramentas do editor de laudos com atalhos Ctrl+Z e Ctrl+Y.", caption_style))
 
     doc.build(story, canvasmaker=NumberedCanvas)
     print("PDF Documentacao_Acompanhamento_2026-09-24.pdf criado com sucesso!")
