@@ -68,8 +68,9 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang }) => {
   // Rich Text Formatting & Editor Font Size State
   const [editorFontSize, setEditorFontSize] = useState(13);
 
-  // Custom Templates State
+  // Custom Templates & Template Overrides State
   const [customTemplates, setCustomTemplates] = useState([]);
+  const [templateOverrides, setTemplateOverrides] = useState({});
   const [deletedTemplateIds, setDeletedTemplateIds] = useState([]);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
@@ -144,7 +145,45 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   const [showWordImporter, setShowWordImporter] = useState(false);
   const [attachedTracingsFile, setAttachedTracingsFile] = useState('Graficos_Aparelho_ENMG_Clelia.pdf');
 
-  const allAvailableTemplates = [...ALL_EXAM_TEMPLATES, ...customTemplates].filter(t => !deletedTemplateIds.includes(t.id));
+  // Combined List of Templates with Overrides for In-Place Saving
+  const allAvailableTemplates = [...ALL_EXAM_TEMPLATES, ...customTemplates]
+    .filter(t => !deletedTemplateIds.includes(t.id))
+    .map(t => {
+      if (templateOverrides[t.id]) {
+        return {
+          ...t,
+          fullText: templateOverrides[t.id],
+          conclusion: templateOverrides[t.id]
+        };
+      }
+      return t;
+    });
+
+  const handleUpdateCurrentTemplate = () => {
+    if (!selectedTemplateId) {
+      alert("Nenhum modelo está selecionado na árvore no momento.");
+      return;
+    }
+
+    const currentTmpl = allAvailableTemplates.find(t => t.id === selectedTemplateId);
+    const tmplName = currentTmpl ? currentTmpl.title : 'o modelo selecionado';
+
+    const isCustom = customTemplates.some(t => t.id === selectedTemplateId);
+    if (isCustom) {
+      setCustomTemplates(prev => prev.map(t => t.id === selectedTemplateId ? {
+        ...t,
+        fullText: fullReportText,
+        conclusion: fullReportText
+      } : t));
+    } else {
+      setTemplateOverrides(prev => ({
+        ...prev,
+        [selectedTemplateId]: fullReportText
+      }));
+    }
+
+    alert(`✨ Alterações salvas com sucesso no modelo "${tmplName}"!\nEle permanecerá na sua posição original na árvore de modelos com o novo texto.`);
+  };
 
   const handleApplyWordText = () => {
     if (!wordImportText.trim()) {
@@ -1070,18 +1109,27 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                 </button>
                               </div>
 
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={handleUpdateCurrentTemplate}
+                                  className="px-3 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 transition"
+                                  title="Salvar alterações pontuais mantendo o modelo na sua posição original na árvore"
+                                >
+                                  <Save className="w-3.5 h-3.5 text-emerald-400" /> {labels.updateCurrentModelBtn || "💾 Salvar no Modelo Atual"}
+                                </button>
                                 <button
                                   type="button"
                                   onClick={handleOpenAddTemplate}
-                                  className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1.5"
+                                  className="px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1.5 transition"
+                                  title="Salvar como um novo modelo independente na árvore"
                                 >
-                                  <Save className="w-3.5 h-3.5 text-amber-400" /> {labels.saveModelBtn}
+                                  <PlusCircle className="w-3.5 h-3.5 text-amber-400" /> {labels.saveNewModelBtn || "➕ Salvar Novo Modelo"}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => updateFullReportText('')}
-                                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 text-[11px] font-bold"
+                                  className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 text-[11px] font-bold transition"
                                 >
                                   {labels.clearBtn}
                                 </button>

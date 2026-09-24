@@ -324,6 +324,47 @@ def generate_screenshots():
     img5.save(os.path.join(docs_dir, "fonte_dinamica_pdf.jpg"))
     print("fonte_dinamica_pdf.jpg gerado!")
 
+    # --- SCREENSHOT 6: SALVAR ALTERAÇÕES NO MODELO ATUAL NA ÁRVORE (24/09/2026 - REQ-24) ---
+    img6 = Image.new('RGB', (750, 420), color='#090d16')
+    draw6 = ImageDraw.Draw(img6)
+    draw_rounded_rect(draw6, (10, 10, 740, 410), 14, fill='#0f172a', outline='#10b981', width=2)
+    draw6.text((25, 22), "💾 Salvar Alterações Pontuais no Modelo Atual da Árvore", fill='#34d399', font=font_title)
+    draw6.text((25, 48), "Atualize modelos existentes mantendo sua posição original sem precisar criar um novo modelo", fill='#94a3b8', font=font_small)
+
+    # Toolbar with both Save buttons highlighted
+    draw_rounded_rect(draw6, (25, 80, 725, 140), 10, fill='#020617', outline='#10b981', width=2)
+    draw6.text((35, 88), "Barra de Ações do Editor de Laudos:", fill='#38bdf8', font=font_small)
+
+    # HIGHLIGHTED SAVE CURRENT MODEL BUTTON
+    draw_rounded_rect(draw6, (35, 105, 235, 130), 6, fill='#064e3b', outline='#10b981', width=2)
+    draw6.text((45, 110), "💾 Salvar no Modelo Atual", fill='#6ee7b7', font=font_bold)
+
+    # SAVE NEW MODEL BUTTON
+    draw_rounded_rect(draw6, (245, 105, 435, 130), 6, fill='#451a03', outline='#f59e0b')
+    draw6.text((255, 110), "➕ Salvar Novo Modelo", fill='#fde047', font=font_bold)
+
+    # CLEAR BUTTON
+    draw_rounded_rect(draw6, (445, 105, 515, 130), 4, fill='#1e293b')
+    draw6.text((455, 110), "Limpar", fill='#94a3b8', font=font_bold)
+
+    # Model Tree position illustration
+    draw_rounded_rect(draw6, (25, 155, 725, 390), 10, fill='#020617', outline='#334155')
+    draw6.text((35, 165), "📁 SÍNDROME DO TÚNEL DO CARPO (STC)", fill='#fde047', font=font_bold)
+    
+    draw_rounded_rect(draw6, (45, 188, 705, 222), 6, fill='#064e3b', outline='#10b981', width=2)
+    draw6.text((55, 197), "📄 STC Grau 2 (Moderado Bilateral) ➔ modelo atualizado na mesma posição da árvore!", fill='#6ee7b7', font=font_bold)
+
+    draw4.text((35, 240), "[ As alterações de negrito, parágrafos ou textos são gravadas no próprio modelo ]", fill='#818cf8', font=font_bold)
+
+    draw_rounded_rect(draw6, (35, 270, 715, 375), 8, fill='#064e3b', outline='#10b981')
+    draw6.text((45, 280), "✨ Vantagens para o Dr. Eduardo:", fill='#fde047', font=font_bold)
+    draw6.text((45, 300), "• Faça modificações pontuais (palavras em negrito, espaçamentos, correções de frases).", fill='#ffffff', font=font_small)
+    draw6.text((45, 320), "• Clique em 'Salvar no Modelo Atual' para atualizar o modelo existente sem duplicar.", fill='#ffffff', font=font_small)
+    draw6.text((45, 340), "• Caso deseje criar um modelo totalmente novo, use o botão 'Salvar Novo Modelo'.", fill='#ffffff', font=font_small)
+
+    img6.save(os.path.join(docs_dir, "salvar_modelo_atual.jpg"))
+    print("salvar_modelo_atual.jpg gerado!")
+
     # Maintain copies for fallback compatibility
     img1.save(os.path.join(docs_dir, "painel_campo_unico_edicao.jpg"))
     img1.save(os.path.join(docs_dir, "painel_layout_duas_colunas.jpg"))
