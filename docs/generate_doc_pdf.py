@@ -28,7 +28,7 @@ class NumberedCanvas(canvas.Canvas):
         self.setFillColor(colors.HexColor("#64748B"))
         
         if self._pageNumber > 1:
-            self.drawString(54, 800, "Relatório de Acompanhamento & Roteiro de Uso | Clínica Dr. Eduardo Magalhães (22/09/2026)")
+            self.drawString(54, 800, "Relatório de Acompanhamento & Roteiro de Uso | Clínica Dr. Eduardo Magalhães (24/09/2026)")
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.5)
             self.line(54, 792, 541, 792)
@@ -41,9 +41,9 @@ class NumberedCanvas(canvas.Canvas):
         self.line(54, 44, 541, 44)
         self.restoreState()
 
-def build_pdf():
+def build_pdf_2026_09_24():
     docs_dir = os.path.dirname(os.path.abspath(__file__))
-    pdf_filename = os.path.join(docs_dir, "Documentacao_Acompanhamento_2026-09-22.pdf")
+    pdf_filename = os.path.join(docs_dir, "Documentacao_Acompanhamento_2026-09-24.pdf")
     doc = SimpleDocTemplate(
         pdf_filename,
         pagesize=A4,
@@ -66,7 +66,6 @@ def build_pdf():
     h1_style = ParagraphStyle('SectionH1', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9.5, leading=12.5, textColor=PRIMARY, spaceBefore=8, spaceAfter=3)
     h2_style = ParagraphStyle('SectionH2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8.5, leading=11.5, textColor=ACCENT, spaceBefore=4, spaceAfter=2)
     body_style = ParagraphStyle('BodyDark', parent=styles['Normal'], fontName='Helvetica', fontSize=7.6, leading=10.5, textColor=TEXT_DARK, spaceAfter=2.5)
-    qa_style = ParagraphStyle('QABox', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.8, leading=11, textColor=colors.HexColor("#4338CA"), spaceAfter=3)
     caption_style = ParagraphStyle('Caption', parent=styles['Normal'], fontName='Helvetica-Oblique', fontSize=7, leading=9.5, textColor=colors.HexColor("#64748B"), spaceAfter=4, alignment=1)
 
     story = []
@@ -76,8 +75,8 @@ def build_pdf():
     if os.path.exists(img_path):
         doctor_img = Image(img_path, width=42, height=42)
         header_text = [
-            Paragraph("RELATÓRIO DE ACOMPANHAMENTO & ROTEIRO DE USO (22/09/2026)", title_style),
-            Paragraph("Carregamento 1:1 Limpo | Edição Expandida 100% | Histórico por CPF | Formatação Rica", subtitle_style)
+            Paragraph("RELATÓRIO DE ACOMPANHAMENTO & ROTEIRO DE USO (24/09/2026)", title_style),
+            Paragraph("Botões Desfazer / Refazer (Ctrl+Z / Ctrl+Y) | Fonte Dinâmica (Edição ➔ PDF Timbrado)", subtitle_style)
         ]
         t_header = Table([[header_text, doctor_img]], colWidths=[435, 48])
         t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
@@ -87,9 +86,9 @@ def build_pdf():
 
     # Meta Table
     meta_data = [
-        [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 22/09/2026", body_style)],
-        [Paragraph("<b>Identificador:</b> DOC-2026-09-22", body_style), Paragraph("<b>Status:</b> Concluído & Publicado em Produção", body_style)],
-        [Paragraph("<b>Plataforma:</b> neuroeduardomagalhaes.vercel.app", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
+        [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 24/09/2026", body_style)],
+        [Paragraph("<b>Identificador:</b> DOC-2026-09-24", body_style), Paragraph("<b>Status:</b> Concluído & Publicado em Produção", body_style)],
+        [Paragraph("<b>Plataforma:</b> neuro.eduardomagalhaes.helpusbr.com", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
     ]
     t_meta = Table(meta_data, colWidths=[240, 243])
     t_meta.setStyle(TableStyle([
@@ -105,64 +104,25 @@ def build_pdf():
     story.append(Spacer(1, 4))
 
     # PARTE 1
-    story.append(Paragraph("PARTE 1: SOLICITAÇÕES E PERGUNTAS DO DR. EDUARDO MAGALHÃES (21:01 e 21:04)", h1_style))
+    story.append(Paragraph("PARTE 1: NOVAS SOLICITAÇÕES DO DR. EDUARDO MAGALHÃES (24/09/2026)", h1_style))
     story.append(Paragraph(
-        "Registro das novas observações enviadas pelo <b>Dr. Eduardo Magalhães</b> na noite de <b>22/09/2026</b> referentes à fidelidade do texto carregado dos modelos, "
-        "espaçamento entre parágrafos, maximização da janela de edição em 100%, respostas sobre busca de exames anteriores por CPF e gerenciamento de modelos na árvore.", body_style
+        "Atendimento às solicitações do <b>Dr. Eduardo Magalhães</b> referentes à inclusão de botões de <b>Desfazer e Refazer</b> no editor de laudos "
+        "e à sincronização dinâmica entre o tamanho de fonte selecionado na tela de edição e a geração do PDF timbrado oficial.", body_style
     ))
-
-    # Respostas Oficiais Box
-    qa_data = [
-        [Paragraph("<b>Pergunta 1 (Dr. Eduardo):</b> <i>'Haverá um meio de buscar os exames anteriores caso o paciente tenha ao longo do tempo?'</i><br/>"
-                   "<b>RESPOSTA OFICIAL: SIM!</b> O sistema indexa todo o histórico de exames anteriores por CPF. Ao pesquisar o CPF do paciente, surge o botão "
-                   "<b>'Exames Anteriores ({qtd})'</b>, abrindo a linha do tempo de laudos passados com a opção <b>'Reutilizar Achados no Laudo Atual'</b>.", body_style)],
-        [Paragraph("<b>Pergunta 2 (Dr. Eduardo):</b> <i>'Os modelos salvos podem ser editáveis, ou removidos da árvore futuramente por mim?'</i><br/>"
-                   "<b>RESPOSTA OFICIAL: SIM!</b> Todos os modelos da árvore contam com os botões diretos de <b>'Editar Modelo'</b> e <b>'Excluir Modelo'</b>. "
-                   "Além disso, o Dr. Eduardo pode clicar em <b>'Salvar como Novo Modelo'</b> no próprio editor para gravar suas alterações como novos templates.", body_style)]
-    ]
-    t_qa = Table(qa_data, colWidths=[483])
-    t_qa.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#EEF2FF")),
-        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#6366F1")),
-        ('TOPPADDING', (0,0), (-1,-1), 4),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-        ('LEFTPADDING', (0,0), (-1,-1), 6),
-        ('RIGHTPADDING', (0,0), (-1,-1), 6),
-    ]))
-    story.append(t_qa)
-    story.append(Spacer(1, 4))
 
     req_table = [
         [Paragraph("<b>ID</b>", h2_style), Paragraph("<b>Solicitação do Dr. Eduardo</b>", h2_style), Paragraph("<b>Solução Técnica Implementada</b>", h2_style), Paragraph("<b>Status</b>", h2_style)],
         [
-            Paragraph("REQ-17", body_style),
-            Paragraph("<b>Carregamento Limpo 1:1 sem Frases Estranhas:</b> Eliminar / EEG e parágrafos colados.", body_style),
-            Paragraph("Carregamento de texto original sem inserções artificiais de cabeçalhos e mantendo espaçamentos.", body_style),
-            Paragraph("<font color='#0d9488'><b>Concluído (22/09)</b></font>", body_style)
+            Paragraph("REQ-22", body_style),
+            Paragraph("<b>Botões Desfazer / Refazer no Editor de Laudos:</b> Função Undo/Redo para reverter alterações.", body_style),
+            Paragraph("Adicionados botões [Desfazer] (Ctrl+Z) e [Refazer] (Ctrl+Y/Ctrl+Shift+Z) com pilha de histórico completa.", body_style),
+            Paragraph("<font color='#0d9488'><b>Concluído (24/09)</b></font>", body_style)
         ],
         [
-            Paragraph("REQ-18", body_style),
-            Paragraph("<b>Janela de Edição Expandida 100%:</b> Ocultar árvore após seleção do modelo.", body_style),
-            Paragraph("Botão [Ocultar Árvore] expande a área de edição para 100% da largura da tela.", body_style),
-            Paragraph("<font color='#0d9488'><b>Concluído (22/09)</b></font>", body_style)
-        ],
-        [
-            Paragraph("REQ-19", body_style),
-            Paragraph("<b>Barra de Formatação Rica:</b> Botões de negrito, itálico e tamanho de fonte.", body_style),
-            Paragraph("Barra de ferramentas de texto no topo do editor (B, I, U, A-, A+ e Salvar Modelo).", body_style),
-            Paragraph("<font color='#0d9488'><b>Concluído (22/09)</b></font>", body_style)
-        ],
-        [
-            Paragraph("REQ-20", body_style),
-            Paragraph("<b>Gestão de Modelos na Árvore:</b> Editar, excluir e salvar modelos na árvore.", body_style),
-            Paragraph("Menu de ações [Editar] e [Excluir] nos templates da árvore e modal de criação.", body_style),
-            Paragraph("<font color='#0d9488'><b>Concluído (22/09)</b></font>", body_style)
-        ],
-        [
-            Paragraph("REQ-21", body_style),
-            Paragraph("<b>Histórico de Exames por CPF:</b> Buscar laudos anteriores do paciente ao longo do tempo.", body_style),
-            Paragraph("Painel de histórico retroativo por CPF com reutilização rápida de diagnósticos prévios.", body_style),
-            Paragraph("<font color='#0d9488'><b>Concluído (22/09)</b></font>", body_style)
+            Paragraph("REQ-23", body_style),
+            Paragraph("<b>Sincronização de Fonte (Edição ➔ PDF):</b> Aumentar a fonte na edição deve alterar no PDF.", body_style),
+            Paragraph("Cálculo proporcional de fonte no jsPDF (7.2pt a 13.1pt) com altura de linha e suporte a quebra multi-páginas.", body_style),
+            Paragraph("<font color='#0d9488'><b>Concluído (24/09)</b></font>", body_style)
         ]
     ]
 
@@ -171,8 +131,8 @@ def build_pdf():
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#F1F5F9")),
         ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
         ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#E2E8F0")),
-        ('TOPPADDING', (0,0), (-1,-1), 2),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+        ('TOPPADDING', (0,0), (-1,-1), 2.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
         ('LEFTPADDING', (0,0), (-1,-1), 4),
         ('RIGHTPADDING', (0,0), (-1,-1), 4),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
@@ -181,43 +141,41 @@ def build_pdf():
     story.append(Spacer(1, 4))
 
     # PARTE 2
-    story.append(Paragraph("PARTE 2: IMPLEMENTAÇÕES E COMPONENTES DESENVOLVIDOS", h1_style))
-    story.append(Paragraph("<b>2.1. Fidelidade de Texto & Espaçamento (REQ-17):</b> Carregamento 100% fiel dos modelos originais do Dr. Eduardo sem títulos forçados.", body_style))
-    story.append(Paragraph("<b>2.2. Modo de Edição Expandido em 100% (REQ-18):</b> Possibilidade de ocultar a árvore de modelos para maximizar a área de trabalho.", body_style))
-    story.append(Paragraph("<b>2.3. Barra de Formatação Rica (REQ-19):</b> Inserção rápida de Negrito, Itálico, Sublinhado e controle de tamanho da fonte (11px a 18px).", body_style))
-    story.append(Paragraph("<b>2.4. Gestão de Modelos (REQ-20):</b> Controle total para editar, excluir ou adicionar novos templates personalizados à árvore.", body_style))
-    story.append(Paragraph("<b>2.5. Histórico de Exames por CPF (REQ-21):</b> Módulo de consulta retroativa a exames anteriores do mesmo paciente ao longo do tempo.", body_style))
+    story.append(Paragraph("PARTE 2: DETALHAMENTO DAS SOLUÇÕES TÉCNICAS", h1_style))
+    story.append(Paragraph("<b>2.1. Pilha de Histórico & Atalhos Nativos (REQ-22):</b> A cada digitação, carregamento de modelo ou formatação, o sistema registra um snapshot. Atalhos nativos de teclado (Ctrl+Z para Desfazer e Ctrl+Y para Refazer) foram vinculados à área de texto.", body_style))
+    story.append(Paragraph("<b>2.2. Cálculo de Fonte Proporcional & Paging no PDF (REQ-23):</b> A fonte configurada na tela (ex: 13px ➔ 8.5pt, 16px ➔ 10.5pt, 18px ➔ 11.8pt) é repassada ao gerador do PDF. Foi adicionada a instrução de quebra de página automática caso o texto ampliado exceda a folha A4.", body_style))
+    story.append(Paragraph("<b>2.3. Suporte Completo a Idiomas:</b> Novas opções 100% integradas nos idiomas Português 🇧🇷, English 🇺🇸 e Español 🇪🇸.", body_style))
     story.append(Spacer(1, 4))
 
     # PARTE 3: ROTEIRO PASSO A PASSO
-    story.append(Paragraph("PARTE 3: ROTEIRO PASSO A PASSO DE USO COM CAPTURAS DE TELA ATUALIZADAS", h1_style))
+    story.append(Paragraph("PARTE 3: ROTEIRO PASSO A PASSO DE USO COM CAPTURAS DE TELA", h1_style))
 
-    story.append(Paragraph("Passo 1: Modo de Edição Expandido em 100% da Tela e Formatação Rica", h2_style))
-    story.append(Paragraph("Ao selecionar o modelo desejado, clique em <b>[Ocultar Árvore]</b> no topo. A janela expande para 100% da largura. Utilize os botões <b>B</b>, <i>I</i>, <u>U</u> e <b>A+</b> para formatar o laudo.", body_style))
+    story.append(Paragraph("Passo 1: Utilizando os Botões Desfazer e Refazer (Ctrl+Z e Ctrl+Y)", h2_style))
+    story.append(Paragraph("No editor de laudos, utilize os botões <b>[Desfazer]</b> e <b>[Refazer]</b> ou pressione <b>Ctrl+Z</b> / <b>Ctrl+Y</b> para reverter ou restaurar alterações rapidamente.", body_style))
+
+    img_undo = os.path.join(docs_dir, "desfazer_refazer_editor.jpg")
+    if os.path.exists(img_undo):
+        story.append(Image(img_undo, width=483, height=270))
+        story.append(Paragraph("Figura 1: Botões Desfazer e Refazer na barra de ferramentas do editor de laudos com atalhos Ctrl+Z e Ctrl+Y.", caption_style))
+
+    story.append(Paragraph("Passo 2: Sincronização Dinâmica do Tamanho de Fonte na Edição e no PDF", h2_style))
+    story.append(Paragraph("Ao ajustar a fonte no editor (A- / A+), o indicador mostra a pré-visualização em pt no PDF. O PDF timbrado gerado utilizará exatamente o mesmo tamanho de fonte ampliado.", body_style))
+
+    img_font = os.path.join(docs_dir, "fonte_dinamica_pdf.jpg")
+    if os.path.exists(img_font):
+        story.append(Image(img_font, width=483, height=296))
+        story.append(Paragraph("Figura 2: Ajuste de tamanho de fonte no editor refletido diretamente no laudo em PDF com quebra automática de página.", caption_style))
+
+    story.append(Paragraph("Passo 3: Modo de Edição Expandido em 100% da Tela", h2_style))
+    story.append(Paragraph("Clique em <b>[Ocultar Árvore]</b> para expandir o editor em 100% da largura da tela, aproveitando todo o monitor para laudar com conforto.", body_style))
 
     img_exp = os.path.join(docs_dir, "painel_editor_expansivel.jpg")
     if os.path.exists(img_exp):
         story.append(Image(img_exp, width=483, height=255))
-        story.append(Paragraph("Figura 1: Modo de Edição Expandido em 100% da tela com barra de formatação rica e carregamento limpo de texto.", caption_style))
-
-    story.append(Paragraph("Passo 2: Consulta do Histórico de Exames Anteriores por CPF", h2_style))
-    story.append(Paragraph("Ao digitar o CPF do paciente, clique no botão <b>[Exames Anteriores]</b> para visualizar a linha do tempo de laudos passados e reutilizar achados anteriores.", body_style))
-
-    img_hist = os.path.join(docs_dir, "historico_exames_paciente.jpg")
-    if os.path.exists(img_hist):
-        story.append(Image(img_hist, width=483, height=210))
-        story.append(Paragraph("Figura 2: Consulta ao histórico retroativo de exames do paciente indexado por CPF.", caption_style))
-
-    story.append(Paragraph("Passo 3: Editar, Excluir e Criar Modelos na Árvore", h2_style))
-    story.append(Paragraph("Na árvore de modelos, utilize os botões <b>[Edit]</b> e <b>[Del]</b> em cada template para gerenciar o catálogo ou salve novas versões pelo editor.", body_style))
-
-    img_mod = os.path.join(docs_dir, "edicao_remocao_modelos.jpg")
-    if os.path.exists(img_mod):
-        story.append(Image(img_mod, width=483, height=210))
-        story.append(Paragraph("Figura 3: Recursos de edição, exclusão e inclusão de novos templates na árvore da clínica.", caption_style))
+        story.append(Paragraph("Figura 3: Modo de edição expandido em 100% da largura com carregamento limpo e botões de formatação.", caption_style))
 
     doc.build(story, canvasmaker=NumberedCanvas)
-    print("PDF Documentacao_Acompanhamento_2026-09-22.pdf criado com sucesso!")
+    print("PDF Documentacao_Acompanhamento_2026-09-24.pdf criado com sucesso!")
 
 if __name__ == '__main__':
-    build_pdf()
+    build_pdf_2026_09_24()

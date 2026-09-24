@@ -3,7 +3,7 @@ import {
   X, Search, PlusCircle, FileText, Send, UserPlus, ShieldCheck, Lock, 
   Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, ChevronDown, 
   Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw, Upload, Database, LogOut, CheckCircle2,
-  Maximize2, Minimize2, Bold, Italic, Underline, Save, History, Type
+  Maximize2, Minimize2, Bold, Italic, Underline, Save, History, Type, Undo, Redo, RotateCcw, RotateCw
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
@@ -26,6 +26,9 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang }) => {
     formatBold: "Negrito",
     formatItalic: "Itálico",
     formatUnderline: "Sublinhado",
+    undoBtn: "Desfazer (Ctrl+Z)",
+    redoBtn: "Refazer (Ctrl+Y)",
+    pdfFontPreview: "Tam. PDF",
     saveModelBtn: "💾 Salvar como Novo Modelo",
     clearBtn: "Limpar",
     whatsappBtn: "Disparar Link no WhatsApp",
@@ -88,8 +91,8 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang }) => {
   const [conclusion, setConclusion] = useState('Exame compatível com neuropatia do mediano ao nível do carpo, com comprometimento parcial de fibras sensitivas, de caráter desmielinizante (grau 2), bilateral.');
 
   const [editorMode, setEditorMode] = useState('unified');
-  const [fullReportText, setFullReportText] = useState(
-`ELETRONEUROMIOGRAFIA DOS MEMBROS SUPERIORES
+
+  const initialReportText = `ELETRONEUROMIOGRAFIA DOS MEMBROS SUPERIORES
 
 Realizada eletroneuromiografia de membros superiores.
 A neurocondução motora foi realizada em nervos medianos e ulnares. Os potenciais de ação motores apresentaram velocidades de condução normais, latência distal limítrofe e amplitudes conservadas.
@@ -98,8 +101,44 @@ A onda F foi pesquisada em nervos medianos e ulnares, apresentando latências m�
 A eletromiografia realizada com agulha monopolar exibiu potenciais de ação de unidades motoras com recrutamento normal e ausência de atividade espontânea.
 
 CONCLUSÃO:
-Exame compatível com neuropatia do mediano ao nível do carpo, com comprometimento parcial de fibras sensitivas, de caráter desmielinizante (grau 2), bilateral.`
-  );
+Exame compatível com neuropatia do mediano ao nível do carpo, com comprometimento parcial de fibras sensitivas, de caráter desmielinizante (grau 2), bilateral.`;
+
+  const [fullReportText, setFullReportText] = useState(initialReportText);
+
+  // Undo / Redo History Stack State
+  const [reportHistory, setReportHistory] = useState([initialReportText]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+
+  const updateFullReportText = (newText, pushToHistory = true) => {
+    setFullReportText(newText);
+    if (pushToHistory) {
+      setReportHistory(prev => {
+        const next = prev.slice(0, historyIndex + 1);
+        if (next[next.length - 1] !== newText) {
+          next.push(newText);
+          setHistoryIndex(next.length - 1);
+          return next;
+        }
+        return prev;
+      });
+    }
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const prevIdx = historyIndex - 1;
+      setHistoryIndex(prevIdx);
+      setFullReportText(reportHistory[prevIdx]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < reportHistory.length - 1) {
+      const nextIdx = historyIndex + 1;
+      setHistoryIndex(nextIdx);
+      setFullReportText(reportHistory[nextIdx]);
+    }
+  };
 
   const [wordImportText, setWordImportText] = useState('');
   const [showWordImporter, setShowWordImporter] = useState(false);
@@ -326,7 +365,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       cleanText = parts.join('\n\n');
     }
     
-    setFullReportText(cleanText);
+    updateFullReportText(cleanText);
   };
 
   const handleInsertFormat = (tagStart, tagEnd = tagStart) => {
@@ -337,7 +376,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     const selectedText = fullReportText.substring(start, end) || 'texto';
     const replacement = `${tagStart}${selectedText}${tagEnd}`;
     const newText = fullReportText.substring(0, start) + replacement + fullReportText.substring(end);
-    setFullReportText(newText);
+    updateFullReportText(newText);
   };
 
   const handleOpenAddTemplate = () => {
@@ -425,20 +464,37 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     doc.text(`SOLICITANTE: ${requestingDoctor}`, 18, 54);
     doc.text(`DATA DO EXAME: ${examDate}`, 120, 54);
 
+    // Calculate PDF body font size dynamically based on editorFontSize (default 13px -> 8.5pt in PDF)
+    const pdfBodyFontSize = Number((8.5 * (editorFontSize / 13)).toFixed(1));
+    const pdfLineHeight = Number((pdfBodyFontSize * 0.52).toFixed(1));
+
     let y = 80;
     const addBlock = (title, text) => {
       if (!text) return;
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9.5);
       doc.setTextColor(3, 105, 161);
       doc.text(title, 14, y);
       y += 6;
+
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
+      doc.setFontSize(pdfBodyFontSize);
       doc.setTextColor(30, 41, 59);
+
       const lines = doc.splitTextToSize(text, 182);
-      doc.text(lines, 14, y);
-      y += lines.length * 4.5 + 5;
+      lines.forEach((line) => {
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(line, 14, y);
+        y += pdfLineHeight;
+      });
+      y += 5;
     };
 
     if (editorMode === 'unified') {
@@ -449,20 +505,34 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       addBlock('ONDA F:', fWave);
       addBlock('ELETROMIOGRAFIA / REGISTRO CEREBRAL:', emgText);
 
+      if (y > 240) {
+        doc.addPage();
+        y = 20;
+      }
       doc.setFillColor(240, 249, 255);
       doc.setDrawColor(2, 132, 199);
+      doc.setFontSize(pdfBodyFontSize);
       const concLines = doc.splitTextToSize(conclusion, 174);
-      const bh = concLines.length * 4.5 + 12;
+      const bh = concLines.length * pdfLineHeight + 14;
       doc.rect(14, y, 182, bh, 'FD');
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(2, 132, 199);
       doc.text('CONCLUSÃO MÉDICA:', 18, y + 7);
+      doc.setFont('helvetica', 'normal');
       doc.setTextColor(15, 23, 42);
-      doc.text(concLines, 18, y + 13);
+      let yConc = y + 13;
+      concLines.forEach((cline) => {
+        doc.text(cline, 18, yConc);
+        yConc += pdfLineHeight;
+      });
 
       y += bh + 15;
     }
 
+    if (y > 250) {
+      doc.addPage();
+      y = 30;
+    }
     doc.setDrawColor(148, 163, 184);
     doc.line(70, y, 140, y);
     y += 4;
@@ -922,7 +992,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         editorMode === 'unified' ? (
                           <div className="space-y-2">
                             <div className="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800 flex-wrap gap-2 text-xs">
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">
                                   Formatação:
                                 </span>
@@ -953,19 +1023,48 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
                                 <div className="h-4 w-px bg-slate-800 mx-1" />
 
+                                {/* Undo / Redo Buttons */}
+                                <button
+                                  type="button"
+                                  onClick={handleUndo}
+                                  disabled={historyIndex <= 0}
+                                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1 transition ${historyIndex > 0 ? 'bg-indigo-600/30 border-indigo-500/50 text-indigo-200 hover:bg-indigo-600/50 cursor-pointer' : 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'}`}
+                                  title={labels.undoBtn}
+                                >
+                                  <Undo className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">Desfazer</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={handleRedo}
+                                  disabled={historyIndex >= reportHistory.length - 1}
+                                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1 transition ${historyIndex < reportHistory.length - 1 ? 'bg-indigo-600/30 border-indigo-500/50 text-indigo-200 hover:bg-indigo-600/50 cursor-pointer' : 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'}`}
+                                  title={labels.redoBtn}
+                                >
+                                  <Redo className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">Refazer</span>
+                                </button>
+
+                                <div className="h-4 w-px bg-slate-800 mx-1" />
+
                                 <span className="text-[10px] font-bold text-slate-400">Fonte:</span>
                                 <button
                                   type="button"
                                   onClick={() => setEditorFontSize(prev => Math.max(11, prev - 1))}
                                   className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-mono font-bold text-xs"
+                                  title="Diminuir Fonte (Edição & PDF)"
                                 >
                                   A-
                                 </button>
-                                <span className="text-xs font-mono font-bold text-cyan-400 px-1">{editorFontSize}px</span>
+                                <span className="text-xs font-mono font-bold text-cyan-400 px-1">
+                                  {editorFontSize}px <span className="text-[10px] text-amber-400 font-semibold">(PDF: {(8.5 * (editorFontSize / 13)).toFixed(1)}pt)</span>
+                                </span>
                                 <button
                                   type="button"
-                                  onClick={() => setEditorFontSize(prev => Math.min(18, prev + 1))}
+                                  onClick={() => setEditorFontSize(prev => Math.min(20, prev + 1))}
                                   className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-mono font-bold text-xs"
+                                  title="Aumentar Fonte (Edição & PDF)"
                                 >
                                   A+
                                 </button>
@@ -981,7 +1080,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => setFullReportText('')}
+                                  onClick={() => updateFullReportText('')}
                                   className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 text-[11px] font-bold"
                                 >
                                   {labels.clearBtn}
@@ -993,8 +1092,17 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                               id="unified-editor-textarea"
                               rows={isTreeVisible ? 14 : 18}
                               value={fullReportText}
-                              onChange={(e) => setFullReportText(e.target.value)}
-                              placeholder="Edite aqui todo o texto do laudo..."
+                              onChange={(e) => updateFullReportText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+                                  e.preventDefault();
+                                  handleUndo();
+                                } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+                                  e.preventDefault();
+                                  handleRedo();
+                                }
+                              }}
+                              placeholder="Edite aqui todo o texto do laudo (Suporta Atalhos Ctrl+Z para Desfazer e Ctrl+Y para Refazer)..."
                               style={{ fontSize: `${editorFontSize}px`, whiteSpace: 'pre-wrap' }}
                               className="w-full p-4 rounded-xl bg-slate-950 border border-cyan-500/40 text-white font-mono focus:outline-none focus:border-cyan-400 leading-relaxed shadow-inner"
                             />

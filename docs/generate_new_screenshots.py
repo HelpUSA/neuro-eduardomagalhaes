@@ -226,6 +226,104 @@ def generate_screenshots():
     img3.save(os.path.join(docs_dir, "edicao_remocao_modelos.jpg"))
     print("edicao_remocao_modelos.jpg gerado!")
 
+    # --- SCREENSHOT 4: BOTÕES DESFAZER / REFAZER E ATALHOS CTRL+Z / CTRL+Y (24/09/2026) ---
+    img4 = Image.new('RGB', (750, 420), color='#090d16')
+    draw4 = ImageDraw.Draw(img4)
+    draw_rounded_rect(draw4, (10, 10, 740, 410), 14, fill='#0f172a', outline='#818cf8', width=2)
+    draw4.text((25, 22), "🔄 Botões Desfazer / Refazer na Edição de Laudos", fill='#818cf8', font=font_title)
+    draw4.text((25, 48), "Recuperação instantânea de digitações acidentais e históricos de alterações", fill='#94a3b8', font=font_small)
+
+    # Toolbar Zoom Card
+    draw_rounded_rect(draw4, (25, 80, 725, 140), 10, fill='#020617', outline='#38bdf8', width=2)
+    draw4.text((35, 88), "Barra de Ferramentas do Editor de Laudos:", fill='#38bdf8', font=font_small)
+
+    # Bold, Italic, Underline
+    draw_rounded_rect(draw4, (35, 105, 60, 130), 4, fill='#1e293b')
+    draw4.text((43, 110), "B", fill='#ffffff', font=font_bold)
+    draw_rounded_rect(draw4, (65, 105, 90, 130), 4, fill='#1e293b')
+    draw4.text((73, 110), "I", fill='#ffffff', font=font_bold)
+    draw_rounded_rect(draw4, (95, 105, 120, 130), 4, fill='#1e293b')
+    draw4.text((103, 110), "U", fill='#ffffff', font=font_bold)
+
+    # HIGHLIGHTED UNDO / REDO BUTTONS
+    draw_rounded_rect(draw4, (135, 105, 275, 130), 6, fill='#312e81', outline='#818cf8', width=2)
+    draw4.text((143, 110), "↩️ Desfazer (Ctrl+Z)", fill='#e0e7ff', font=font_bold)
+
+    draw_rounded_rect(draw4, (285, 105, 420, 130), 6, fill='#312e81', outline='#818cf8', width=2)
+    draw4.text((293, 110), "↪️ Refazer (Ctrl+Y)", fill='#e0e7ff', font=font_bold)
+
+    # Font Controls
+    draw4.text((435, 111), "Fonte:", fill='#94a3b8', font=font_bold)
+    draw_rounded_rect(draw4, (480, 105, 505, 130), 4, fill='#1e293b')
+    draw4.text((487, 110), "A-", fill='#38bdf8', font=font_bold)
+    draw4.text((512, 110), "14px", fill='#38bdf8', font=font_mono)
+    draw_rounded_rect(draw4, (550, 105, 575, 130), 4, fill='#1e293b')
+    draw4.text((557, 110), "A+", fill='#38bdf8', font=font_bold)
+
+    # Text Area simulation with history annotation
+    draw_rounded_rect(draw4, (25, 155, 725, 390), 10, fill='#020617', outline='#334155')
+    draw4.text((35, 165), "ELETRONEUROMIOGRAFIA DOS MEMBROS SUPERIORES", fill='#38bdf8', font=font_bold)
+    draw4.text((35, 190), "Realizada eletroneuromiografia de membros superiores.", fill='#f8fafc', font=font_medium)
+    draw4.text((35, 210), "A neurocondução motora foi realizada em nervos medianos e ulnares...", fill='#cbd5e1', font=font_medium)
+    draw4.text((35, 240), "[ Pressione Ctrl + Z no teclado para desfazer qualquer trecho digitado ]", fill='#818cf8', font=font_bold)
+    draw4.text((35, 260), "[ Pressione Ctrl + Y ou Ctrl + Shift + Z para refazer a edição anterior ]", fill='#818cf8', font=font_bold)
+
+    draw_rounded_rect(draw4, (35, 300, 715, 375), 8, fill='#1e1b4b', outline='#6366f1')
+    draw4.text((45, 310), "💡 Como usar:", fill='#fde047', font=font_bold)
+    draw4.text((45, 330), "• Clique no botão 'Desfazer' ou use a tecla de atalho Ctrl+Z no teclado.", fill='#ffffff', font=font_small)
+    draw4.text((45, 350), "• Clique no botão 'Refazer' ou use a tecla de atalho Ctrl+Y no teclado.", fill='#ffffff', font=font_small)
+
+    img4.save(os.path.join(docs_dir, "desfazer_refazer_editor.jpg"))
+    print("desfazer_refazer_editor.jpg gerado!")
+
+    # --- SCREENSHOT 5: COMPATIBILIDADE DE FONTE DO EDITOR COM O PDF (24/09/2026) ---
+    img5 = Image.new('RGB', (750, 460), color='#090d16')
+    draw5 = ImageDraw.Draw(img5)
+    draw_rounded_rect(draw5, (10, 10, 740, 450), 14, fill='#0f172a', outline='#f59e0b', width=2)
+    draw5.text((25, 22), "🖨️ Sincronização Dinâmica da Fonte (Edição ➔ PDF)", fill='#fde047', font=font_title)
+    draw5.text((25, 48), "Ajustar o tamanho da fonte na edição altera automaticamente o tamanho no PDF timbrado", fill='#94a3b8', font=font_small)
+
+    # Font size control highlight
+    draw_rounded_rect(draw5, (25, 80, 725, 145), 10, fill='#020617', outline='#f59e0b', width=2)
+    draw5.text((35, 88), "Controle de Tamanho de Fonte na Tela de Edição:", fill='#38bdf8', font=font_bold)
+    
+    draw_rounded_rect(draw5, (35, 110, 75, 135), 4, fill='#1e293b', outline='#475569')
+    draw5.text((47, 115), "A-", fill='#38bdf8', font=font_bold)
+
+    draw_rounded_rect(draw5, (85, 110, 260, 135), 6, fill='#451a03', outline='#f59e0b')
+    draw5.text((95, 115), "16px (PDF: 10.5pt)", fill='#fde047', font=font_bold)
+
+    draw_rounded_rect(draw5, (270, 110, 310, 135), 4, fill='#1e293b', outline='#475569')
+    draw5.text((282, 115), "A+", fill='#38bdf8', font=font_bold)
+
+    draw5.text((325, 115), "⬅️ Selecione o tamanho desejado (ex: 16px ➔ 10.5pt no PDF)", fill='#cbd5e1', font=font_small)
+
+    # PDF Output Simulation Comparison
+    draw_rounded_rect(draw5, (25, 160, 725, 430), 10, fill='#020617', outline='#334155')
+    draw5.text((35, 172), "📄 Resultado no PDF Oficial Timbrado (Laudo Médico):", fill='#10b981', font=font_bold)
+
+    # Simulated PDF Document
+    draw_rounded_rect(draw5, (45, 200, 705, 415), 6, fill='#ffffff')
+    draw_rounded_rect(draw5, (45, 200, 705, 235), 0, fill='#0f172a')
+    draw5.text((55, 208), "CLÍNICA DE NEUROLOGIA DR. EDUARDO MAGALHÃES", fill='#ffffff', font=font_bold)
+    draw5.text((55, 222), "Neurologia & Neurofisiologia Clínica | Laudo de Exame Oficial", fill='#38bdf8', font=font_small)
+
+    # Patient info box
+    draw_rounded_rect(draw5, (55, 245, 695, 280), 4, fill='#f8fafc', outline='#cbd5e1')
+    draw5.text((65, 252), "PACIENTE: CLELIA MARI DE CARVALHO    DATA NASC: 07/05/1967", fill='#0f172a', font=font_bold)
+    draw5.text((65, 266), "SOLICITANTE: DR HEMANOEL FERRO       DATA EXAME: 03/10/2025", fill='#0f172a', font=font_bold)
+
+    # Body text rendered with enlarged font size (10.5pt proportional)
+    draw5.text((55, 290), "CORPO TÉCNICO & LAUDO DIAGNÓSTICO:", fill='#0369a1', font=font_bold)
+    draw5.text((55, 310), "ELETRONEUROMIOGRAFIA DOS MEMBROS SUPERIORES", fill='#1e293b', font=font_bold)
+    draw5.text((55, 330), "Realizada eletroneuromiografia de membros superiores com fonte expandida.", fill='#1e293b', font=font_medium)
+    draw5.text((55, 350), "A neurocondução motora apresentou velocidades normais e latência preservada.", fill='#1e293b', font=font_medium)
+    draw5.text((55, 375), "CONCLUSÃO: Exame compatível com neuropatia do mediano no carpo (grau 2).", fill='#0f172a', font=font_bold)
+    draw5.text((55, 395), "✨ Quebra automática de página habilitada se o texto exceder a folha!", fill='#059669', font=font_small)
+
+    img5.save(os.path.join(docs_dir, "fonte_dinamica_pdf.jpg"))
+    print("fonte_dinamica_pdf.jpg gerado!")
+
     # Maintain copies for fallback compatibility
     img1.save(os.path.join(docs_dir, "painel_campo_unico_edicao.jpg"))
     img1.save(os.path.join(docs_dir, "painel_layout_duas_colunas.jpg"))
