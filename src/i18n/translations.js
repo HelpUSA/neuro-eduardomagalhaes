@@ -164,6 +164,8 @@ export const translations = {
       saveModelBtn: "💾 Salvar como Novo Modelo",
       clearBtn: "Limpar",
       whatsappBtn: "Disparar Link no WhatsApp",
+      examDateLabel: "📅 Data do Exame",
+      reportIssueDateLabel: "✍️ Emissão do Laudo",
       signPdfBtn: "Assinar & Gerar PDF Timbrado"
     }
   },
@@ -333,6 +335,8 @@ export const translations = {
       saveModelBtn: "💾 Save as New Template",
       clearBtn: "Clear",
       whatsappBtn: "Send Link via WhatsApp",
+      examDateLabel: "📅 Exam Date",
+      reportIssueDateLabel: "✍️ Report Issuance Date",
       signPdfBtn: "Sign & Generate Letterhead PDF"
     }
   },

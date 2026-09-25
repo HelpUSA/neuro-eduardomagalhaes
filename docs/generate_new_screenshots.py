@@ -394,6 +394,61 @@ def generate_screenshots():
     img7.save(os.path.join(docs_dir, "hover_titulo_modelo.jpg"))
     print("hover_titulo_modelo.jpg gerado!")
 
+    # --- SCREENSHOT 8: NOVAS ATUALIZAÇÕES (25/09/2026 - REQ-26 A REQ-29) ---
+    img8 = Image.new('RGB', (850, 520), color='#090d16')
+    draw8 = ImageDraw.Draw(img8)
+    draw_rounded_rect(draw8, (10, 10, 840, 510), 14, fill='#0f172a', outline='#38bdf8', width=2)
+    draw8.text((25, 20), "⚡ Novas Atualizações & Recursos — Soluções Solicitadas (25/09/2026)", fill='#38bdf8', font=font_title)
+    draw8.text((25, 46), "Árvore Fechada por Padrão | Disparo WhatsApp Direto | Fonte Default 15px | Campos de Datas Separados", fill='#94a3b8', font=font_small)
+
+    # Box 1: Árvore Fechada por Padrão (REQ-26)
+    draw_rounded_rect(draw8, (25, 75, 410, 240), 10, fill='#020617', outline='#f59e0b', width=2)
+    draw8.text((35, 85), "1. 📁 Árvore de Modelos (Default: Fechada)", fill='#fde047', font=font_bold)
+    draw8.text((35, 108), "• As pastas 'Eletroneuromiografia' e 'Eletroencefalograma'", fill='#ffffff', font=font_small)
+    draw8.text((35, 126), "  iniciam 100% fechadas ao carregar a página.", fill='#ffffff', font=font_small)
+    draw8.text((35, 148), "📁 1. ELETRONEUROMIOGRAFIA (ENMG) [3 modelos]", fill='#cbd5e1', font=font_medium)
+    draw8.text((35, 170), "📁 2. ELETROENCEFALOGRAMA (EEG) [3 modelos]", fill='#cbd5e1', font=font_medium)
+    draw8.text((35, 195), "✨ Expanda com 1 clique apenas as categorias desejadas.", fill='#10b981', font=font_small)
+
+    # Box 2: Disparo WhatsApp (REQ-27)
+    draw_rounded_rect(draw8, (425, 75, 825, 240), 10, fill='#020617', outline='#10b981', width=2)
+    draw8.text((435, 85), "2. 📱 Disparo WhatsApp (Número do Paciente)", fill='#34d399', font=font_bold)
+    draw8.text((435, 108), "• O botão 'Disparar Link no WhatsApp' abre o WhatsApp", fill='#ffffff', font=font_small)
+    draw8.text((435, 126), "  conectado no PC da recepção/consultório e envia", fill='#ffffff', font=font_small)
+    draw8.text((435, 144), "  a mensagem diretamente para o celular do paciente.", fill='#ffffff', font=font_small)
+    draw_rounded_rect(draw8, (435, 168, 815, 200), 6, fill='#064e3b', outline='#10b981')
+    draw8.text((445, 176), "📲 wa.me/5569992345678?text=Olá Clelia! Seu laudo...", fill='#6ee7b7', font=font_mono)
+    draw8.text((435, 210), "✅ Utiliza a conta comercial do WhatsApp do consultório.", fill='#10b981', font=font_small)
+
+    # Box 3: Fonte Padrão 15px (REQ-28)
+    draw_rounded_rect(draw8, (25, 255, 410, 490), 10, fill='#020617', outline='#818cf8', width=2)
+    draw8.text((35, 265), "3. 🔤 Tamanho da Fonte Padrão: 15px", fill='#818cf8', font=font_bold)
+    draw8.text((35, 288), "• O editor inicia em 15px por default.", fill='#ffffff', font=font_small)
+    draw8.text((35, 306), "• Escalonamento automático proporcional para a", fill='#ffffff', font=font_small)
+    draw8.text((35, 324), "  geração de PDF timbrado (~9.8pt).", fill='#ffffff', font=font_small)
+    draw_rounded_rect(draw8, (35, 350, 395, 395), 6, fill='#1e1b4b', outline='#6366f1')
+    draw8.text((45, 362), "Barra: Fonte: [A-]  15px  [A+]", fill='#38bdf8', font=font_bold)
+    draw8.text((35, 410), "✨ Ajuste em tempo real sem distorcer o layout.", fill='#10b981', font=font_small)
+
+    # Box 4: Datas de Exame e Emissão Separadas (REQ-29)
+    draw_rounded_rect(draw8, (425, 255, 825, 490), 10, fill='#020617', outline='#0284c7', width=2)
+    draw8.text((435, 265), "4. 📅 Datas de Exame e Emissão Distintas", fill='#38bdf8', font=font_bold)
+    draw8.text((435, 288), "• Permite laudar em data posterior à realização.", fill='#ffffff', font=font_small)
+    
+    draw_rounded_rect(draw8, (435, 310, 615, 355), 6, fill='#0f172a', outline='#f59e0b')
+    draw8.text((445, 316), "📅 Data do Exame:", fill='#fde047', font=font_small)
+    draw8.text((445, 332), "03/10/2025", fill='#ffffff', font=font_bold)
+
+    draw_rounded_rect(draw8, (625, 310, 815, 355), 6, fill='#0f172a', outline='#38bdf8')
+    draw8.text((635, 316), "✍️ Emissão do Laudo:", fill='#38bdf8', font=font_small)
+    draw8.text((635, 332), "25/09/2026", fill='#ffffff', font=font_bold)
+
+    draw8.text((435, 370), "📄 Exibidos de forma clara no cabeçalho e rodapé do PDF.", fill='#cbd5e1', font=font_small)
+    draw8.text((435, 390), "✅ Cumpre exigências éticas e legais de laudos médicos.", fill='#10b981', font=font_small)
+
+    img8.save(os.path.join(docs_dir, "datas_whatsapp_arvore.jpg"))
+    print("datas_whatsapp_arvore.jpg gerado!")
+
     # Maintain copies for fallback compatibility
     img1.save(os.path.join(docs_dir, "painel_campo_unico_edicao.jpg"))
     img1.save(os.path.join(docs_dir, "painel_layout_duas_colunas.jpg"))

@@ -191,5 +191,130 @@ def build_pdf_2026_09_24():
     doc.build(story, canvasmaker=NumberedCanvas)
     print("PDF Documentacao_Acompanhamento_2026-09-24.pdf criado com sucesso!")
 
+def build_pdf_2026_09_25():
+    docs_dir = os.path.dirname(os.path.abspath(__file__))
+    pdf_filename = os.path.join(docs_dir, "Documentacao_Acompanhamento_2026-09-25.pdf")
+    doc = SimpleDocTemplate(
+        pdf_filename,
+        pagesize=A4,
+        leftMargin=54,
+        rightMargin=54,
+        topMargin=54,
+        bottomMargin=54
+    )
+
+    styles = getSampleStyleSheet()
+    PRIMARY = colors.HexColor("#0F172A")
+    SECONDARY = colors.HexColor("#0284C7")
+    TEXT_DARK = colors.HexColor("#1E293B")
+    BG_LIGHT = colors.HexColor("#F8FAFC")
+    ACCENT = colors.HexColor("#0369A1")
+    SUCCESS = colors.HexColor("#0D9488")
+
+    title_style = ParagraphStyle('DocTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=PRIMARY, spaceAfter=4)
+    subtitle_style = ParagraphStyle('DocSubtitle', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=11.5, textColor=SECONDARY, spaceAfter=8)
+    h1_style = ParagraphStyle('SectionH1', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9.5, leading=12.5, textColor=PRIMARY, spaceBefore=8, spaceAfter=3)
+    h2_style = ParagraphStyle('SectionH2', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8.5, leading=11.5, textColor=ACCENT, spaceBefore=4, spaceAfter=2)
+    body_style = ParagraphStyle('BodyDark', parent=styles['Normal'], fontName='Helvetica', fontSize=7.6, leading=10.5, textColor=TEXT_DARK, spaceAfter=2.5)
+    caption_style = ParagraphStyle('Caption', parent=styles['Normal'], fontName='Helvetica-Oblique', fontSize=7, leading=9.5, textColor=colors.HexColor("#64748B"), spaceAfter=4, alignment=1)
+
+    story = []
+
+    # Header Banner
+    img_path = os.path.join(docs_dir, "foto eduardo.jpg")
+    if os.path.exists(img_path):
+        doctor_img = Image(img_path, width=42, height=42)
+        header_text = [
+            Paragraph("RELATÓRIO DE ACOMPANHAMENTO & ROTEIRO DE USO (25/09/2026)", title_style),
+            Paragraph("Árvore Fechada Default | Disparo WhatsApp Paciente | Fonte 15px | Datas Separadas", subtitle_style)
+        ]
+        t_header = Table([[header_text, doctor_img]], colWidths=[435, 48])
+        t_header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,0), (1,0), 'RIGHT')]))
+        story.append(t_header)
+
+    story.append(HRFlowable(width="100%", thickness=1.5, color=SECONDARY, spaceAfter=5))
+
+    # Meta Table
+    meta_data = [
+        [Paragraph("<b>Cliente:</b> Dr. Eduardo Magalhães", body_style), Paragraph("<b>Data da Rodada:</b> 25/09/2026", body_style)],
+        [Paragraph("<b>Identificador:</b> DOC-2026-09-25", body_style), Paragraph("<b>Status:</b> Concluído & Publicado em Produção", body_style)],
+        [Paragraph("<b>Plataforma:</b> neuro.eduardomagalhaes.helpusbr.com", body_style), Paragraph("<b>Desenvolvimento:</b> HelpUS Technology", body_style)]
+    ]
+    t_meta = Table(meta_data, colWidths=[240, 243])
+    t_meta.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), BG_LIGHT),
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#E2E8F0")),
+        ('TOPPADDING', (0,0), (-1,-1), 2.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
+        ('LEFTPADDING', (0,0), (-1,-1), 5),
+        ('RIGHTPADDING', (0,0), (-1,-1), 5),
+    ]))
+    story.append(t_meta)
+    story.append(Spacer(1, 4))
+
+    # PARTE 1
+    story.append(Paragraph("PARTE 1: NOVAS SOLICITAÇÕES DO DR. EDUARDO MAGALHÃES (25/09/2026)", h1_style))
+    story.append(Paragraph(
+        "Atendimento às solicitações do <b>Dr. Eduardo Magalhães</b> para a <b>Árvore de Modelos Fechada por Padrão</b>, "
+        "o <b>Disparo do Link via WhatsApp direto ao Celular do Paciente</b>, o <b>Tamanho da Fonte Inicial em 15px</b> "
+        "e os <b>Campos Distintos para Data do Exame e Data da Emissão do Laudo</b>.", body_style
+    ))
+
+    req_table = [
+        [Paragraph("<b>ID</b>", h2_style), Paragraph("<b>Solicitação do Dr. Eduardo</b>", h2_style), Paragraph("<b>Solução Técnica Implementada</b>", h2_style), Paragraph("<b>Status</b>", h2_style)],
+        [
+            Paragraph("REQ-26", body_style),
+            Paragraph("<b>Árvore de Modelos Fechada por Default:</b> Iniciar com todas as pastas recolhidas ao carregar.", body_style),
+            Paragraph("Alterado o estado inicial `expandedFolders` para `{}`. Pastas de ENMG e EEG iniciam 100% fechadas.", body_style),
+            Paragraph("<font color='#0d9488'><b>Concluído (25/09)</b></font>", body_style)
+        ],
+        [
+            Paragraph("REQ-27", body_style),
+            Paragraph("<b>Disparo WhatsApp para Celular do Paciente:</b> Utilizar a conta da clínica para enviar ao paciente.", body_style),
+            Paragraph("Função atualizada para formatar `wa.me/55<telefone_paciente>` enviando mensagem personalizada.", body_style),
+            Paragraph("<font color='#0d9488'><b>Concluído (25/09)</b></font>", body_style)
+        ],
+        [
+            Paragraph("REQ-28", body_style),
+            Paragraph("<b>Tamanho da Fonte Padrão em 15px:</b> Iniciar o editor com fonte em 15px.", body_style),
+            Paragraph("Ajustado `editorFontSize` inicial para `15` com escalonamento proporcional para o PDF timbrado (~9.8pt).", body_style),
+            Paragraph("<font color='#0d9488'><b>Concluído (25/09)</b></font>", body_style)
+        ],
+        [
+            Paragraph("REQ-29", body_style),
+            Paragraph("<b>Data do Exame e Data da Emissão Separadas:</b> Permitir laudo em data posterior à realização.", body_style),
+            Paragraph("Criados campos e estados para `examDate` e `reportIssueDate`, renderizados no cabeçalho e rodapé do PDF.", body_style),
+            Paragraph("<font color='#0d9488'><b>Concluído (25/09)</b></font>", body_style)
+        ]
+    ]
+
+    t_req = Table(req_table, colWidths=[38, 162, 220, 63])
+    t_req.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#F1F5F9")),
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#E2E8F0")),
+        ('TOPPADDING', (0,0), (-1,-1), 2.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
+        ('LEFTPADDING', (0,0), (-1,-1), 4),
+        ('RIGHTPADDING', (0,0), (-1,-1), 4),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+    ]))
+    story.append(t_req)
+    story.append(Spacer(1, 4))
+
+    # PARTE 2
+    story.append(Paragraph("PARTE 2: DETALHAMENTO DAS SOLUÇÕES E ILUSTRAÇÃO VISUAL", h1_style))
+    story.append(Paragraph("Abaixo é apresentada a captura de tela com as 4 atualizações implementadas:", body_style))
+
+    img_datas = os.path.join(docs_dir, "datas_whatsapp_arvore.jpg")
+    if os.path.exists(img_datas):
+        story.append(Image(img_datas, width=483, height=295))
+        story.append(Paragraph("Figura 1: Resumo visual das atualizações (Árvore Fechada, WhatsApp Paciente, Fonte 15px e Datas Separadas).", caption_style))
+
+    doc.build(story, canvasmaker=NumberedCanvas)
+    print("PDF Documentacao_Acompanhamento_2026-09-25.pdf criado com sucesso!")
+
 if __name__ == '__main__':
     build_pdf_2026_09_24()
+    build_pdf_2026_09_25()

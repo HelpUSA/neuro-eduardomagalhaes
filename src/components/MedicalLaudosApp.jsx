@@ -55,10 +55,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang }) => {
   const [viewMode, setViewMode] = useState('folders'); // 'folders' | 'search'
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedFolder, setSelectedFolder] = useState(null);
-  const [expandedFolders, setExpandedFolders] = useState({
-    'enmg_root': true,
-    'eeg_root': true
-  });
+  const [expandedFolders, setExpandedFolders] = useState({});
   const [selectedTemplateId, setSelectedTemplateId] = useState('enmg_stc_grau2');
   const [templateSearchText, setTemplateSearchText] = useState('');
 
@@ -66,7 +63,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang }) => {
   const [isTreeVisible, setIsTreeVisible] = useState(true);
 
   // Rich Text Formatting & Editor Font Size State
-  const [editorFontSize, setEditorFontSize] = useState(13);
+  const [editorFontSize, setEditorFontSize] = useState(15);
 
   // Custom Templates & Template Overrides State
   const [customTemplates, setCustomTemplates] = useState([]);
@@ -84,6 +81,8 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang }) => {
   const [birthDate, setBirthDate] = useState('07/05/1967');
   const [requestingDoctor, setRequestingDoctor] = useState('DR HEMANOEL FERRO');
   const [examDate, setExamDate] = useState('03/10/2025');
+  const [reportIssueDate, setReportIssueDate] = useState('25/09/2026');
+  const [patientPhone, setPatientPhone] = useState('(69) 99234-5678');
   
   const [motorConduction, setMotorConduction] = useState('Realizada em nervos ulnares e medianos. Observamos amplitudes conservadas, com velocidades de condução normais, e latências distais limítrofes em medianos.');
   const [sensoryConduction, setSensoryConduction] = useState('Realizada em nervos ulnares, medianos e radiais. Em nervos medianos observamos potenciais de ação com latências prolongadas, velocidades de condução diminuídas e amplitudes normais.');
@@ -366,6 +365,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       setPatientName(found.name);
       setBirthDate(found.birthDate);
       if (found.requestingDoctor) setRequestingDoctor(found.requestingDoctor);
+      if (found.phone) setPatientPhone(found.phone);
+      if (found.lastExam) setExamDate(found.lastExam);
       setCpfSearchStatus('found');
       setSelectedPatientExams(found.examHistory || []);
       return;
@@ -491,23 +492,25 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     doc.text('Neurologia & Neurofisiologia Clínica | Laudo de Exame Oficial', 14, 23);
 
     doc.setFillColor(248, 250, 252);
-    doc.rect(14, 38, 182, 32, 'F');
+    doc.rect(14, 38, 182, 36, 'F');
     doc.setDrawColor(203, 213, 225);
-    doc.rect(14, 38, 182, 32, 'S');
+    doc.rect(14, 38, 182, 36, 'S');
 
     doc.setTextColor(15, 23, 42);
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.setFont('helvetica', 'bold');
     doc.text(`PACIENTE: ${patientName}`, 18, 46);
     doc.text(`DATA NASC: ${birthDate}`, 120, 46);
-    doc.text(`SOLICITANTE: ${requestingDoctor}`, 18, 54);
-    doc.text(`DATA DO EXAME: ${examDate}`, 120, 54);
+    doc.text(`SOLICITANTE: ${requestingDoctor}`, 18, 53);
+    doc.text(`DATA DO EXAME: ${examDate}`, 120, 53);
+    doc.text(`EMISSÃO LAUDO: ${reportIssueDate}`, 18, 60);
+    doc.text(`WHATSAPP PACIENTE: ${patientPhone}`, 120, 60);
 
-    // Calculate PDF body font size dynamically based on editorFontSize (default 13px -> 8.5pt in PDF)
+    // Calculate PDF body font size dynamically based on editorFontSize (default 15px -> 9.8pt in PDF)
     const pdfBodyFontSize = Number((8.5 * (editorFontSize / 13)).toFixed(1));
     const pdfLineHeight = Number((pdfBodyFontSize * 0.52).toFixed(1));
 
-    let y = 80;
+    let y = 84;
     const addBlock = (title, text) => {
       if (!text) return;
       if (y > 260) {
@@ -582,16 +585,22 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text('Neurologista & Neurofisiologista | CRM-RO', 105, y + 4, { align: 'center' });
+    doc.text(`Neurologista & Neurofisiologista | CRM-RO  •  Emissão: ${reportIssueDate}`, 105, y + 4, { align: 'center' });
 
     doc.save(`Laudo_Oficial_${patientName.replace(/\s+/g, '_')}.pdf`);
   };
 
   const handleSendWhatsApp = () => {
+    const cleanPhone = patientPhone.replace(/\D/g, '');
+    const targetNumber = cleanPhone ? (cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`) : '';
     const text = encodeURIComponent(
-      `Olá ${patientName}! Seu laudo de exame foi concluído pela Clínica Dr. Eduardo Magalhães. Você pode baixar seu laudo e gráficos de exame com segurança no nosso portal usando seu CPF.`
+      `Olá ${patientName}! Seu laudo de exame (realizado em ${examDate}) foi assinado e emitido pela Clínica Dr. Eduardo Magalhães. Você pode baixar seu laudo e exames com segurança no nosso portal usando seu CPF.`
     );
-    window.open(`https://wa.me/556932235805?text=${text}`, '_blank');
+    if (targetNumber) {
+      window.open(`https://wa.me/${targetNumber}?text=${text}`, '_blank');
+    } else {
+      window.open(`https://wa.me/?text=${text}`, '_blank');
+    }
   };
 
   return (
@@ -959,8 +968,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                        <div className="sm:col-span-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
+                        <div className="sm:col-span-2">
                           <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
                             <span>CPF do Paciente</span>
                             <span className="text-[10px] text-cyan-400 font-mono">Mevo</span>
@@ -974,6 +983,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                               className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono font-bold"
                             />
                             <button
+                              type="button"
                               onClick={() => performCpfLookup()}
                               className="px-2.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0"
                             >
@@ -982,7 +992,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           </div>
                         </div>
 
-                        <div className="sm:col-span-1">
+                        <div className="sm:col-span-2">
                           <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nome Completo</label>
                           <input
                             type="text"
@@ -992,7 +1002,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           />
                         </div>
 
-                        <div>
+                        <div className="sm:col-span-1">
                           <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Nasc.</label>
                           <input
                             type="text"
@@ -1002,13 +1012,46 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           />
                         </div>
 
-                        <div>
+                        <div className="sm:col-span-1">
                           <label className="block text-[11px] font-semibold text-slate-400 mb-1">Médico Solicitante</label>
                           <input
                             type="text"
                             value={requestingDoctor}
                             onChange={(e) => setRequestingDoctor(e.target.value)}
                             className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-amber-400 mb-1">📅 Data do Exame</label>
+                          <input
+                            type="text"
+                            value={examDate}
+                            onChange={(e) => setExamDate(e.target.value)}
+                            placeholder="03/10/2025"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-amber-500/40 text-amber-200 text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-cyan-400 mb-1">✍️ Emissão / Assinatura do Laudo</label>
+                          <input
+                            type="text"
+                            value={reportIssueDate}
+                            onChange={(e) => setReportIssueDate(e.target.value)}
+                            placeholder="25/09/2026"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 text-cyan-200 text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-emerald-400 mb-1">📱 Tel / WhatsApp do Paciente</label>
+                          <input
+                            type="text"
+                            value={patientPhone}
+                            onChange={(e) => setPatientPhone(e.target.value)}
+                            placeholder="(69) 99234-5678"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-emerald-500/40 text-emerald-200 text-xs font-semibold"
                           />
                         </div>
                       </div>
