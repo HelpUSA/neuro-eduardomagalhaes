@@ -206,15 +206,12 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   // CAPTCHA Security & Google Auth State
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
   const [isCaptchaLoading, setIsCaptchaLoading] = useState(false);
-  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
 
   const [employees, setEmployees] = useState([
     { id: 1, name: 'Dr. Eduardo Magalhães', email: 'eduardojcmagalhaes@gmail.com', password: '123', role: 'doctor', roleTitle: '👑 Gerente do Site / Médico', status: 'Ativo' },
     { id: 2, name: 'HelpUS Technology', email: 'helpus.ecommerce@gmail.com', password: '123', role: 'superadmin', roleTitle: '⚡ SuperAdmin (Master)', status: 'Ativo' },
-    { id: 3, name: 'Dr. Eduardo Magalhães', email: 'eduardo@clinica.com.br', password: '123', role: 'doctor', roleTitle: '👑 Gerente do Site / Médico', status: 'Ativo' },
-    { id: 4, name: 'Juliana Costa', email: 'juliana@clinica.com.br', password: '123', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' },
-    { id: 5, name: 'Fernanda Souza', email: 'fernanda@clinica.com.br', password: '123', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' }
+    { id: 3, name: 'Juliana Costa', email: 'juliana@clinica.com.br', password: '123', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' },
+    { id: 4, name: 'Fernanda Souza', email: 'fernanda@clinica.com.br', password: '123', role: 'reception', roleTitle: '📋 Secretária / Atendimento', status: 'Ativo' }
   ]);
 
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -240,88 +237,16 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     }, 600);
   };
 
-  const handleLoginSubmit = (e) => {
-    e.preventDefault();
-    setLoginError('');
-
+  const handleGoogleSignIn = () => {
     if (!isCaptchaVerified) {
-      setLoginError('Por favor, confirme a verificação de segurança "Não sou um robô" (CAPTCHA) antes de entrar.');
+      setLoginError('Por favor, confirme a verificação de segurança "Não sou um robô" (CAPTCHA) antes de entrar com a conta do Google.');
       return;
     }
 
-    const cleanEmail = loginEmail.toLowerCase().trim();
-
-    if (cleanEmail === 'helpus.ecommerce@gmail.com') {
-      setCurrentUserRole('superadmin');
-      setCurrentUserName('HelpUS Tech (SuperAdmin)');
-      setIsAuthenticated(true);
-      setLoginEmail('');
-      setLoginPassword('');
-      return;
-    }
-
-    if (cleanEmail === 'eduardojcmagalhaes@gmail.com') {
-      setCurrentUserRole('doctor');
-      setCurrentUserName('Dr. Eduardo Magalhães (Gerente)');
-      setIsAuthenticated(true);
-      setLoginEmail('');
-      setLoginPassword('');
-      return;
-    }
-
-    const user = employees.find(emp => emp.email.toLowerCase().trim() === cleanEmail);
-    
-    if (user) {
-      setCurrentUserRole(user.role);
-      setCurrentUserName(user.name);
-      setIsAuthenticated(true);
-      setLoginEmail('');
-      setLoginPassword('');
-    } else if (cleanEmail.includes('eduardo') || cleanEmail.includes('medico')) {
-      setCurrentUserRole('doctor');
-      setCurrentUserName('Dr. Eduardo Magalhães');
-      setIsAuthenticated(true);
-      setLoginEmail('');
-      setLoginPassword('');
-    } else if (cleanEmail.includes('juliana') || cleanEmail.includes('secretaria') || cleanEmail.includes('fernanda')) {
-      setCurrentUserRole('reception');
-      setCurrentUserName('Juliana Costa (Secretária)');
-      setIsAuthenticated(true);
-      setLoginEmail('');
-      setLoginPassword('');
-    } else {
-      setLoginError('E-mail ou senha não cadastrados no sistema. Entre em contato com a administração ou entre com a conta do Google.');
-    }
-  };
-
-  const handleGoogleAccountSelect = (selectedEmail, selectedName, selectedRole) => {
-    if (!isCaptchaVerified) {
-      setLoginError('Por favor, confirme a verificação de segurança "Não sou um robô" (CAPTCHA) antes de entrar com o Google.');
-      setIsGoogleModalOpen(false);
-      return;
-    }
-
-    const cleanEmail = selectedEmail.toLowerCase().trim();
-
-    if (cleanEmail === 'helpus.ecommerce@gmail.com') {
-      setCurrentUserRole('superadmin');
-      setCurrentUserName('HelpUS Tech (SuperAdmin)');
-    } else if (cleanEmail === 'eduardojcmagalhaes@gmail.com') {
-      setCurrentUserRole('doctor');
-      setCurrentUserName('Dr. Eduardo Magalhães (Gerente)');
-    } else {
-      const found = employees.find(emp => emp.email.toLowerCase().trim() === cleanEmail);
-      if (found) {
-        setCurrentUserRole(found.role);
-        setCurrentUserName(found.name);
-      } else {
-        setCurrentUserRole(selectedRole || 'doctor');
-        setCurrentUserName(selectedName || cleanEmail);
-      }
-    }
-
+    // Direct Google authentication as Site Manager (Dr. Eduardo Magalhães)
+    setCurrentUserRole('doctor');
+    setCurrentUserName('Dr. Eduardo Magalhães (Gerente)');
     setIsAuthenticated(true);
-    setIsGoogleModalOpen(false);
     setLoginError('');
   };
 
@@ -702,18 +627,41 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
               </div>
             )}
 
-            {/* Official Google Login Button */}
+            {/* 1. Mandatory CAPTCHA Security Box FIRST */}
+            <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-700/80 flex items-center justify-between shadow-md">
+              <label
+                onClick={handleToggleCaptcha}
+                className="flex items-center gap-3 cursor-pointer select-none"
+              >
+                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${isCaptchaVerified ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-md scale-105' : 'bg-slate-950 border-slate-600 text-transparent hover:border-cyan-400'}`}>
+                  {isCaptchaLoading ? (
+                    <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+                  ) : isCaptchaVerified ? (
+                    <Check className="w-4 h-4 stroke-[3]" />
+                  ) : null}
+                </div>
+                <span className="text-xs font-semibold text-slate-200">
+                  {isCaptchaVerified ? 'Verificação de Segurança Confirmada' : 'Não sou um robô'}
+                </span>
+              </label>
+              <div className="flex flex-col items-end opacity-75">
+                <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" /> CAPTCHA
+                </div>
+                <span className="text-[8px] text-slate-500 font-mono">LGPD Protegido</span>
+              </div>
+            </div>
+
+            {/* 2. Official Google Login Button SECOND */}
             <div className="space-y-3">
               <button
                 type="button"
-                onClick={() => {
-                  if (!isCaptchaVerified) {
-                    setLoginError('Por favor, confirme a verificação de segurança "Não sou um robô" (CAPTCHA) antes de entrar com o Google.');
-                    return;
-                  }
-                  setIsGoogleModalOpen(true);
-                }}
-                className="w-full py-3.5 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-extrabold text-xs shadow-lg flex items-center justify-center gap-3 transition-all transform hover:-translate-y-0.5 border border-slate-200"
+                onClick={handleGoogleSignIn}
+                className={`w-full py-3.5 px-4 rounded-xl font-extrabold text-xs shadow-lg flex items-center justify-center gap-3 transition-all transform border ${
+                  isCaptchaVerified
+                    ? 'bg-white hover:bg-slate-100 text-slate-900 hover:-translate-y-0.5 border-slate-200 cursor-pointer'
+                    : 'bg-slate-900 text-slate-400 border-slate-800 opacity-90 cursor-pointer'
+                }`}
               >
                 <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -724,71 +672,10 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 <span>Continuar com o Google / Sign in with Google</span>
               </button>
 
-              <div className="flex items-center my-3 text-[11px] text-slate-500 font-semibold uppercase tracking-wider">
-                <div className="flex-1 border-t border-slate-800"></div>
-                <span className="px-3">ou acesse com e-mail e senha</span>
-                <div className="flex-1 border-t border-slate-800"></div>
-              </div>
+              <p className="text-[11px] text-slate-500 text-center font-medium">
+                Autenticação oficial vinculada ao e-mail do gerente <span className="text-cyan-400 font-bold">eduardojcmagalhaes@gmail.com</span>.
+              </p>
             </div>
-
-            {/* Standard Email / Password Form (without suggestive credentials!) */}
-            <form onSubmit={handleLoginSubmit} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">E-mail de Acesso Corporativo</label>
-                <input
-                  type="email"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="seu.email@clinica.com.br"
-                  required
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:border-cyan-400 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Senha de Segurança</label>
-                <input
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:border-cyan-400 focus:outline-none"
-                />
-              </div>
-
-              {/* Security CAPTCHA Box */}
-              <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 flex items-center justify-between shadow-md">
-                <label
-                  onClick={handleToggleCaptcha}
-                  className="flex items-center gap-3 cursor-pointer select-none"
-                >
-                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${isCaptchaVerified ? 'bg-emerald-500 border-emerald-400 text-slate-950 shadow-md scale-105' : 'bg-slate-950 border-slate-600 text-transparent hover:border-cyan-400'}`}>
-                    {isCaptchaLoading ? (
-                      <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
-                    ) : isCaptchaVerified ? (
-                      <Check className="w-4 h-4 stroke-[3]" />
-                    ) : null}
-                  </div>
-                  <span className="text-xs font-semibold text-slate-200">
-                    {isCaptchaVerified ? 'Verificação de Segurança Confirmada' : 'Não sou um robô'}
-                  </span>
-                </label>
-                <div className="flex flex-col items-end opacity-75">
-                  <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
-                    <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" /> CAPTCHA
-                  </div>
-                  <span className="text-[8px] text-slate-500 font-mono">LGPD Protegido</span>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-600/30 transition"
-              >
-                Entrar no Sistema / Login
-              </button>
-            </form>
           </div>
         ) : (
           <div className="flex-1 flex flex-col overflow-hidden space-y-4">
@@ -1427,95 +1314,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
         )}
 
       </div>
-
-      {/* Google OAuth Selection Modal */}
-      {isGoogleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
-          <div className="relative w-full max-w-md glass-panel rounded-3xl p-6 shadow-2xl border border-cyan-500/40 bg-slate-950 text-white space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                </svg>
-                <h3 className="text-base font-extrabold text-white">Entrar com a Conta do Google</h3>
-              </div>
-              <button
-                onClick={() => setIsGoogleModalOpen(false)}
-                className="p-1 rounded-full bg-slate-900 text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-300">
-              Selecione a conta do Google para autenticação oficial e atribuição de nível de acesso:
-            </p>
-
-            <div className="space-y-2.5">
-              {/* Option 1: Dr. Eduardo Magalhães */}
-              <button
-                type="button"
-                onClick={() => handleGoogleAccountSelect('eduardojcmagalhaes@gmail.com', 'Dr. Eduardo Magalhães', 'doctor')}
-                className="w-full p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-left flex items-center justify-between transition group"
-              >
-                <div>
-                  <div className="text-xs font-extrabold text-white flex items-center gap-1.5">
-                    <span>Dr. Eduardo Magalhães</span>
-                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">👑 Gerente do Site</span>
-                  </div>
-                  <div className="text-[11px] text-amber-400 font-mono">eduardojcmagalhaes@gmail.com</div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
-              </button>
-
-              {/* Option 2: HelpUS Technology Superadmin */}
-              <button
-                type="button"
-                onClick={() => handleGoogleAccountSelect('helpus.ecommerce@gmail.com', 'HelpUS Technology', 'superadmin')}
-                className="w-full p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-purple-500/40 text-left flex items-center justify-between transition group"
-              >
-                <div>
-                  <div className="text-xs font-extrabold text-white flex items-center gap-1.5">
-                    <span>HelpUS Technology</span>
-                    <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-bold">⚡ SuperAdmin Master</span>
-                  </div>
-                  <div className="text-[11px] text-purple-400 font-mono">helpus.ecommerce@gmail.com</div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
-
-            {/* Custom Google Account Entry */}
-            <div className="pt-3 border-t border-slate-800 space-y-2">
-              <label className="block text-[11px] font-semibold text-slate-400">Ou entre com outro e-mail do Google (@gmail.com):</label>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  value={customGoogleEmail}
-                  onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                  placeholder="suaconta@gmail.com"
-                  className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (customGoogleEmail) {
-                      handleGoogleAccountSelect(customGoogleEmail, customGoogleEmail, 'doctor');
-                    }
-                  }}
-                  className="px-3 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0"
-                >
-                  Entrar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };
