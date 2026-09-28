@@ -245,17 +245,19 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
     setLoginError('');
 
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '812202824664-s716306ibb7c15jh7aok2v0lfnuocpkn.apps.googleusercontent.com';
 
-    // Trigger official Google OAuth 2.0 Popup if VITE_GOOGLE_CLIENT_ID is configured in environment
-    if (googleClientId && window.google?.accounts?.oauth2) {
+    // Trigger official Google OAuth 2.0 Account Selection Popup (accounts.google.com)
+    if (window.google?.accounts?.oauth2) {
       try {
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: googleClientId,
           scope: 'email profile openid',
+          prompt: 'select_account',
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
               try {
+                // Fetch real user account details directly from Google's official userinfo endpoint
                 const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                   headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
                 });
@@ -266,10 +268,10 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                   
                   if (cleanEmail === 'helpus.ecommerce@gmail.com') {
                     setCurrentUserRole('superadmin');
-                    setCurrentUserName(`HelpUS Tech (SuperAdmin)`);
+                    setCurrentUserName(`HelpUS Tech (${googleUser.email})`);
                   } else if (cleanEmail === 'eduardojcmagalhaes@gmail.com') {
                     setCurrentUserRole('doctor');
-                    setCurrentUserName(`Dr. Eduardo Magalhães (Gerente)`);
+                    setCurrentUserName(`Dr. Eduardo Magalhães (${googleUser.email})`);
                   } else {
                     setCurrentUserRole('doctor');
                     setCurrentUserName(`${googleUser.name || 'Médico'} (${googleUser.email})`);
@@ -283,28 +285,36 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 console.error('Erro ao consultar dados da conta do Google:', fetchErr);
               }
             }
-            setCurrentUserRole('doctor');
-            setCurrentUserName('Dr. Eduardo Magalhães (Gerente)');
-            setIsAuthenticated(true);
           },
-          error_callback: () => {
-            setCurrentUserRole('doctor');
-            setCurrentUserName('Dr. Eduardo Magalhães (Gerente)');
-            setIsAuthenticated(true);
+          error_callback: (err) => {
+            console.warn('Google OAuth popup fechado ou cancelado:', err);
           }
         });
-        client.requestAccessToken();
+        client.requestAccessToken({ prompt: 'select_account' });
         return;
       } catch (e) {
         console.warn('Falha ao inicializar Google Identity Services:', e);
       }
     }
 
-    // Direct official Google account login as Dr. Eduardo Magalhães (Site Manager)
-    setCurrentUserRole('doctor');
-    setCurrentUserName('Dr. Eduardo Magalhães (Gerente)');
-    setIsAuthenticated(true);
-    setLoginError('');
+    // Direct official Google OAuth 2.0 popup URL fallback (accounts.google.com)
+    const redirectUri = encodeURIComponent(window.location.origin);
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${redirectUri}&response_type=token&scope=email%20profile%20openid&prompt=select_account`;
+    
+    const width = 500;
+    const height = 650;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    
+    const popup = window.open(
+      authUrl,
+      'GoogleSignInPopup',
+      `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,status=yes`
+    );
+
+    if (popup) {
+      popup.focus();
+    }
   };
 
   const handleLogout = () => {
