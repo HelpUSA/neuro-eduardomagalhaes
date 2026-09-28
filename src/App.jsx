@@ -25,6 +25,22 @@ export default function App() {
     }
   }, []);
 
+  const handleOpenDoctorPanel = () => {
+    const savedSession = localStorage.getItem('neuro_auth_user');
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession);
+        if (parsed.email && (parsed.email === 'helpus.ecommerce@gmail.com' || parsed.email === 'eduardojcmagalhaes@gmail.com')) {
+          window.open(`${window.location.origin}${window.location.pathname}?panel=open`, '_blank');
+          return;
+        }
+      } catch (e) {
+        console.error('Session check error:', e);
+      }
+    }
+    setIsDoctorPanelOpen(true);
+  };
+
   const t = translations[lang] || translations.pt;
 
   return (
@@ -36,7 +52,7 @@ export default function App() {
         setLang={setLang}
         t={t}
         onOpenPatientPortal={() => setIsPatientPortalOpen(true)}
-        onOpenDoctorPanel={() => setIsDoctorPanelOpen(true)}
+        onOpenDoctorPanel={handleOpenDoctorPanel}
       />
 
       {/* Main Content */}
@@ -44,7 +60,7 @@ export default function App() {
         <Hero
           t={t}
           onOpenPatientPortal={() => setIsPatientPortalOpen(true)}
-          onOpenDoctorPanel={() => setIsDoctorPanelOpen(true)}
+          onOpenDoctorPanel={handleOpenDoctorPanel}
         />
         
         <Specialties
@@ -68,7 +84,7 @@ export default function App() {
         setLang={setLang}
         t={t}
         onOpenPatientPortal={() => setIsPatientPortalOpen(true)}
-        onOpenDoctorPanel={() => setIsDoctorPanelOpen(true)}
+        onOpenDoctorPanel={handleOpenDoctorPanel}
         onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
       />
 
