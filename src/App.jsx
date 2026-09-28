@@ -8,12 +8,15 @@ import { ClinicLocation } from './components/ClinicLocation';
 import { Footer } from './components/Footer';
 import { PatientPortalModal } from './components/PatientPortalModal';
 import { MedicalLaudosApp } from './components/MedicalLaudosApp';
+import { CookieBanner } from './components/CookieBanner';
+import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { translations } from './i18n/translations';
 
 export default function App() {
   const [lang, setLang] = useState('pt');
   const [isPatientPortalOpen, setIsPatientPortalOpen] = useState(false);
   const [isDoctorPanelOpen, setIsDoctorPanelOpen] = useState(false);
+  const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState(false);
 
   const t = translations[lang] || translations.pt;
 
@@ -59,6 +62,19 @@ export default function App() {
         t={t}
         onOpenPatientPortal={() => setIsPatientPortalOpen(true)}
         onOpenDoctorPanel={() => setIsDoctorPanelOpen(true)}
+        onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
+      />
+
+      {/* Cookie Consent Alert Banner */}
+      <CookieBanner
+        onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
+      />
+
+      {/* LGPD Privacy Policy Modal */}
+      <PrivacyPolicyModal
+        isOpen={isPrivacyPolicyOpen}
+        onClose={() => setIsPrivacyPolicyOpen(false)}
+        t={t}
       />
 
       {/* Modals & Portals with 3-Language i18n support */}

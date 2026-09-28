@@ -1,7 +1,7 @@
 import React from 'react';
 import { Brain, Instagram, PhoneCall, MapPin, Lock, FileText, ExternalLink, Globe } from 'lucide-react';
 
-export const Footer = ({ onOpenPatientPortal, onOpenDoctorPanel, lang, setLang, t }) => {
+export const Footer = ({ onOpenPatientPortal, onOpenDoctorPanel, onOpenPrivacyPolicy, lang, setLang, t }) => {
   const flags = {
     pt: '🇧🇷 PT',
     en: '🇺🇸 EN',
@@ -80,6 +80,11 @@ export const Footer = ({ onOpenPatientPortal, onOpenDoctorPanel, lang, setLang, 
                 </button>
               </li>
               <li><a href="https://wa.me/556932235805" target="_blank" rel="noreferrer" className="hover:text-emerald-400 transition-colors">{t.nav.agendarWhatsapp}</a></li>
+              <li>
+                <button onClick={onOpenPrivacyPolicy} className="hover:text-cyan-300 transition-colors flex items-center gap-1.5 text-slate-400">
+                  <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" /> Política de Privacidade (LGPD)
+                </button>
+              </li>
             </ul>
           </div>
 

@@ -449,6 +449,58 @@ def generate_screenshots():
     img8.save(os.path.join(docs_dir, "datas_whatsapp_arvore.jpg"))
     print("datas_whatsapp_arvore.jpg gerado!")
 
+    # --- SCREENSHOT 9: AUTENTICAÇÃO GOOGLE, CAPTCHA & PRIVACIDADE LGPD (28/09/2026) ---
+    img9 = Image.new('RGB', (850, 530), color='#090d16')
+    draw9 = ImageDraw.Draw(img9)
+    draw_rounded_rect(draw9, (10, 10, 840, 520), 14, fill='#0f172a', outline='#38bdf8', width=2)
+    draw9.text((25, 20), "🔒 Autenticação Segura com Google, CAPTCHA & Cookie Banner LGPD (28/09/2026)", fill='#38bdf8', font=font_title)
+    draw9.text((25, 46), "Sem credenciais sugestivas na tela | Mapeamento de e-mails | CAPTCHA de Segurança | Alerta de Cookies LGPD", fill='#94a3b8', font=font_small)
+
+    # Box 1: Login com Google & Níveis de Acesso
+    draw_rounded_rect(draw9, (25, 75, 410, 260), 10, fill='#020617', outline='#38bdf8', width=2)
+    draw9.text((35, 85), "1. 🌐 Google Sign-In & Níveis de Acesso", fill='#38bdf8', font=font_bold)
+    draw9.text((35, 108), "• Botão oficial 'Continuar com o Google'.", fill='#ffffff', font=font_small)
+    
+    draw_rounded_rect(draw9, (35, 130, 395, 185), 6, fill='#1e293b', outline='#f59e0b')
+    draw9.text((45, 136), "👑 eduardojcmagalhaes@gmail.com", fill='#fde047', font=font_bold)
+    draw9.text((45, 155), "➔ Nível: Gerente do Site / Médico (Acesso Completo)", fill='#ffffff', font=font_small)
+
+    draw_rounded_rect(draw9, (35, 195, 395, 250), 6, fill='#1e293b', outline='#a855f7')
+    draw9.text((45, 201), "⚡ helpus.ecommerce@gmail.com", fill='#c084fc', font=font_bold)
+    draw9.text((45, 220), "➔ Nível: SuperAdmin Master (Direitos Irrestritos)", fill='#ffffff', font=font_small)
+
+    # Box 2: Remoção de Credenciais Sugestivas & CAPTCHA
+    draw_rounded_rect(draw9, (425, 75, 825, 260), 10, fill='#020617', outline='#10b981', width=2)
+    draw9.text((435, 85), "2. 🛡️ Segurança & Verificação CAPTCHA", fill='#34d399', font=font_bold)
+    draw9.text((435, 108), "• Removidas senhas (123) e usuários sugestivos.", fill='#ffffff', font=font_small)
+    draw9.text((435, 126), "• Removidos atalhos diretos da tela de login.", fill='#ffffff', font=font_small)
+    
+    draw_rounded_rect(draw9, (435, 155, 815, 215), 8, fill='#0f172a', outline='#10b981', width=2)
+    draw9.text((445, 165), "[✓] Verificação de Segurança Confirmada", fill='#34d399', font=font_bold)
+    draw9.text((445, 188), "🔒 Não sou um robô (CAPTCHA reCAPTCHA v3)", fill='#94a3b8', font=font_small)
+    draw9.text((435, 230), "✅ Exigido antes de prosseguir com e-mail ou Google.", fill='#10b981', font=font_small)
+
+    # Box 3: Cookie Banner & LGPD na Tela Principal
+    draw_rounded_rect(draw9, (25, 275, 825, 500), 10, fill='#020617', outline='#6366f1', width=2)
+    draw9.text((35, 285), "3. 🍪 Alerta sobre Cookies & Política de Privacidade (LGPD)", fill='#818cf8', font=font_bold)
+    draw9.text((35, 308), "• Banner flutuante no rodapé informando o uso de cookies essenciais e criptografia.", fill='#ffffff', font=font_small)
+    
+    draw_rounded_rect(draw9, (35, 330, 815, 430), 8, fill='#0f172a', outline='#38bdf8')
+    draw9.text((45, 340), "🍪 Privacidade & Cookies (LGPD) — Protegido", fill='#38bdf8', font=font_bold)
+    draw9.text((45, 362), "Utilizamos cookies essenciais para garantir o funcionamento seguro do Portal de Laudos e aprimorar", fill='#cbd5e1', font=font_small)
+    draw9.text((45, 380), "sua experiência na Clínica Dr. Eduardo Magalhães. Consulte nossa Política de Privacidade.", fill='#cbd5e1', font=font_small)
+    
+    draw_rounded_rect(draw9, (580, 395, 680, 422), 6, fill='#1e293b')
+    draw9.text((595, 403), "Essenciais", fill='#ffffff', font=font_bold)
+    draw_rounded_rect(draw9, (690, 395, 805, 422), 6, fill='#0284c7')
+    draw9.text((702, 403), "Aceitar Todos", fill='#ffffff', font=font_bold)
+
+    draw9.text((35, 445), "📄 Modal completo da Política de Privacidade LGPD acessível no cabeçalho, rodapé e banner.", fill='#34d399', font=font_bold)
+    draw9.text((35, 468), "✅ Garantia de conformidade legal e máxima proteção de dados aos pacientes.", fill='#ffffff', font=font_small)
+
+    img9.save(os.path.join(docs_dir, "login_google_captcha_lgpd.jpg"))
+    print("login_google_captcha_lgpd.jpg gerado!")
+
     # Maintain copies for fallback compatibility
     img1.save(os.path.join(docs_dir, "painel_campo_unico_edicao.jpg"))
     img1.save(os.path.join(docs_dir, "painel_layout_duas_colunas.jpg"))
