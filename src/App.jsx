@@ -18,6 +18,13 @@ export default function App() {
   const [isDoctorPanelOpen, setIsDoctorPanelOpen] = useState(false);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState(false);
 
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('panel') === 'open') {
+      setIsDoctorPanelOpen(true);
+    }
+  }, []);
+
   const t = translations[lang] || translations.pt;
 
   return (

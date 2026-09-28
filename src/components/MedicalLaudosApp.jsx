@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, Search, PlusCircle, FileText, Send, UserPlus, ShieldCheck, Lock, 
   Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, ChevronDown, 
   Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw, Upload, Database, LogOut, CheckCircle2,
-  Maximize2, Minimize2, Bold, Italic, Underline, Save, History, Type, Undo, Redo, RotateCcw, RotateCw
+  Maximize2, Minimize2, Bold, Italic, Underline, Save, History, Type, Undo, Redo, RotateCcw, RotateCw, UserCheck, ShieldAlert
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
@@ -237,6 +237,95 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     }, 600);
   };
 
+  // Official Whitelisted Accounts
+  const AUTHORIZED_EMAILS = [
+    { email: 'helpus.ecommerce@gmail.com', role: 'superadmin', name: 'HelpUS Tech (SuperAdmin)' },
+    { email: 'eduardojcmagalhaes@gmail.com', role: 'doctor', name: 'Dr. Eduardo Magalhães (Gestor / Médico)' }
+  ];
+
+  const processGoogleUserInfo = (googleUser) => {
+    if (!googleUser || !googleUser.email) return false;
+    const cleanEmail = googleUser.email.toLowerCase().trim();
+
+    const authRecord = AUTHORIZED_EMAILS.find(a => a.email.toLowerCase() === cleanEmail);
+
+    if (authRecord) {
+      const userRole = authRecord.role;
+      const userName = googleUser.name ? `${googleUser.name} (${cleanEmail})` : authRecord.name;
+
+      setCurrentUserRole(userRole);
+      setCurrentUserName(userName);
+      setIsAuthenticated(true);
+      setLoginError('');
+
+      const sessionObj = { email: cleanEmail, role: userRole, name: userName, time: Date.now() };
+      localStorage.setItem('neuro_auth_user', JSON.stringify(sessionObj));
+
+      // Open panel in new tab if currently on main page tab
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('panel') !== 'open') {
+        if (onClose) onClose();
+        window.open(`${window.location.origin}${window.location.pathname}?panel=open`, '_blank');
+      }
+      return true;
+    } else {
+      setIsAuthenticated(false);
+      setLoginError(`⛔ Acesso Negado: O e-mail (${googleUser.email}) não possui permissão para acessar o sistema. Apenas os e-mails autorizados (eduardojcmagalhaes@gmail.com e helpus.ecommerce@gmail.com) possuem permissão de acesso.`);
+      localStorage.removeItem('neuro_auth_user');
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    // 1. Check OAuth Hash Fragment Token
+    if (window.location.hash.includes('access_token=')) {
+      const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+      const token = hashParams.get('access_token');
+      if (token) {
+        fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        .then(res => res.json())
+        .then(googleUser => {
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', user: googleUser }, window.location.origin);
+            window.close();
+          } else {
+            processGoogleUserInfo(googleUser);
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
+        })
+        .catch(err => console.error('Erro OAuth token hash:', err));
+      }
+    }
+
+    // 2. Listen for postMessage from Google Auth Popup window
+    const handleMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' && event.data?.user) {
+        processGoogleUserInfo(event.data.user);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    // 3. Auto-restore session from localStorage
+    const savedSession = localStorage.getItem('neuro_auth_user');
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession);
+        if (parsed.email && (parsed.email === 'helpus.ecommerce@gmail.com' || parsed.email === 'eduardojcmagalhaes@gmail.com')) {
+          setCurrentUserRole(parsed.role || 'doctor');
+          setCurrentUserName(parsed.name || parsed.email);
+          setIsAuthenticated(true);
+        }
+      } catch (e) {
+        console.error('Falha ao restaurar sessão:', e);
+      }
+    }
+
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   const handleGoogleSignIn = () => {
     if (!isCaptchaVerified) {
       setLoginError('Por favor, confirme a verificação de segurança "Não sou um robô" (CAPTCHA) antes de entrar com a conta do Google.');
@@ -247,7 +336,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '812202824664-s716306ibb7c15jh7aok2v0lfnuocpkn.apps.googleusercontent.com';
 
-    // Trigger official Google OAuth 2.0 Account Selection Popup (accounts.google.com)
+    // Official Google Identity Services GIS SDK Client
     if (window.google?.accounts?.oauth2) {
       try {
         const client = window.google.accounts.oauth2.initTokenClient({
@@ -261,25 +350,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                   headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
                 });
                 const googleUser = await res.json();
-                
-                if (googleUser && googleUser.email) {
-                  const cleanEmail = googleUser.email.toLowerCase().trim();
-                  
-                  if (cleanEmail === 'helpus.ecommerce@gmail.com') {
-                    setCurrentUserRole('superadmin');
-                    setCurrentUserName(`HelpUS Tech (${googleUser.email})`);
-                  } else if (cleanEmail === 'eduardojcmagalhaes@gmail.com') {
-                    setCurrentUserRole('doctor');
-                    setCurrentUserName(`Dr. Eduardo Magalhães (${googleUser.email})`);
-                  } else {
-                    setCurrentUserRole('doctor');
-                    setCurrentUserName(`${googleUser.name || 'Médico'} (${googleUser.email})`);
-                  }
-                  
-                  setIsAuthenticated(true);
-                  setLoginError('');
-                  return;
-                }
+                processGoogleUserInfo(googleUser);
               } catch (fetchErr) {
                 console.error('Erro ao consultar API do Google UserInfo:', fetchErr);
               }
@@ -296,7 +367,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       }
     }
 
-    // Direct official Google OAuth 2.0 popup URL fallback (accounts.google.com)
+    // Direct Google OAuth Popup Window Fallback
     const redirectUri = encodeURIComponent(window.location.origin);
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${redirectUri}&response_type=token&scope=email%20profile%20openid&prompt=select_account`;
     
@@ -320,6 +391,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     setIsAuthenticated(false);
     setIsCaptchaVerified(false);
     setLoginError('');
+    localStorage.removeItem('neuro_auth_user');
   };
 
   const handleOpenAddUser = () => {
@@ -1376,6 +1448,321 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 </div>
               </div>
             )}
+
+            {activeTab === 'winsoft' && (
+              <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                      <Database className="w-4 h-4 text-cyan-400" />
+                      <span>Base de Dados Winsoft — Pacientes da Clínica ({patientDb.length})</span>
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Pesquise por CPF ou Nome do paciente para carregar dados diretamente no gerador de laudos.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {patientDb.map((pt, idx) => (
+                    <div key={idx} className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3 hover:border-cyan-500/40 transition">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <span className="text-xs font-bold text-white truncate">{pt.name}</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold">{pt.cpf}</span>
+                      </div>
+
+                      <div className="text-xs text-slate-300 space-y-1">
+                        <div><strong className="text-slate-400">Data Nasc:</strong> {pt.birthDate || 'N/A'}</div>
+                        <div><strong className="text-slate-400">Último Exame:</strong> {pt.lastExam || 'N/A'}</div>
+                        <div><strong className="text-slate-400">WhatsApp:</strong> {pt.phone || 'N/A'}</div>
+                        <div><strong className="text-slate-400">Histórico:</strong> {pt.examHistory?.length || 0} exames anteriores</div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setCpf(pt.cpf);
+                          setPatientName(pt.name);
+                          if (pt.birthDate) setBirthDate(pt.birthDate);
+                          if (pt.phone) setPatientPhone(pt.phone);
+                          if (pt.lastExam) setExamDate(pt.lastExam);
+                          setSelectedPatientExams(pt.examHistory || []);
+                          setActiveTab('generator');
+                        }}
+                        className="w-full py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5" /> Carregar no Gerador de Laudos
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'users' && (
+              <div className="flex-1 overflow-y-auto pr-1 space-y-5">
+                {/* Header Banner */}
+                <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 border border-indigo-500/30 shadow-xl flex items-center justify-between flex-wrap gap-4">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-extrabold text-white flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-indigo-400" />
+                      <span>Gestão de Usuários & Direitos de Acesso ao Sistema</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 max-w-2xl">
+                      Painel de Administração Master. Controle de perfis de privilégio (SuperAdmin, Gestor/Médico, Secretária), cadastramento de e-mails Google autorizados e conformidade LGPD.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleOpenAddUser}
+                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition cursor-pointer"
+                  >
+                    <UserPlus className="w-4 h-4" /> Cadastrar Novo Usuário / Autorizar E-mail
+                  </button>
+                </div>
+
+                {/* Role Privilege Legend Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-2xl bg-purple-950/20 border border-purple-500/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-purple-300 flex items-center gap-1.5">
+                        ⚡ SuperAdmin (Master)
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-mono font-bold">Acesso Total</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Administração completa do ambiente, edição de modelos, inclusão de e-mails na whitelist Google Cloud e gestão de direitos.
+                    </p>
+                    <div className="text-[10px] font-mono text-purple-400 font-bold">
+                      E-mail: helpus.ecommerce@gmail.com
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-amber-300 flex items-center gap-1.5">
+                        👑 Gestor do Site / Médico
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold">Clínico Completo</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Emissão de laudos de EEG e Eletroneuromiografia, assinatura digital ICP-Brasil com QR Code e edição de corpo técnico.
+                    </p>
+                    <div className="text-[10px] font-mono text-amber-400 font-bold">
+                      E-mail: eduardojcmagalhaes@gmail.com
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-cyan-300 flex items-center gap-1.5">
+                        📋 Secretária / Atendimento
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono font-bold">Restrito LGPD</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Busca CPF (Winsoft/Mevo) e envio de links no WhatsApp. Conclusões médicas ocultas por sigilo LGPD.
+                    </p>
+                    <div className="text-[10px] font-mono text-cyan-400 font-bold">
+                      E-mail: juliana@clinica.com.br / fernanda...
+                    </div>
+                  </div>
+                </div>
+
+                {/* Users Table */}
+                <div className="rounded-2xl bg-slate-900/90 border border-slate-800 overflow-hidden shadow-xl">
+                  <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                      <UserCheck className="w-4 h-4 text-indigo-400" />
+                      <span>Lista de Usuários Cadastrados & Autorizados ({employees.length})</span>
+                    </h4>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      Autenticação Google OAuth 2.0 Ativa
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-950/80 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-bold">
+                          <th className="p-3.5">Usuário / Nome</th>
+                          <th className="p-3.5">E-mail Google Autorizado</th>
+                          <th className="p-3.5">Papel / Função</th>
+                          <th className="p-3.5">Status</th>
+                          <th className="p-3.5">Direitos de Acesso</th>
+                          <th className="p-3.5 text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 text-xs font-medium">
+                        {employees.map((emp) => (
+                          <tr key={emp.id} className="hover:bg-slate-800/40 transition">
+                            <td className="p-3.5 font-bold text-white flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-bold text-xs border border-indigo-500/30">
+                                {emp.name.charAt(0)}
+                              </div>
+                              <span>{emp.name}</span>
+                            </td>
+
+                            <td className="p-3.5 font-mono text-cyan-300">
+                              {emp.email}
+                            </td>
+
+                            <td className="p-3.5">
+                              <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 ${
+                                emp.role === 'superadmin' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
+                                emp.role === 'doctor' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                              }`}>
+                                {emp.roleTitle || emp.role}
+                              </span>
+                            </td>
+
+                            <td className="p-3.5">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${
+                                emp.status === 'Ativo' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              }`}>
+                                {emp.status || 'Ativo'}
+                              </span>
+                            </td>
+
+                            <td className="p-3.5">
+                              <div className="flex flex-wrap gap-1 text-[10px]">
+                                {emp.role === 'superadmin' && (
+                                  <>
+                                    <span className="px-2 py-0.5 rounded bg-purple-900/40 text-purple-200 border border-purple-800 font-mono">✓ Acesso Total</span>
+                                    <span className="px-2 py-0.5 rounded bg-purple-900/40 text-purple-200 border border-purple-800 font-mono">✓ Gestão Usuários</span>
+                                    <span className="px-2 py-0.5 rounded bg-purple-900/40 text-purple-200 border border-purple-800 font-mono">✓ Whitelist GCP</span>
+                                  </>
+                                )}
+                                {emp.role === 'doctor' && (
+                                  <>
+                                    <span className="px-2 py-0.5 rounded bg-amber-900/40 text-amber-200 border border-amber-800 font-mono">✓ Emissão Laudos</span>
+                                    <span className="px-2 py-0.5 rounded bg-amber-900/40 text-amber-200 border border-amber-800 font-mono">✓ Assinatura ICP</span>
+                                    <span className="px-2 py-0.5 rounded bg-amber-900/40 text-amber-200 border border-amber-800 font-mono">✓ Modelos EEG/ENMG</span>
+                                  </>
+                                )}
+                                {emp.role === 'reception' && (
+                                  <>
+                                    <span className="px-2 py-0.5 rounded bg-cyan-900/40 text-cyan-200 border border-cyan-800 font-mono">✓ Busca CPF Winsoft</span>
+                                    <span className="px-2 py-0.5 rounded bg-cyan-900/40 text-cyan-200 border border-cyan-800 font-mono">✓ Envio WhatsApp</span>
+                                    <span className="px-2 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-800 font-mono">🔒 Conclusão Oculta</span>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="p-3.5 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => handleOpenEditUser(emp)}
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 transition cursor-pointer"
+                                  title="Editar Direitos do Usuário"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                {emp.email !== 'helpus.ecommerce@gmail.com' && emp.email !== 'eduardojcmagalhaes@gmail.com' && (
+                                  <button
+                                    onClick={() => handleDeleteUser(emp.id)}
+                                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-rose-400 hover:text-rose-300 transition cursor-pointer"
+                                    title="Revogar Acesso"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* User Management Edit/Add Modal */}
+        {isUserModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-6 space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-cyan-400" />
+                  <span>{editingUserId ? 'Editar Direitos de Usuário' : 'Cadastrar Usuário / Autorizar E-mail'}</span>
+                </h3>
+                <button onClick={() => setIsUserModalOpen(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveUser} className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Nome Completo do Usuário</label>
+                  <input
+                    type="text"
+                    required
+                    value={userFormName}
+                    onChange={(e) => setUserFormName(e.target.value)}
+                    placeholder="Ex: Dr. Eduardo Magalhães"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">E-mail de Conta Google Autorizado</label>
+                  <input
+                    type="email"
+                    required
+                    value={userFormEmail}
+                    onChange={(e) => setUserFormEmail(e.target.value)}
+                    placeholder="exemplo@gmail.com"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Papel / Perfil de Privilégios</label>
+                  <select
+                    value={userFormRole}
+                    onChange={(e) => setUserFormRole(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-semibold focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="superadmin">⚡ SuperAdmin Master (Acesso Completo + Whitelist)</option>
+                    <option value="doctor">👑 Gestor do Site / Médico (Laudos, PDF & ICP-Brasil)</option>
+                    <option value="reception">📋 Secretária / Atendimento (Busca Winsoft & LGPD)</option>
+                    <option value="technician">🔬 Técnico de Exames (Anexos & Traçados)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Status da Conta</label>
+                  <select
+                    value={userFormStatus}
+                    onChange={(e) => setUserFormStatus(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-semibold focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="Ativo">Ativo (Acesso Liberado)</option>
+                    <option value="Inativo">Inativo (Acesso Revogado)</option>
+                  </select>
+                </div>
+
+                <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsUserModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold hover:bg-slate-700 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold shadow-md cursor-pointer"
+                  >
+                    Salvar Permissões
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
