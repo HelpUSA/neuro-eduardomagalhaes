@@ -5,19 +5,32 @@ export const CookieBanner = ({ onOpenPrivacyPolicy }) => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    const consent = localStorage.getItem('neuro_cookie_consent');
-    if (!consent) {
+    try {
+      const consent = localStorage.getItem('neuro_cookie_consent');
+      if (!consent) {
+        setIsVisible(true);
+      }
+    } catch (e) {
+      console.warn('localStorage is not available:', e);
       setIsVisible(true);
     }
   }, []);
 
   const handleAcceptAll = () => {
-    localStorage.setItem('neuro_cookie_consent', 'accepted_all');
+    try {
+      localStorage.setItem('neuro_cookie_consent', 'accepted_all');
+    } catch (e) {
+      console.warn('Could not save consent to localStorage:', e);
+    }
     setIsVisible(false);
   };
 
   const handleAcceptEssential = () => {
-    localStorage.setItem('neuro_cookie_consent', 'accepted_essential');
+    try {
+      localStorage.setItem('neuro_cookie_consent', 'accepted_essential');
+    } catch (e) {
+      console.warn('Could not save consent to localStorage:', e);
+    }
     setIsVisible(false);
   };
 
