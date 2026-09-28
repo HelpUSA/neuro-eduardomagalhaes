@@ -222,8 +222,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   const [userFormRole, setUserFormRole] = useState('reception');
   const [userFormStatus, setUserFormStatus] = useState('Ativo');
 
-  if (!isOpen) return null;
-
   const handleToggleCaptcha = () => {
     if (isCaptchaVerified) {
       setIsCaptchaVerified(false);
@@ -734,6 +732,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       window.open(`https://wa.me/?text=${text}`, '_blank');
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
