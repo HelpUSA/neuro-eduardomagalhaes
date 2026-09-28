@@ -1,5 +1,5 @@
 import React from 'react';
-import { Brain, Instagram, PhoneCall, MapPin, Lock, FileText, ExternalLink, Globe } from 'lucide-react';
+import { Brain, Instagram, PhoneCall, MapPin, Lock, FileText, ExternalLink, Globe, ShieldCheck } from 'lucide-react';
 
 export const Footer = ({ onOpenPatientPortal, onOpenDoctorPanel, onOpenPrivacyPolicy, lang, setLang, t }) => {
   const flags = {
