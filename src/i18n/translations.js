@@ -506,6 +506,8 @@ export const translations = {
       saveModelBtn: "💾 Guardar como Nueva Plantilla",
       clearBtn: "Limpiar",
       whatsappBtn: "Enviar Enlace por WhatsApp",
+      examDateLabel: "📅 Fecha del Examen",
+      reportIssueDateLabel: "✍️ Emisión del Informe",
       signPdfBtn: "Firmar y Generar PDF Membretado"
     }
   }
