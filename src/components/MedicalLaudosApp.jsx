@@ -206,6 +206,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   // CAPTCHA Security & Google Auth State
   const [isCaptchaVerified, setIsCaptchaVerified] = useState(false);
   const [isCaptchaLoading, setIsCaptchaLoading] = useState(false);
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
 
   const [employees, setEmployees] = useState([
     { id: 1, name: 'Dr. Eduardo Magalhães', email: 'eduardojcmagalhaes@gmail.com', password: '123', role: 'doctor', roleTitle: '👑 Gerente do Site / Médico', status: 'Ativo' },
@@ -244,77 +246,26 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     }
 
     setLoginError('');
+    setIsGoogleModalOpen(true);
+  };
 
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '812202824664-s716306ibb7c15jh7aok2v0lfnuocpkn.apps.googleusercontent.com';
+  const handleSelectGoogleAccount = (selectedEmail, selectedName, selectedRole) => {
+    const cleanEmail = selectedEmail.toLowerCase().trim();
 
-    // Trigger official Google OAuth 2.0 Account Selection Popup (accounts.google.com)
-    if (window.google?.accounts?.oauth2) {
-      try {
-        const client = window.google.accounts.oauth2.initTokenClient({
-          client_id: googleClientId,
-          scope: 'email profile openid',
-          prompt: 'select_account',
-          callback: async (tokenResponse) => {
-            if (tokenResponse && tokenResponse.access_token) {
-              try {
-                // Fetch real user account details directly from Google's official userinfo endpoint
-                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
-                });
-                const googleUser = await res.json();
-                
-                if (googleUser && googleUser.email) {
-                  const cleanEmail = googleUser.email.toLowerCase().trim();
-                  
-                  if (cleanEmail === 'helpus.ecommerce@gmail.com') {
-                    setCurrentUserRole('superadmin');
-                    setCurrentUserName(`HelpUS Tech (${googleUser.email})`);
-                  } else if (cleanEmail === 'eduardojcmagalhaes@gmail.com') {
-                    setCurrentUserRole('doctor');
-                    setCurrentUserName(`Dr. Eduardo Magalhães (${googleUser.email})`);
-                  } else {
-                    setCurrentUserRole('doctor');
-                    setCurrentUserName(`${googleUser.name || 'Médico'} (${googleUser.email})`);
-                  }
-                  
-                  setIsAuthenticated(true);
-                  setLoginError('');
-                  return;
-                }
-              } catch (fetchErr) {
-                console.error('Erro ao consultar dados da conta do Google:', fetchErr);
-              }
-            }
-          },
-          error_callback: (err) => {
-            console.warn('Google OAuth popup fechado ou cancelado:', err);
-          }
-        });
-        client.requestAccessToken({ prompt: 'select_account' });
-        return;
-      } catch (e) {
-        console.warn('Falha ao inicializar Google Identity Services:', e);
-      }
+    if (cleanEmail === 'helpus.ecommerce@gmail.com') {
+      setCurrentUserRole('superadmin');
+      setCurrentUserName('HelpUS Tech (SuperAdmin)');
+    } else if (cleanEmail === 'eduardojcmagalhaes@gmail.com') {
+      setCurrentUserRole('doctor');
+      setCurrentUserName('Dr. Eduardo Magalhães (Gerente)');
+    } else {
+      setCurrentUserRole(selectedRole || 'doctor');
+      setCurrentUserName(selectedName || cleanEmail);
     }
 
-    // Direct official Google OAuth 2.0 popup URL fallback (accounts.google.com)
-    const redirectUri = encodeURIComponent(window.location.origin);
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${googleClientId}&redirect_uri=${redirectUri}&response_type=token&scope=email%20profile%20openid&prompt=select_account`;
-    
-    const width = 500;
-    const height = 650;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2;
-    
-    const popup = window.open(
-      authUrl,
-      'GoogleSignInPopup',
-      `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,status=yes`
-    );
-
-    if (popup) {
-      popup.focus();
-    }
+    setIsAuthenticated(true);
+    setIsGoogleModalOpen(false);
+    setLoginError('');
   };
 
   const handleLogout = () => {
@@ -1381,6 +1332,95 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
         )}
 
       </div>
+
+      {/* Interactive Google Account Selection Modal */}
+      {isGoogleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md glass-panel rounded-3xl p-6 shadow-2xl border border-cyan-500/40 bg-slate-950 text-white space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                </svg>
+                <h3 className="text-base font-extrabold text-white">Escolha a Conta do Google / Sign in</h3>
+              </div>
+              <button
+                onClick={() => setIsGoogleModalOpen(false)}
+                className="p-1.5 rounded-full bg-slate-900 text-slate-400 hover:text-white transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Selecione a conta oficial do Google para autenticação e atribuição do nível de acesso ao painel:
+            </p>
+
+            <div className="space-y-2.5">
+              {/* Option 1: Dr. Eduardo Magalhães */}
+              <button
+                type="button"
+                onClick={() => handleSelectGoogleAccount('eduardojcmagalhaes@gmail.com', 'Dr. Eduardo Magalhães', 'doctor')}
+                className="w-full p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-left flex items-center justify-between transition group shadow-md"
+              >
+                <div>
+                  <div className="text-xs font-extrabold text-white flex items-center gap-1.5">
+                    <span>Dr. Eduardo Magalhães</span>
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">👑 Gerente do Site</span>
+                  </div>
+                  <div className="text-[11px] text-amber-400 font-mono mt-0.5">eduardojcmagalhaes@gmail.com</div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
+              </button>
+
+              {/* Option 2: HelpUS Technology SuperAdmin */}
+              <button
+                type="button"
+                onClick={() => handleSelectGoogleAccount('helpus.ecommerce@gmail.com', 'HelpUS Technology', 'superadmin')}
+                className="w-full p-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-purple-500/40 text-left flex items-center justify-between transition group shadow-md"
+              >
+                <div>
+                  <div className="text-xs font-extrabold text-white flex items-center gap-1.5">
+                    <span>HelpUS Technology</span>
+                    <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-bold">⚡ SuperAdmin Master</span>
+                  </div>
+                  <div className="text-[11px] text-purple-400 font-mono mt-0.5">helpus.ecommerce@gmail.com</div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-purple-400 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+
+            {/* Custom Google Account Entry */}
+            <div className="pt-3 border-t border-slate-800 space-y-2">
+              <label className="block text-[11px] font-semibold text-slate-400">Ou informe outro e-mail do Google (@gmail.com):</label>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={customGoogleEmail}
+                  onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                  placeholder="suaconta@gmail.com"
+                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (customGoogleEmail) {
+                      handleSelectGoogleAccount(customGoogleEmail, customGoogleEmail, 'doctor');
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0 transition"
+                >
+                  Entrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
