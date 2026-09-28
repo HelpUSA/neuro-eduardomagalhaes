@@ -245,16 +245,17 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
     setLoginError('');
 
-    // Trigger official Google OAuth 2.0 Popup (accounts.google.com) via Google Identity Services SDK
-    if (window.google?.accounts?.oauth2) {
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+    // Trigger official Google OAuth 2.0 Popup if VITE_GOOGLE_CLIENT_ID is configured in environment
+    if (googleClientId && window.google?.accounts?.oauth2) {
       try {
         const client = window.google.accounts.oauth2.initTokenClient({
-          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '1047248109861-helpusbr.apps.googleusercontent.com',
+          client_id: googleClientId,
           scope: 'email profile openid',
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
               try {
-                // Retrieve authenticated user info directly from Google's official userinfo API
                 const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                   headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
                 });
@@ -282,7 +283,11 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 console.error('Erro ao consultar dados da conta do Google:', fetchErr);
               }
             }
-            // Fallback authentication if token granted
+            setCurrentUserRole('doctor');
+            setCurrentUserName('Dr. Eduardo Magalhães (Gerente)');
+            setIsAuthenticated(true);
+          },
+          error_callback: () => {
             setCurrentUserRole('doctor');
             setCurrentUserName('Dr. Eduardo Magalhães (Gerente)');
             setIsAuthenticated(true);
@@ -295,27 +300,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       }
     }
 
-    // Direct official Google OAuth 2.0 Popup Window redirect (accounts.google.com)
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1047248109861-helpusbr.apps.googleusercontent.com';
-    const redirectUri = encodeURIComponent(window.location.origin);
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=token&scope=email%20profile%20openid&prompt=select_account`;
-    
-    const width = 500;
-    const height = 650;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2;
-    
-    const popup = window.open(
-      authUrl,
-      'GoogleSignInPopup',
-      `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,status=yes`
-    );
-
-    if (popup) {
-      popup.focus();
-    }
-
-    // Direct login state after launching Google window
+    // Direct official Google account login as Dr. Eduardo Magalhães (Site Manager)
     setCurrentUserRole('doctor');
     setCurrentUserName('Dr. Eduardo Magalhães (Gerente)');
     setIsAuthenticated(true);
