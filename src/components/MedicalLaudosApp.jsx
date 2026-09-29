@@ -324,21 +324,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     };
     window.addEventListener('message', handleMessage);
 
-    // 3. Auto-restore session from localStorage
-    const savedSession = localStorage.getItem('neuro_auth_user');
-    if (savedSession) {
-      try {
-        const parsed = JSON.parse(savedSession);
-        if (parsed.email && (parsed.email === 'helpus.ecommerce@gmail.com' || parsed.email === 'eduardojcmagalhaes@gmail.com')) {
-          setCurrentUserRole(parsed.role || 'doctor');
-          setCurrentUserName(parsed.name || parsed.email);
-          setIsAuthenticated(true);
-        }
-      } catch (e) {
-        console.error('Falha ao restaurar sessão:', e);
-      }
-    }
-
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
