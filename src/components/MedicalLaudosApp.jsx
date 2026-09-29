@@ -9,7 +9,8 @@ import jsPDF from 'jspdf';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
 import { INITIAL_PATIENT_DATABASE, formatCPF, findPatientByCPF, fetchCpfOnlineData } from '../data/patientDatabase';
 
-export const MedicalLaudosApp = ({ isOpen, onClose, t, lang }) => {
+export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: isStandaloneProp = false }) => {
+  const isStandalonePage = isStandaloneProp || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('panel') === 'open');
   const [activeTab, setActiveTab] = useState('generator'); // 'generator' | 'search' | 'users' | 'winsoft'
   
   const labels = t?.doctorPanel || {
@@ -790,15 +791,17 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-[96vw] xl:max-w-7xl glass-panel rounded-3xl p-4 sm:p-6 shadow-2xl border border-indigo-500/30 my-3 max-h-[92vh] flex flex-col overflow-hidden">
+    <div className={isStandalonePage ? "min-h-screen w-full bg-slate-950 p-2 sm:p-4 flex flex-col justify-start" : "fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto"}>
+      <div className={isStandalonePage ? "relative w-full flex-1 min-h-[96vh] glass-panel rounded-2xl p-4 sm:p-6 shadow-2xl border border-indigo-500/30 flex flex-col overflow-hidden" : "relative w-full max-w-[96vw] xl:max-w-7xl glass-panel rounded-3xl p-4 sm:p-6 shadow-2xl border border-indigo-500/30 my-3 max-h-[92vh] flex flex-col overflow-hidden"}>
         
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full bg-slate-900 text-slate-400 hover:text-white transition z-20"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {!isStandalonePage && (
+          <button
+            onClick={onClose}
+            className="absolute top-5 right-5 p-2 rounded-full bg-slate-900 text-slate-400 hover:text-white transition z-20 cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
 
         {!isAuthenticated ? (
           <div className="py-6 px-2 max-w-md mx-auto space-y-5 overflow-y-auto">
@@ -919,10 +922,20 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                   </div>
                 )}
 
+                {isStandalonePage && (
+                  <button
+                    onClick={() => { window.location.href = window.location.origin; }}
+                    title="Ir para o Site Principal da Clínica"
+                    className="px-3 py-2 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition flex items-center gap-1.5 font-bold text-xs cursor-pointer"
+                  >
+                    🌐 Site Principal
+                  </button>
+                )}
+
                 <button
                   onClick={handleLogout}
                   title="Encerrar Sessão"
-                  className="p-2.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 transition flex items-center gap-1.5 font-bold text-xs"
+                  className="p-2.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 transition flex items-center gap-1.5 font-bold text-xs cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" /> <span>Sair</span>
                 </button>

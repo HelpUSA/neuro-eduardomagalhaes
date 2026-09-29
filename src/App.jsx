@@ -18,12 +18,22 @@ export default function App() {
   const [isDoctorPanelOpen, setIsDoctorPanelOpen] = useState(false);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState(false);
 
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('panel') === 'open') {
-      setIsDoctorPanelOpen(true);
-    }
-  }, []);
+  const isPanelStandalone = new URLSearchParams(window.location.search).get('panel') === 'open';
+  const t = translations[lang] || translations.pt;
+
+  if (isPanelStandalone) {
+    return (
+      <div className="min-h-screen w-full bg-slate-950 text-slate-100 selection:bg-cyan-500 selection:text-slate-950 flex flex-col">
+        <MedicalLaudosApp
+          isOpen={true}
+          isStandalonePage={true}
+          onClose={() => { window.location.href = window.location.origin; }}
+          t={t}
+          lang={lang}
+        />
+      </div>
+    );
+  }
 
   const handleOpenDoctorPanel = () => {
     const savedSession = localStorage.getItem('neuro_auth_user');
@@ -40,8 +50,6 @@ export default function App() {
     }
     setIsDoctorPanelOpen(true);
   };
-
-  const t = translations[lang] || translations.pt;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-cyan-500 selection:text-slate-950">
