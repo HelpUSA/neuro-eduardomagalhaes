@@ -1026,7 +1026,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                               .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
 
                             if (catTemplates.length === 0) return null;
-                            const isExpanded = expandedFolders[cat.id] !== false;
+                            const isExpanded = templateSearchText ? true : Boolean(expandedFolders[cat.id]);
 
                             return (
                               <div key={cat.id} className="rounded-xl bg-slate-950/70 border border-slate-800/80 p-2.5 space-y-1.5">
