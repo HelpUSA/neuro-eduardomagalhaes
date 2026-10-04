@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Segredos e Variáveis de Ambiente
+.env
+.env.local
+.env*.local

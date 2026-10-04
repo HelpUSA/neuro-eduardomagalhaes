@@ -3,11 +3,40 @@ import {
   X, Search, PlusCircle, FileText, Send, UserPlus, ShieldCheck, Lock, 
   Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, ChevronDown, 
   Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw, Upload, Database, LogOut, CheckCircle2,
-  Maximize2, Minimize2, Bold, Italic, Underline, Save, History, Type, Undo, Redo, RotateCcw, RotateCw, UserCheck, ShieldAlert
+  Maximize2, Minimize2, Bold, Italic, Underline, Save, History, Type, Undo, Redo, RotateCcw, RotateCw, UserCheck, ShieldAlert, Calendar
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
 import { INITIAL_PATIENT_DATABASE, formatCPF, findPatientByCPF, fetchCpfOnlineData } from '../data/patientDatabase';
+
+// Utility: Format input digits into DD/MM/YYYY mask
+const formatDateMask = (value) => {
+  if (!value) return '';
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
+// Utility: Convert YYYY-MM-DD from HTML5 date picker to DD/MM/YYYY
+const convertIsoToBrDate = (isoString) => {
+  if (!isoString) return '';
+  const parts = isoString.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return isoString;
+};
+
+// Utility: Convert DD/MM/YYYY to YYYY-MM-DD for HTML5 date picker
+const convertBrToIsoDate = (brDate) => {
+  if (!brDate) return '';
+  const parts = brDate.split('/');
+  if (parts.length === 3 && parts[2].length === 4) {
+    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  return '';
+};
 
 export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: isStandaloneProp = false }) => {
   const isStandalonePage = isStandaloneProp || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('panel') === 'open');
@@ -82,7 +111,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
   const [birthDate, setBirthDate] = useState('07/05/1967');
   const [requestingDoctor, setRequestingDoctor] = useState('DR HEMANOEL FERRO');
   const [examDate, setExamDate] = useState('03/10/2025');
-  const [reportIssueDate, setReportIssueDate] = useState('25/09/2026');
+  const [reportIssueDate, setReportIssueDate] = useState(() => new Date().toLocaleDateString('pt-BR'));
   const [patientPhone, setPatientPhone] = useState('(69) 99234-5678');
   
   const [motorConduction, setMotorConduction] = useState('Realizada em nervos ulnares e medianos. Observamos amplitudes conservadas, com velocidades de condução normais, e latências distais limítrofes em medianos.');
@@ -1220,24 +1249,50 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
                         <div className="sm:col-span-2">
                           <label className="block text-[11px] font-semibold text-amber-400 mb-1">📅 Data do Exame</label>
-                          <input
-                            type="text"
-                            value={examDate}
-                            onChange={(e) => setExamDate(e.target.value)}
-                            placeholder="03/10/2025"
-                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-amber-500/40 text-amber-200 text-xs font-semibold"
-                          />
+                          <div className="relative flex items-center">
+                            <input
+                              type="text"
+                              value={examDate}
+                              onChange={(e) => setExamDate(formatDateMask(e.target.value))}
+                              placeholder="03/10/2025"
+                              className="w-full pl-3 pr-10 py-2 rounded-xl bg-slate-950 border border-amber-500/40 text-amber-200 text-xs font-semibold focus:outline-none focus:border-amber-400"
+                            />
+                            <div className="absolute right-2.5 flex items-center justify-center cursor-pointer text-amber-400 hover:text-amber-300">
+                              <Calendar className="w-4 h-4 pointer-events-none" />
+                              <input
+                                type="date"
+                                value={convertBrToIsoDate(examDate)}
+                                onChange={(e) => {
+                                  if (e.target.value) setExamDate(convertIsoToBrDate(e.target.value));
+                                }}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              />
+                            </div>
+                          </div>
                         </div>
 
                         <div className="sm:col-span-2">
                           <label className="block text-[11px] font-semibold text-cyan-400 mb-1">✍️ Emissão / Assinatura do Laudo</label>
-                          <input
-                            type="text"
-                            value={reportIssueDate}
-                            onChange={(e) => setReportIssueDate(e.target.value)}
-                            placeholder="25/09/2026"
-                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 text-cyan-200 text-xs font-semibold"
-                          />
+                          <div className="relative flex items-center">
+                            <input
+                              type="text"
+                              value={reportIssueDate}
+                              onChange={(e) => setReportIssueDate(formatDateMask(e.target.value))}
+                              placeholder="25/09/2026"
+                              className="w-full pl-3 pr-10 py-2 rounded-xl bg-slate-950 border border-cyan-500/40 text-cyan-200 text-xs font-semibold focus:outline-none focus:border-cyan-400"
+                            />
+                            <div className="absolute right-2.5 flex items-center justify-center cursor-pointer text-cyan-400 hover:text-cyan-300">
+                              <Calendar className="w-4 h-4 pointer-events-none" />
+                              <input
+                                type="date"
+                                value={convertBrToIsoDate(reportIssueDate)}
+                                onChange={(e) => {
+                                  if (e.target.value) setReportIssueDate(convertIsoToBrDate(e.target.value));
+                                }}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              />
+                            </div>
+                          </div>
                         </div>
 
                         <div className="sm:col-span-2">
