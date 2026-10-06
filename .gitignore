@@ -29,3 +29,7 @@ dist-ssr
 .env
 .env.local
 .env*.local
+
+# Internal scripts and raw extracts
+scratch_extract/
+
