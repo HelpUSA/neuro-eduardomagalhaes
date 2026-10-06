@@ -1180,12 +1180,22 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
                           {cpfSearchStatus === 'loading' && (
                             <span className="px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold flex items-center gap-1.5 animate-pulse">
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Consultando CPF Online (Mevo)...
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Consultando Receita Federal (HelpUS CPF)...
                             </span>
                           )}
                           {cpfSearchStatus === 'found' && (
                             <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
-                              <Check className="w-3.5 h-3.5" /> Paciente Localizado no Winsoft!
+                              <Check className="w-3.5 h-3.5" /> Paciente Localizado no Histórico!
+                            </span>
+                          )}
+                          {cpfSearchStatus === 'found_online' && (
+                            <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
+                              <Check className="w-3.5 h-3.5" /> 🌐 Verificado na Receita Federal (HelpUS CPF)!
+                            </span>
+                          )}
+                          {cpfSearchStatus === 'not_found' && (
+                            <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-bold flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5" /> CPF não encontrado online (Digite manualmente abaixo)
                             </span>
                           )}
                         </div>
