@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, Search, PlusCircle, FileText, Send, UserPlus, ShieldCheck, Lock, 
-  Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, ChevronDown, 
+  Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, ChevronDown, ChevronLeft,
   Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw, Upload, Database, LogOut, CheckCircle2,
-  Maximize2, Minimize2, Bold, Italic, Underline, Save, History, Type, Undo, Redo, RotateCcw, RotateCw, UserCheck, ShieldAlert, Calendar
+  Maximize2, Minimize2, Bold, Italic, Underline, Save, History, Type, Undo, Redo, RotateCcw, RotateCw, UserCheck, ShieldAlert, Calendar,
+  ArrowUpDown, ArrowUp, ArrowDown, Filter, Phone, MapPin, Grid, List, Copy, ExternalLink
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
@@ -80,6 +81,110 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
   const [cpfSearchStatus, setCpfSearchStatus] = useState(null); // null | 'found' | 'found_online' | 'not_found' | 'loading'
   const [selectedPatientExams, setSelectedPatientExams] = useState(INITIAL_PATIENT_DATABASE[0].examHistory || []);
   const [isExamHistoryOpen, setIsExamHistoryOpen] = useState(false);
+
+  // Filter, Search & Sorting State for Patient Table View
+  const [patientSearchQuery, setPatientSearchQuery] = useState('');
+  const [patientFilterType, setPatientFilterType] = useState('all'); // 'all' | 'has_cpf' | 'has_dob' | 'has_phone'
+  const [patientSortField, setPatientSortField] = useState('name'); // 'name' | 'cpf' | 'birthDate' | 'city'
+  const [patientSortOrder, setPatientSortOrder] = useState('asc'); // 'asc' | 'desc'
+  const [patientPage, setPatientPage] = useState(1);
+  const [patientPerPage, setPatientPerPage] = useState(25);
+  const [patientViewMode, setPatientViewMode] = useState('table'); // 'table' | 'cards'
+  const [copiedCpf, setCopiedCpf] = useState(null);
+
+  // Helper to calculate approximate age from DD/MM/YYYY
+  const calculateAge = (birthDateStr) => {
+    if (!birthDateStr || !birthDateStr.includes('/')) return null;
+    const parts = birthDateStr.split('/');
+    if (parts.length !== 3) return null;
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const year = parseInt(parts[2], 10);
+    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+    const today = new Date();
+    let age = today.getFullYear() - year;
+    const monthDiff = today.getMonth() - month;
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < day)) {
+      age--;
+    }
+    return age >= 0 && age < 120 ? age : null;
+  };
+
+  // Reset page when filter/search/sort/perPage change
+  useEffect(() => {
+    setPatientPage(1);
+  }, [patientSearchQuery, patientFilterType, patientSortField, patientSortOrder, patientPerPage]);
+
+  // Filtered & Sorted Patient List
+  const filteredPatients = React.useMemo(() => {
+    return patientDb.filter(pt => {
+      // 1. Universal Search (CPF, Nome, Data de Nascimento, Telefone, Cidade)
+      if (patientSearchQuery.trim()) {
+        const query = patientSearchQuery.trim().toLowerCase();
+        const cleanQuery = query.replace(/\D/g, '');
+        
+        const nameMatch = (pt.name || '').toLowerCase().includes(query);
+        const cpfMatch = (pt.cpf || '').toLowerCase().includes(query) || (cleanQuery.length > 0 && (pt.cpfClean || '').includes(cleanQuery));
+        const dobMatch = (pt.birthDate || '').includes(query);
+        const cityMatch = (pt.city || '').toLowerCase().includes(query);
+        const phoneMatch = (pt.phone || '').includes(query);
+
+        if (!nameMatch && !cpfMatch && !dobMatch && !cityMatch && !phoneMatch) {
+          return false;
+        }
+      }
+
+      // 2. Quick Filter Pills
+      if (patientFilterType === 'has_cpf' && (!pt.cpf || pt.cpf.trim() === '')) return false;
+      if (patientFilterType === 'has_dob' && (!pt.birthDate || pt.birthDate.trim() === '')) return false;
+      if (patientFilterType === 'has_phone' && (!pt.phone || pt.phone.trim() === '')) return false;
+
+      return true;
+    }).sort((a, b) => {
+      let valueA = a[patientSortField] || '';
+      let valueB = b[patientSortField] || '';
+
+      if (patientSortField === 'birthDate') {
+        const convertToKey = (dateStr) => {
+          if (!dateStr || !dateStr.includes('/')) return '00000000';
+          const parts = dateStr.split('/');
+          if (parts.length === 3) return `${parts[2]}${parts[1].padStart(2, '0')}${parts[0].padStart(2, '0')}`;
+          return '00000000';
+        };
+        valueA = convertToKey(valueA);
+        valueB = convertToKey(valueB);
+      }
+
+      if (typeof valueA === 'string') valueA = valueA.toLowerCase();
+      if (typeof valueB === 'string') valueB = valueB.toLowerCase();
+
+      if (valueA < valueB) return patientSortOrder === 'asc' ? -1 : 1;
+      if (valueA > valueB) return patientSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [patientDb, patientSearchQuery, patientFilterType, patientSortField, patientSortOrder]);
+
+  const totalPages = Math.ceil(filteredPatients.length / patientPerPage) || 1;
+  const paginatedPatients = React.useMemo(() => {
+    const start = (patientPage - 1) * patientPerPage;
+    return filteredPatients.slice(start, start + patientPerPage);
+  }, [filteredPatients, patientPage, patientPerPage]);
+
+  const handleSortToggle = (field) => {
+    if (patientSortField === field) {
+      setPatientSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setPatientSortField(field);
+      setPatientSortOrder('asc');
+    }
+  };
+
+  const handleCopyCpf = (cpfText) => {
+    if (!cpfText) return;
+    navigator.clipboard.writeText(cpfText);
+    setCopiedCpf(cpfText);
+    setTimeout(() => setCopiedCpf(null), 2000);
+  };
 
   // Selected Category / Folder View / Template
   const [viewMode, setViewMode] = useState('folders'); // 'folders' | 'search'
@@ -1572,51 +1677,415 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
             )}
 
             {activeTab === 'winsoft' && (
-              <div className="flex-1 overflow-y-auto pr-1 space-y-4">
-                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-4">
-                  <div>
-                    <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
-                      <Database className="w-4 h-4 text-cyan-400" />
-                      <span>Base de Dados Winsoft — Pacientes da Clínica ({patientDb.length})</span>
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Pesquise por CPF ou Nome do paciente para carregar dados diretamente no gerador de laudos.
-                    </p>
+              <div className="flex-1 overflow-y-auto pr-1 space-y-4 flex flex-col min-h-0">
+                
+                {/* Header & Main Control Bar */}
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4 shadow-xl">
+                  <div className="flex items-center justify-between flex-wrap gap-4 border-b border-slate-800 pb-3">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+                        <Database className="w-4.5 h-4.5 text-cyan-400" />
+                        <span>Base de Dados de Pacientes — Clínica Dr. Eduardo Magalhães</span>
+                        <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-mono font-bold border border-cyan-500/30">
+                          {filteredPatients.length} de {patientDb.length} registros
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Consulte a lista completa com ordenação interativa por colunas, filtros rápidos e busca simultânea por Nome, CPF ou Data de Nascimento.
+                      </p>
+                    </div>
+
+                    {/* View Switcher & Per Page Selector */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                        <button
+                          onClick={() => setPatientViewMode('table')}
+                          className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                            patientViewMode === 'table' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                          }`}
+                          title="Visualização em Lista / Tabela"
+                        >
+                          <List className="w-3.5 h-3.5" /> Tabela
+                        </button>
+                        <button
+                          onClick={() => setPatientViewMode('cards')}
+                          className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                            patientViewMode === 'cards' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                          }`}
+                          title="Visualização em Grade de Cards"
+                        >
+                          <Grid className="w-3.5 h-3.5" /> Cards
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                        <span>Exibir:</span>
+                        <select
+                          value={patientPerPage}
+                          onChange={(e) => setPatientPerPage(Number(e.target.value))}
+                          className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
+                        >
+                          <option value={10}>10</option>
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Inputs Bar: Search & Quick Filters */}
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                    
+                    {/* Universal Search Input */}
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={patientSearchQuery}
+                        onChange={(e) => setPatientSearchQuery(e.target.value)}
+                        placeholder="Buscar por Nome, CPF (números ou formatado), Data Nasc (DD/MM/AAAA) ou Cidade..."
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-9 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+                      />
+                      {patientSearchQuery && (
+                        <button
+                          onClick={() => setPatientSearchQuery('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 rounded-full transition"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filter Chips */}
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+                      <button
+                        onClick={() => setPatientFilterType('all')}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer border ${
+                          patientFilterType === 'all'
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-sm'
+                            : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                        }`}
+                      >
+                        Todos ({patientDb.length})
+                      </button>
+                      
+                      <button
+                        onClick={() => setPatientFilterType('has_cpf')}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer border ${
+                          patientFilterType === 'has_cpf'
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-sm'
+                            : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                        }`}
+                      >
+                        Com CPF (1.543)
+                      </button>
+
+                      <button
+                        onClick={() => setPatientFilterType('has_dob')}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer border ${
+                          patientFilterType === 'has_dob'
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-sm'
+                            : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                        }`}
+                      >
+                        Com Data Nasc
+                      </button>
+
+                      <button
+                        onClick={() => setPatientFilterType('has_phone')}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer border ${
+                          patientFilterType === 'has_phone'
+                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-sm'
+                            : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                        }`}
+                      >
+                        Com Telefone
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {patientDb.map((pt, idx) => (
-                    <div key={idx} className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3 hover:border-cyan-500/40 transition">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                        <span className="text-xs font-bold text-white truncate">{pt.name}</span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold">{pt.cpf}</span>
-                      </div>
+                {/* Content Area: Table View vs Cards View */}
+                {paginatedPatients.length === 0 ? (
+                  <div className="p-12 rounded-2xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
+                    <Database className="w-10 h-10 text-slate-600 mx-auto" />
+                    <h4 className="text-sm font-bold text-slate-300">Nenhum paciente encontrado</h4>
+                    <p className="text-xs text-slate-400 max-w-md mx-auto">
+                      Não encontramos nenhum registro correspondente a "{patientSearchQuery}". Verifique a digitação do CPF, Nome ou Data de Nascimento.
+                    </p>
+                    <button
+                      onClick={() => { setPatientSearchQuery(''); setPatientFilterType('all'); }}
+                      className="px-4 py-2 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold hover:bg-cyan-500/30 transition cursor-pointer"
+                    >
+                      Limpar Filtros de Busca
+                    </button>
+                  </div>
+                ) : patientViewMode === 'table' ? (
+                  /* Elegant Data Table */
+                  <div className="rounded-2xl bg-slate-900/90 border border-slate-800 overflow-hidden shadow-xl flex-1 flex flex-col">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-950/90 border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 font-bold select-none sticky top-0 z-10">
+                            <th className="py-3 px-4 w-12 text-center">#</th>
+                            
+                            {/* Column: Nome */}
+                            <th 
+                              onClick={() => handleSortToggle('name')}
+                              className="py-3 px-4 cursor-pointer hover:text-cyan-400 transition"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span>Nome Completo do Paciente</span>
+                                {patientSortField === 'name' ? (
+                                  patientSortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-cyan-400" /> : <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
+                                ) : (
+                                  <ArrowUpDown className="w-3 h-3 text-slate-600" />
+                                )}
+                              </div>
+                            </th>
 
-                      <div className="text-xs text-slate-300 space-y-1">
-                        <div><strong className="text-slate-400">Data Nasc:</strong> {pt.birthDate || 'N/A'}</div>
-                        <div><strong className="text-slate-400">Último Exame:</strong> {pt.lastExam || 'N/A'}</div>
-                        <div><strong className="text-slate-400">WhatsApp:</strong> {pt.phone || 'N/A'}</div>
-                        <div><strong className="text-slate-400">Histórico:</strong> {pt.examHistory?.length || 0} exames anteriores</div>
+                            {/* Column: CPF */}
+                            <th 
+                              onClick={() => handleSortToggle('cpf')}
+                              className="py-3 px-4 cursor-pointer hover:text-cyan-400 transition"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span>CPF</span>
+                                {patientSortField === 'cpf' ? (
+                                  patientSortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-cyan-400" /> : <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
+                                ) : (
+                                  <ArrowUpDown className="w-3 h-3 text-slate-600" />
+                                )}
+                              </div>
+                            </th>
+
+                            {/* Column: Data Nasc */}
+                            <th 
+                              onClick={() => handleSortToggle('birthDate')}
+                              className="py-3 px-4 cursor-pointer hover:text-cyan-400 transition"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <span>Data de Nascimento</span>
+                                {patientSortField === 'birthDate' ? (
+                                  patientSortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-cyan-400" /> : <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
+                                ) : (
+                                  <ArrowUpDown className="w-3 h-3 text-slate-600" />
+                                )}
+                              </div>
+                            </th>
+
+                            {/* Column: Telefone / WhatsApp */}
+                            <th className="py-3 px-4">
+                              <div className="flex items-center gap-1.5">
+                                <Phone className="w-3 h-3 text-slate-500" />
+                                <span>Telefone / WhatsApp</span>
+                              </div>
+                            </th>
+
+                            {/* Column: Cidade / UF */}
+                            <th 
+                              onClick={() => handleSortToggle('city')}
+                              className="py-3 px-4 cursor-pointer hover:text-cyan-400 transition"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3 h-3 text-slate-500" />
+                                <span>Cidade / UF</span>
+                                {patientSortField === 'city' ? (
+                                  patientSortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-cyan-400" /> : <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
+                                ) : (
+                                  <ArrowUpDown className="w-3 h-3 text-slate-600" />
+                                )}
+                              </div>
+                            </th>
+
+                            {/* Column: Actions */}
+                            <th className="py-3 px-4 text-right">Ação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 text-xs">
+                          {paginatedPatients.map((pt, idx) => {
+                            const globalIndex = (patientPage - 1) * patientPerPage + idx + 1;
+                            const age = calculateAge(pt.birthDate);
+                            const hasValidCpf = pt.cpf && pt.cpf.trim().length > 0;
+
+                            return (
+                              <tr key={idx} className="hover:bg-slate-800/50 transition-colors group">
+                                <td className="py-3 px-4 font-mono text-[11px] text-slate-500 text-center font-semibold">
+                                  {globalIndex}
+                                </td>
+
+                                {/* Name */}
+                                <td className="py-3 px-4 font-bold text-white group-hover:text-cyan-300 transition">
+                                  <div className="flex items-center gap-2">
+                                    <User className="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400 flex-shrink-0" />
+                                    <span className="truncate max-w-xs">{pt.name}</span>
+                                  </div>
+                                </td>
+
+                                {/* CPF */}
+                                <td className="py-3 px-4 font-mono">
+                                  {hasValidCpf ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-bold text-[11px]">
+                                        {pt.cpf}
+                                      </span>
+                                      <button
+                                        onClick={() => handleCopyCpf(pt.cpfClean || pt.cpf)}
+                                        className="p-1 rounded text-slate-500 hover:text-cyan-300 hover:bg-slate-800 transition cursor-pointer"
+                                        title="Copiar CPF"
+                                      >
+                                        {copiedCpf === (pt.cpfClean || pt.cpf) ? (
+                                          <Check className="w-3 h-3 text-emerald-400" />
+                                        ) : (
+                                          <Copy className="w-3 h-3" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-600 text-[11px] italic">Sem CPF</span>
+                                  )}
+                                </td>
+
+                                {/* Birth Date & Age */}
+                                <td className="py-3 px-4 text-slate-300 font-mono">
+                                  {pt.birthDate ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <Calendar className="w-3 h-3 text-slate-500" />
+                                      <span>{pt.birthDate}</span>
+                                      {age !== null && (
+                                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                                          {age} anos
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-600 text-[11px] italic">N/A</span>
+                                  )}
+                                </td>
+
+                                {/* Phone / WhatsApp */}
+                                <td className="py-3 px-4 font-mono text-slate-300">
+                                  {pt.phone ? (
+                                    <a
+                                      href={`https://wa.me/55${pt.phone.replace(/\D/g, '')}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-slate-300 hover:text-emerald-400 transition"
+                                      title="Abrir WhatsApp"
+                                    >
+                                      <Phone className="w-3 h-3 text-emerald-500" />
+                                      <span>{pt.phone}</span>
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-600 text-[11px] italic">Sem telefone</span>
+                                  )}
+                                </td>
+
+                                {/* City / UF */}
+                                <td className="py-3 px-4 text-slate-300">
+                                  {pt.city || pt.state ? (
+                                    <span className="truncate max-w-[140px] block">
+                                      {[pt.city, pt.state].filter(Boolean).join(' - ')}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-600 text-[11px] italic">Porto Velho - RO</span>
+                                  )}
+                                </td>
+
+                                {/* Actions */}
+                                <td className="py-3 px-4 text-right">
+                                  <button
+                                    onClick={() => {
+                                      if (pt.cpf) setCpf(pt.cpf);
+                                      setPatientName(pt.name);
+                                      if (pt.birthDate) setBirthDate(pt.birthDate);
+                                      if (pt.phone) setPatientPhone(pt.phone);
+                                      if (pt.lastExam) setExamDate(pt.lastExam);
+                                      setSelectedPatientExams(pt.examHistory || []);
+                                      setActiveTab('generator');
+                                    }}
+                                    className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                                  >
+                                    <FileText className="w-3 h-3" /> Gerar Laudo
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  /* Grid Cards View Alternative */
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {paginatedPatients.map((pt, idx) => (
+                      <div key={idx} className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3 hover:border-cyan-500/40 transition shadow-md">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <span className="text-xs font-bold text-white truncate max-w-[180px]">{pt.name}</span>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">
+                            {pt.cpf || 'Sem CPF'}
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-slate-300 space-y-1">
+                          <div><strong className="text-slate-400">Data Nasc:</strong> {pt.birthDate || 'N/A'}</div>
+                          <div><strong className="text-slate-400">WhatsApp:</strong> {pt.phone || 'N/A'}</div>
+                          <div><strong className="text-slate-400">Cidade:</strong> {[pt.city, pt.state].filter(Boolean).join(' - ') || 'Porto Velho - RO'}</div>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            if (pt.cpf) setCpf(pt.cpf);
+                            setPatientName(pt.name);
+                            if (pt.birthDate) setBirthDate(pt.birthDate);
+                            if (pt.phone) setPatientPhone(pt.phone);
+                            if (pt.lastExam) setExamDate(pt.lastExam);
+                            setSelectedPatientExams(pt.examHistory || []);
+                            setActiveTab('generator');
+                          }}
+                          className="w-full py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> Carregar no Gerador de Laudos
+                        </button>
                       </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Pagination Bar */}
+                {filteredPatients.length > 0 && (
+                  <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-3 text-xs text-slate-400">
+                    <div>
+                      Exibindo <span className="text-white font-bold font-mono">{(patientPage - 1) * patientPerPage + 1}</span> a{' '}
+                      <span className="text-white font-bold font-mono">{Math.min(patientPage * patientPerPage, filteredPatients.length)}</span> de{' '}
+                      <span className="text-cyan-400 font-bold font-mono">{filteredPatients.length}</span> pacientes
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPatientPage(p => Math.max(1, p - 1))}
+                        disabled={patientPage === 1}
+                        className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" /> Anterior
+                      </button>
+
+                      <span className="font-mono text-slate-300 px-2">
+                        Página <strong className="text-cyan-400">{patientPage}</strong> de <strong>{totalPages}</strong>
+                      </span>
 
                       <button
-                        onClick={() => {
-                          setCpf(pt.cpf);
-                          setPatientName(pt.name);
-                          if (pt.birthDate) setBirthDate(pt.birthDate);
-                          if (pt.phone) setPatientPhone(pt.phone);
-                          if (pt.lastExam) setExamDate(pt.lastExam);
-                          setSelectedPatientExams(pt.examHistory || []);
-                          setActiveTab('generator');
-                        }}
-                        className="w-full py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+                        onClick={() => setPatientPage(p => Math.min(totalPages, p + 1))}
+                        disabled={patientPage === totalPages}
+                        className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1 cursor-pointer"
                       >
-                        <FileText className="w-3.5 h-3.5" /> Carregar no Gerador de Laudos
+                        Próxima <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             )}
 
