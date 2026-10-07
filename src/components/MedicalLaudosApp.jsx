@@ -2593,12 +2593,12 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
         {/* Patient CRUD Modal (Cadastrar / Editar Paciente) */}
         {isPatientModalOpen && (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto">
-            <div className="relative z-[100000] w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[90vh]">
-              {/* Modal Header */}
-              <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950/50 to-slate-900 border-b border-slate-800 flex items-center justify-between">
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md overflow-y-auto">
+            <div className="relative z-[100000] w-full max-w-lg bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl overflow-hidden my-auto">
+              {/* Header */}
+              <div className="p-5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                  <div className="p-2.5 rounded-2xl bg-cyan-500/20 text-cyan-400">
                     {editingPatientIndex !== null ? <Edit2 className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
                   </div>
                   <div>
@@ -2606,11 +2606,12 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                       {editingPatientIndex !== null ? 'Editar Cadastro do Paciente' : 'Cadastrar Novo Paciente'}
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Preencha os dados do paciente para salvar na base de dados da clínica.
+                      Preencha os dados abaixo para salvar na base de dados.
                     </p>
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsPatientModalOpen(false)}
                   className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
                 >
@@ -2618,8 +2619,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 </button>
               </div>
 
-              {/* Modal Form */}
-              <form onSubmit={handleSavePatient} className="p-6 space-y-4 text-xs">
+              {/* Form Body */}
+              <form onSubmit={handleSavePatient} className="p-6 space-y-4 text-xs bg-slate-900 max-h-[80vh] overflow-y-auto">
                 <div>
                   <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
                     Nome Completo do Paciente *
@@ -2627,27 +2628,27 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                   <input
                     type="text"
                     required
-                    value={patientFormData.name}
-                    onChange={(e) => setPatientFormData({ ...patientFormData, name: e.target.value })}
+                    value={patientFormData?.name || ''}
+                    onChange={(e) => setPatientFormData(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Ex: MARIA DA SILVA SOUZA"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
                       CPF (11 dígitos)
                     </label>
                     <input
                       type="text"
-                      value={patientFormData.cpf}
+                      value={patientFormData?.cpf || ''}
                       onChange={(e) => {
                         const formatted = formatDateMask(e.target.value);
-                        setPatientFormData({ ...patientFormData, cpf: formatted });
+                        setPatientFormData(prev => ({ ...prev, cpf: formatted }));
                       }}
                       placeholder="000.000.000-00"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
                     />
                   </div>
 
@@ -2657,28 +2658,28 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                     </label>
                     <input
                       type="text"
-                      value={patientFormData.birthDate}
+                      value={patientFormData?.birthDate || ''}
                       onChange={(e) => {
                         const formatted = formatDateMask(e.target.value);
-                        setPatientFormData({ ...patientFormData, birthDate: formatted });
+                        setPatientFormData(prev => ({ ...prev, birthDate: formatted }));
                       }}
                       placeholder="DD/MM/AAAA"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="sm:col-span-2">
                     <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
                       Telefone / WhatsApp
                     </label>
                     <input
                       type="text"
-                      value={patientFormData.phone}
-                      onChange={(e) => setPatientFormData({ ...patientFormData, phone: e.target.value })}
+                      value={patientFormData?.phone || ''}
+                      onChange={(e) => setPatientFormData(prev => ({ ...prev, phone: e.target.value }))}
                       placeholder="(69) 99999-9999"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
                     />
                   </div>
 
@@ -2688,11 +2689,11 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                     </label>
                     <input
                       type="text"
-                      value={patientFormData.state}
-                      onChange={(e) => setPatientFormData({ ...patientFormData, state: e.target.value.toUpperCase() })}
+                      value={patientFormData?.state || ''}
+                      onChange={(e) => setPatientFormData(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
                       placeholder="RO"
                       maxLength={2}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 uppercase"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 uppercase"
                     />
                   </div>
                 </div>
@@ -2703,10 +2704,10 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                   </label>
                   <input
                     type="text"
-                    value={patientFormData.city}
-                    onChange={(e) => setPatientFormData({ ...patientFormData, city: e.target.value })}
+                    value={patientFormData?.city || ''}
+                    onChange={(e) => setPatientFormData(prev => ({ ...prev, city: e.target.value }))}
                     placeholder="Porto Velho"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
                   />
                 </div>
 
