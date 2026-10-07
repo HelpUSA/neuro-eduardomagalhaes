@@ -39,6 +39,12 @@ const convertBrToIsoDate = (brDate) => {
   return '';
 };
 
+// Official Whitelisted Accounts
+const AUTHORIZED_EMAILS = [
+  { email: 'helpus.ecommerce@gmail.com', role: 'superadmin', name: 'HelpUS Tech (SuperAdmin)' },
+  { email: 'eduardojcmagalhaes@gmail.com', role: 'doctor', name: 'Dr. Eduardo Magalhães (Gestor / Médico)' }
+];
+
 export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: isStandaloneProp = false }) => {
   const isStandalonePage = isStandaloneProp || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('panel') === 'open');
   const [activeTab, setActiveTab] = useState('generator'); // 'generator' | 'search' | 'users' | 'winsoft'
@@ -66,15 +72,53 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
     signPdfBtn: "Assinar & Gerar PDF Timbrado"
   };
 
-  // Authentication State
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Authentication State with localStorage session persistence across page reloads (F5)
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return false;
+      const savedSession = localStorage.getItem('neuro_auth_user');
+      if (savedSession) {
+        const sessionObj = JSON.parse(savedSession);
+        if (sessionObj && sessionObj.email) {
+          const cleanEmail = sessionObj.email.toLowerCase().trim();
+          const authRecord = AUTHORIZED_EMAILS.find(a => a.email.toLowerCase() === cleanEmail);
+          if (authRecord) return true;
+        }
+      }
+    } catch (e) {
+      console.error('Error restoring auth session:', e);
+    }
+    return false;
+  });
+
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
   // User Role State (Dr. Eduardo vs Secretária)
-  const [currentUserRole, setCurrentUserRole] = useState('doctor'); // 'doctor' | 'reception' | 'technician'
-  const [currentUserName, setCurrentUserName] = useState('Dr. Eduardo Magalhães');
+  const [currentUserRole, setCurrentUserRole] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return 'doctor';
+      const savedSession = localStorage.getItem('neuro_auth_user');
+      if (savedSession) {
+        const sessionObj = JSON.parse(savedSession);
+        if (sessionObj && sessionObj.role) return sessionObj.role;
+      }
+    } catch (e) {}
+    return 'doctor';
+  });
+
+  const [currentUserName, setCurrentUserName] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return 'Dr. Eduardo Magalhães';
+      const savedSession = localStorage.getItem('neuro_auth_user');
+      if (savedSession) {
+        const sessionObj = JSON.parse(savedSession);
+        if (sessionObj && sessionObj.name) return sessionObj.name;
+      }
+    } catch (e) {}
+    return 'Dr. Eduardo Magalhães';
+  });
 
   // Patient Database State (Winsoft + New Patients) with localStorage persistence
   const [patientDb, setPatientDb] = useState(() => {
@@ -476,12 +520,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       setLoginError('');
     }, 600);
   };
-
-  // Official Whitelisted Accounts
-  const AUTHORIZED_EMAILS = [
-    { email: 'helpus.ecommerce@gmail.com', role: 'superadmin', name: 'HelpUS Tech (SuperAdmin)' },
-    { email: 'eduardojcmagalhaes@gmail.com', role: 'doctor', name: 'Dr. Eduardo Magalhães (Gestor / Médico)' }
-  ];
 
   const processGoogleUserInfo = (googleUser, pendingTab = null) => {
     if (!googleUser || !googleUser.email) {
