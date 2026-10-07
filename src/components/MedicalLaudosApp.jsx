@@ -158,28 +158,54 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
   const [patientViewMode, setPatientViewMode] = useState('table'); // 'table' | 'cards'
   const [copiedCpf, setCopiedCpf] = useState(null);
 
-  // CRUD Modal State for Patients
+  // CRUD Modal State for Patients with support for all 50 ZIP database fields
   const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
   const [editingPatientIndex, setEditingPatientIndex] = useState(null);
-  const [patientFormData, setPatientFormData] = useState({
+  const [patientModalTab, setPatientModalTab] = useState('main'); // 'main' | 'contact' | 'address' | 'extra'
+
+  const defaultPatientFormData = {
     name: '',
+    civilName: '',
     cpf: '',
     birthDate: '',
+    gender: '',
+    socialGender: '',
+    rg: '',
+    rgIssuer: '',
     phone: '',
+    mobilePhone: '',
+    homePhone: '',
+    email: '',
+    healthInsurance: '',
+    address: '',
+    number: '',
+    complement: '',
+    neighborhood: '',
     city: 'Porto Velho',
-    state: 'RO'
-  });
+    state: 'RO',
+    zipCode: '',
+    motherName: '',
+    fatherName: '',
+    birthPlace: '',
+    birthState: '',
+    nationality: '',
+    ethnicity: '',
+    maritalStatus: '',
+    religion: '',
+    occupation: '',
+    education: '',
+    responsible: '',
+    cns: '',
+    indication: '',
+    observation: ''
+  };
+
+  const [patientFormData, setPatientFormData] = useState(defaultPatientFormData);
 
   const handleOpenAddPatient = () => {
     setEditingPatientIndex(null);
-    setPatientFormData({
-      name: '',
-      cpf: '',
-      birthDate: '',
-      phone: '',
-      city: 'Porto Velho',
-      state: 'RO'
-    });
+    setPatientFormData(defaultPatientFormData);
+    setPatientModalTab('main');
     setIsPatientModalOpen(true);
   };
 
@@ -187,13 +213,16 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
     const idx = patientDb.findIndex(pt => pt === patientObj || (pt.cpf && pt.cpf === patientObj.cpf && pt.name === patientObj.name));
     setEditingPatientIndex(idx >= 0 ? idx : null);
     setPatientFormData({
+      ...defaultPatientFormData,
+      ...patientObj,
       name: patientObj.name || '',
       cpf: patientObj.cpf || '',
       birthDate: patientObj.birthDate || '',
-      phone: patientObj.phone || '',
+      phone: patientObj.phone || patientObj.mobilePhone || '',
       city: patientObj.city || 'Porto Velho',
       state: patientObj.state || 'RO'
     });
+    setPatientModalTab('main');
     setIsPatientModalOpen(true);
   };
 
@@ -208,13 +237,11 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
     const formattedCpfVal = cleanCpfDigits.length === 11 ? formatCPF(cleanCpfDigits) : patientFormData.cpf;
 
     const newRecord = {
+      ...patientFormData,
       name: patientFormData.name.trim().toUpperCase(),
       cpf: formattedCpfVal,
       cpfClean: cleanCpfDigits,
-      birthDate: patientFormData.birthDate,
-      phone: patientFormData.phone,
-      city: patientFormData.city,
-      state: patientFormData.state,
+      phone: patientFormData.phone || patientFormData.mobilePhone,
       lastExam: editingPatientIndex !== null ? patientDb[editingPatientIndex]?.lastExam : undefined,
       examHistory: editingPatientIndex !== null ? patientDb[editingPatientIndex]?.examHistory : []
     };
@@ -2593,22 +2620,22 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
           document.body
         )}
 
-        {/* Patient CRUD Modal (Cadastrar / Editar Paciente) */}
+        {/* Patient CRUD Modal (Cadastrar / Editar Paciente com 50 Campos Integrados) */}
         {isPatientModalOpen && typeof document !== 'undefined' && createPortal(
-          <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md overflow-y-auto">
-            <div className="relative z-[1000000] w-full max-w-lg bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl overflow-hidden my-auto">
+          <div className="fixed inset-0 z-[999999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/95 backdrop-blur-md overflow-y-auto">
+            <div className="relative z-[1000000] w-full max-w-2xl bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[90vh]">
               {/* Header */}
-              <div className="p-5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+              <div className="p-5 bg-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-2xl bg-cyan-500/20 text-cyan-400">
                     {editingPatientIndex !== null ? <Edit2 className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
                   </div>
                   <div>
                     <h3 className="text-base font-extrabold text-white">
-                      {editingPatientIndex !== null ? 'Editar Cadastro do Paciente' : 'Cadastrar Novo Paciente'}
+                      {editingPatientIndex !== null ? 'Editar Cadastro de Paciente' : 'Cadastrar Novo Paciente'}
                     </h3>
                     <p className="text-xs text-slate-400">
-                      Preencha os dados abaixo para salvar na base de dados.
+                      Formulário completo com suporte a todos os 50 campos da base de dados original.
                     </p>
                   </div>
                 </div>
@@ -2621,112 +2648,513 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 </button>
               </div>
 
+              {/* Modal Sub-Tabs Bar */}
+              <div className="flex items-center gap-1 p-2 bg-slate-950/80 border-b border-slate-800 overflow-x-auto text-xs shrink-0 scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setPatientModalTab('main')}
+                  className={`px-3 py-2 rounded-xl font-bold transition cursor-pointer whitespace-nowrap ${patientModalTab === 'main' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                >
+                  📋 Dados Pessoais & Docs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPatientModalTab('contact')}
+                  className={`px-3 py-2 rounded-xl font-bold transition cursor-pointer whitespace-nowrap ${patientModalTab === 'contact' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                >
+                  📞 Contato & Convênio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPatientModalTab('address')}
+                  className={`px-3 py-2 rounded-xl font-bold transition cursor-pointer whitespace-nowrap ${patientModalTab === 'address' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                >
+                  📍 Endereço Completo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPatientModalTab('extra')}
+                  className={`px-3 py-2 rounded-xl font-bold transition cursor-pointer whitespace-nowrap ${patientModalTab === 'extra' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                >
+                  📄 Ficha Complementar
+                </button>
+              </div>
+
               {/* Form Body */}
-              <form onSubmit={handleSavePatient} className="p-6 space-y-4 text-xs bg-slate-900 max-h-[80vh] overflow-y-auto">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    Nome Completo do Paciente *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={patientFormData?.name || ''}
-                    onChange={(e) => setPatientFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Ex: MARIA DA SILVA SOUZA"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
+              <form onSubmit={handleSavePatient} className="p-6 space-y-4 text-xs bg-slate-900 overflow-y-auto flex-1">
+                {patientModalTab === 'main' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        Nome Completo do Paciente *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={patientFormData?.name || ''}
+                        onChange={(e) => setPatientFormData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Ex: MARIA DA SILVA SOUZA"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                      CPF (11 dígitos)
-                    </label>
-                    <input
-                      type="text"
-                      value={patientFormData?.cpf || ''}
-                      onChange={(e) => {
-                        const formatted = formatCPF(e.target.value);
-                        setPatientFormData(prev => ({ ...prev, cpf: formatted }));
-                      }}
-                      placeholder="000.000.000-00"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Nome Social / Nome de Registro
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.civilName || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, civilName: e.target.value }))}
+                          placeholder="Nome Civil se diferente"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          CPF (11 dígitos)
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.cpf || ''}
+                          onChange={(e) => {
+                            const formatted = formatCPF(e.target.value);
+                            setPatientFormData(prev => ({ ...prev, cpf: formatted }));
+                          }}
+                          placeholder="000.000.000-00"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Data de Nascimento
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.birthDate || ''}
+                          onChange={(e) => {
+                            const formatted = formatDateMask(e.target.value);
+                            setPatientFormData(prev => ({ ...prev, birthDate: formatted }));
+                          }}
+                          placeholder="DD/MM/AAAA"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Gênero / Sexo
+                        </label>
+                        <select
+                          value={patientFormData?.gender || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, gender: e.target.value }))}
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="Masculino">Masculino</option>
+                          <option value="Feminino">Feminino</option>
+                          <option value="Outro">Outro / Não Informado</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Identidade de Gênero Social
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.socialGender || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, socialGender: e.target.value }))}
+                          placeholder="Ex: Mulher Trans, etc."
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          RG (Número de Identidade)
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.rg || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, rg: e.target.value }))}
+                          placeholder="00.000.000-0"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Órgão Emissor / UF do RG
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.rgIssuer || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, rgIssuer: e.target.value }))}
+                          placeholder="Ex: SSP/RO"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 uppercase"
+                        />
+                      </div>
+                    </div>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                      Data de Nascimento
-                    </label>
-                    <input
-                      type="text"
-                      value={patientFormData?.birthDate || ''}
-                      onChange={(e) => {
-                        const formatted = formatDateMask(e.target.value);
-                        setPatientFormData(prev => ({ ...prev, birthDate: formatted }));
-                      }}
-                      placeholder="DD/MM/AAAA"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                    />
+                {patientModalTab === 'contact' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Celular / WhatsApp (Principal)
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.mobilePhone || patientFormData?.phone || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, phone: e.target.value, mobilePhone: e.target.value }))}
+                          placeholder="(69) 99999-9999"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Telefone Fixo / Residencial
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.homePhone || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, homePhone: e.target.value }))}
+                          placeholder="(69) 3222-0000"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          E-mail Principal
+                        </label>
+                        <input
+                          type="email"
+                          value={patientFormData?.email || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, email: e.target.value }))}
+                          placeholder="paciente@exemplo.com"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Convênio / Plano de Saúde
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.healthInsurance || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, healthInsurance: e.target.value }))}
+                          placeholder="Ex: UNIMED PORTO VELHO, PARTICULAR..."
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        Responsável Legal / Acompanhante
+                      </label>
+                      <input
+                        type="text"
+                        value={patientFormData?.responsible || ''}
+                        onChange={(e) => setPatientFormData(prev => ({ ...prev, responsible: e.target.value }))}
+                        placeholder="Nome do Pai, Mãe ou Tutor Responsável"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                      Telefone / WhatsApp
-                    </label>
-                    <input
-                      type="text"
-                      value={patientFormData?.phone || ''}
-                      onChange={(e) => setPatientFormData(prev => ({ ...prev, phone: e.target.value }))}
-                      placeholder="(69) 99999-9999"
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                    />
+                {patientModalTab === 'address' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        Logradouro / Endereço Completo
+                      </label>
+                      <input
+                        type="text"
+                        value={patientFormData?.address || ''}
+                        onChange={(e) => setPatientFormData(prev => ({ ...prev, address: e.target.value }))}
+                        placeholder="Ex: Av. Presidente Vargas"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Número
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.number || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, number: e.target.value }))}
+                          placeholder="1234"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Complemento
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.complement || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, complement: e.target.value }))}
+                          placeholder="Apto 302, Bloco B"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Bairro
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.neighborhood || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, neighborhood: e.target.value }))}
+                          placeholder="Centro"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Cidade
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.city || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, city: e.target.value }))}
+                          placeholder="Porto Velho"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          UF (Estado)
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.state || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
+                          placeholder="RO"
+                          maxLength={2}
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 uppercase"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        CEP (Código Postal)
+                      </label>
+                      <input
+                        type="text"
+                        value={patientFormData?.zipCode || ''}
+                        onChange={(e) => setPatientFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+                        placeholder="76800-000"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
                   </div>
+                )}
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                      UF (Estado)
-                    </label>
-                    <input
-                      type="text"
-                      value={patientFormData?.state || ''}
-                      onChange={(e) => setPatientFormData(prev => ({ ...prev, state: e.target.value.toUpperCase() }))}
-                      placeholder="RO"
-                      maxLength={2}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 uppercase"
-                    />
+                {patientModalTab === 'extra' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Nome da Mãe
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.motherName || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, motherName: e.target.value }))}
+                          placeholder="Nome Completo da Mãe"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Nome do Pai
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.fatherName || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, fatherName: e.target.value }))}
+                          placeholder="Nome Completo do Pai"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Naturalidade (Cidade Natal)
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.birthPlace || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, birthPlace: e.target.value }))}
+                          placeholder="Porto Velho"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          UF Natal
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.birthState || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, birthState: e.target.value.toUpperCase() }))}
+                          placeholder="RO"
+                          maxLength={2}
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 uppercase"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Nacionalidade
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.nationality || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, nationality: e.target.value }))}
+                          placeholder="Brasileira"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Estado Civil
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.maritalStatus || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, maritalStatus: e.target.value }))}
+                          placeholder="Solteiro(a), Casado(a)..."
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Profissão / Ocupação
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.occupation || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, occupation: e.target.value }))}
+                          placeholder="Ex: Aposentado, Estudante..."
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Cartão SUS (CNS)
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.cns || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, cns: e.target.value }))}
+                          placeholder="000 0000 0000 0000"
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Indicação / Quem Indicou
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.indication || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, indication: e.target.value }))}
+                          placeholder="Ex: Dr. Solino, Internet..."
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                          Escolaridade / Religião
+                        </label>
+                        <input
+                          type="text"
+                          value={patientFormData?.education || patientFormData?.religion || ''}
+                          onChange={(e) => setPatientFormData(prev => ({ ...prev, education: e.target.value }))}
+                          placeholder="Ensino Médio, etc."
+                          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                        Observações Gerais do Paciente
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={patientFormData?.observation || ''}
+                        onChange={(e) => setPatientFormData(prev => ({ ...prev, observation: e.target.value }))}
+                        placeholder="Anotações internas, alergias, observações clínicas ou de atendimento..."
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                    Cidade
-                  </label>
-                  <input
-                    type="text"
-                    value={patientFormData?.city || ''}
-                    onChange={(e) => setPatientFormData(prev => ({ ...prev, city: e.target.value }))}
-                    placeholder="Porto Velho"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
+                <div className="pt-4 flex items-center justify-between border-t border-slate-800 shrink-0">
+                  <span className="text-[11px] text-slate-500 italic">
+                    * Todos os 50 campos da base original estão disponíveis para salvar ou atualizar.
+                  </span>
 
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setIsPatientModalOpen(false)}
-                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/20 transition cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Save className="w-4 h-4" /> Salvar Paciente
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsPatientModalOpen(false)}
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/20 transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Save className="w-4 h-4" /> Salvar Paciente
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
