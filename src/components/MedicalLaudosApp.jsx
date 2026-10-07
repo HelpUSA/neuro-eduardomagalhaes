@@ -48,7 +48,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
     doctorBadge: "👑 Médico (Dr. Eduardo)",
     receptionBadge: "📋 Secretária (Recepção)",
     tabLaudos: "Emissão de Laudos",
-    tabWinsoft: "Base Winsoft",
+    tabWinsoft: "Base de Dados de Pacientes",
     tabUsers: "Gestão de Equipe",
     hideTreeBtn: "📂 Ocultar Árvore (Maximizar Espaço)",
     showTreeBtn: "📂 Mostrar Árvore de Modelos",
@@ -1123,7 +1123,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                   </h2>
                   <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
                     <span>Sessão Autenticada: <strong>{currentUserName}</strong></span>
-                    <span className="text-emerald-400 font-bold">• Google OAuth & CAPTCHA Ativos</span>
                   </p>
                 </div>
               </div>
