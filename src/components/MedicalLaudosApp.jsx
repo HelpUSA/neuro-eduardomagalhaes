@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, Search, PlusCircle, FileText, Send, UserPlus, ShieldCheck, Lock, 
   Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, ChevronDown, ChevronLeft,
@@ -2507,9 +2508,9 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
         )}
 
         {/* User Management Edit/Add Modal */}
-        {isUserModalOpen && (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto">
-            <div className="relative z-[100000] w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-6 space-y-4 shadow-2xl my-auto">
+        {isUserModalOpen && typeof document !== 'undefined' && createPortal(
+          <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto">
+            <div className="relative z-[1000000] w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-6 space-y-4 shadow-2xl my-auto">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <UserPlus className="w-4 h-4 text-cyan-400" />
@@ -2588,13 +2589,14 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* Patient CRUD Modal (Cadastrar / Editar Paciente) */}
-        {isPatientModalOpen && (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md overflow-y-auto">
-            <div className="relative z-[100000] w-full max-w-lg bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl overflow-hidden my-auto">
+        {isPatientModalOpen && typeof document !== 'undefined' && createPortal(
+          <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md overflow-y-auto">
+            <div className="relative z-[1000000] w-full max-w-lg bg-slate-900 border-2 border-slate-700 rounded-3xl shadow-2xl overflow-hidden my-auto">
               {/* Header */}
               <div className="p-5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -2644,7 +2646,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                       type="text"
                       value={patientFormData?.cpf || ''}
                       onChange={(e) => {
-                        const formatted = formatDateMask(e.target.value);
+                        const formatted = formatCPF(e.target.value);
                         setPatientFormData(prev => ({ ...prev, cpf: formatted }));
                       }}
                       placeholder="000.000.000-00"
@@ -2728,7 +2730,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 </div>
               </form>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
       </div>
