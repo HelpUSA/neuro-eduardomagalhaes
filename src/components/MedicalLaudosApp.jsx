@@ -4,7 +4,7 @@ import {
   Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, ChevronDown, ChevronLeft,
   Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw, Upload, Database, LogOut, CheckCircle2,
   Maximize2, Minimize2, Bold, Italic, Underline, Save, History, Type, Undo, Redo, RotateCcw, RotateCw, UserCheck, ShieldAlert, Calendar,
-  ArrowUpDown, ArrowUp, ArrowDown, Filter, Phone, MapPin, Grid, List, Copy, ExternalLink
+  ArrowUpDown, ArrowUp, ArrowDown, Filter, Phone, MapPin, Grid, List, Copy, ExternalLink, Plus, Edit2, Trash
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
@@ -76,21 +76,121 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
   const [currentUserRole, setCurrentUserRole] = useState('doctor'); // 'doctor' | 'reception' | 'technician'
   const [currentUserName, setCurrentUserName] = useState('Dr. Eduardo Magalhães');
 
-  // Patient Database State (Winsoft + New Patients)
-  const [patientDb, setPatientDb] = useState(INITIAL_PATIENT_DATABASE);
+  // Patient Database State (Winsoft + New Patients) with localStorage persistence
+  const [patientDb, setPatientDb] = useState(() => {
+    try {
+      const saved = localStorage.getItem('neuro_patient_database');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Error loading patient database from localStorage:', e);
+    }
+    return INITIAL_PATIENT_DATABASE;
+  });
+
+  const savePatientDb = (newDb) => {
+    setPatientDb(newDb);
+    try {
+      localStorage.setItem('neuro_patient_database', JSON.stringify(newDb));
+    } catch (e) {
+      console.error('Error saving patient database to localStorage:', e);
+    }
+  };
+
   const [cpfSearchStatus, setCpfSearchStatus] = useState(null); // null | 'found' | 'found_online' | 'not_found' | 'loading'
   const [selectedPatientExams, setSelectedPatientExams] = useState(INITIAL_PATIENT_DATABASE[0].examHistory || []);
   const [isExamHistoryOpen, setIsExamHistoryOpen] = useState(false);
 
-  // Filter, Search & Sorting State for Patient Table View
+  // Filter, Search & Sorting State for Patient Table View (Default 100 per page)
   const [patientSearchQuery, setPatientSearchQuery] = useState('');
-  const [patientFilterType, setPatientFilterType] = useState('all'); // 'all' | 'has_cpf' | 'has_dob' | 'has_phone'
-  const [patientSortField, setPatientSortField] = useState('name'); // 'name' | 'cpf' | 'birthDate' | 'city'
+  const [patientFilterType, setPatientFilterType] = useState('all'); // 'all' | 'has_cpf' | 'has_dob' | 'has_phone' | 'has_laudo'
+  const [patientSortField, setPatientSortField] = useState('name'); // 'name' | 'cpf' | 'birthDate' | 'city' | 'hasLaudo'
   const [patientSortOrder, setPatientSortOrder] = useState('asc'); // 'asc' | 'desc'
   const [patientPage, setPatientPage] = useState(1);
-  const [patientPerPage, setPatientPerPage] = useState(25);
+  const [patientPerPage, setPatientPerPage] = useState(100);
   const [patientViewMode, setPatientViewMode] = useState('table'); // 'table' | 'cards'
   const [copiedCpf, setCopiedCpf] = useState(null);
+
+  // CRUD Modal State for Patients
+  const [isPatientModalOpen, setIsPatientModalOpen] = useState(false);
+  const [editingPatientIndex, setEditingPatientIndex] = useState(null);
+  const [patientFormData, setPatientFormData] = useState({
+    name: '',
+    cpf: '',
+    birthDate: '',
+    phone: '',
+    city: 'Porto Velho',
+    state: 'RO'
+  });
+
+  const handleOpenAddPatient = () => {
+    setEditingPatientIndex(null);
+    setPatientFormData({
+      name: '',
+      cpf: '',
+      birthDate: '',
+      phone: '',
+      city: 'Porto Velho',
+      state: 'RO'
+    });
+    setIsPatientModalOpen(true);
+  };
+
+  const handleOpenEditPatient = (patientObj) => {
+    const idx = patientDb.findIndex(pt => pt === patientObj || (pt.cpf && pt.cpf === patientObj.cpf && pt.name === patientObj.name));
+    setEditingPatientIndex(idx >= 0 ? idx : null);
+    setPatientFormData({
+      name: patientObj.name || '',
+      cpf: patientObj.cpf || '',
+      birthDate: patientObj.birthDate || '',
+      phone: patientObj.phone || '',
+      city: patientObj.city || 'Porto Velho',
+      state: patientObj.state || 'RO'
+    });
+    setIsPatientModalOpen(true);
+  };
+
+  const handleSavePatient = (e) => {
+    e.preventDefault();
+    if (!patientFormData.name.trim()) {
+      alert('Por favor, informe o Nome Completo do paciente.');
+      return;
+    }
+
+    const cleanCpfDigits = (patientFormData.cpf || '').replace(/\D/g, '');
+    const formattedCpfVal = cleanCpfDigits.length === 11 ? formatCPF(cleanCpfDigits) : patientFormData.cpf;
+
+    const newRecord = {
+      name: patientFormData.name.trim().toUpperCase(),
+      cpf: formattedCpfVal,
+      cpfClean: cleanCpfDigits,
+      birthDate: patientFormData.birthDate,
+      phone: patientFormData.phone,
+      city: patientFormData.city,
+      state: patientFormData.state,
+      lastExam: editingPatientIndex !== null ? patientDb[editingPatientIndex]?.lastExam : undefined,
+      examHistory: editingPatientIndex !== null ? patientDb[editingPatientIndex]?.examHistory : []
+    };
+
+    if (editingPatientIndex !== null && editingPatientIndex >= 0) {
+      const updated = [...patientDb];
+      updated[editingPatientIndex] = { ...updated[editingPatientIndex], ...newRecord };
+      savePatientDb(updated);
+    } else {
+      savePatientDb([newRecord, ...patientDb]);
+    }
+
+    setIsPatientModalOpen(false);
+  };
+
+  const handleDeletePatient = (patientObj) => {
+    if (window.confirm(`Tem certeza que deseja excluir o cadastro do paciente "${patientObj.name}"?`)) {
+      const updated = patientDb.filter(pt => pt !== patientObj && !(pt.cpf === patientObj.cpf && pt.name === patientObj.name));
+      savePatientDb(updated);
+    }
+  };
 
   // Helper to calculate approximate age from DD/MM/YYYY
   const calculateAge = (birthDateStr) => {
@@ -138,6 +238,10 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
       if (patientFilterType === 'has_cpf' && (!pt.cpf || pt.cpf.trim() === '')) return false;
       if (patientFilterType === 'has_dob' && (!pt.birthDate || pt.birthDate.trim() === '')) return false;
       if (patientFilterType === 'has_phone' && (!pt.phone || pt.phone.trim() === '')) return false;
+      if (patientFilterType === 'has_laudo') {
+        const count = (pt.examHistory?.length || 0) + (pt.lastExam ? 1 : 0);
+        if (count === 0) return false;
+      }
 
       return true;
     }).sort((a, b) => {
@@ -153,6 +257,9 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
         };
         valueA = convertToKey(valueA);
         valueB = convertToKey(valueB);
+      } else if (patientSortField === 'hasLaudo') {
+        valueA = (a.examHistory?.length || 0) + (a.lastExam ? 1 : 0);
+        valueB = (b.examHistory?.length || 0) + (b.lastExam ? 1 : 0);
       }
 
       if (typeof valueA === 'string') valueA = valueA.toLowerCase();
@@ -1691,12 +1798,19 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         </span>
                       </h3>
                       <p className="text-xs text-slate-400 mt-1">
-                        Consulte a lista completa com ordenação interativa por colunas, filtros rápidos e busca simultânea por Nome, CPF ou Data de Nascimento.
+                        Consulte, inclua, edite ou exclua registros de pacientes. Filtre por CPF, Nome, Data de Nascimento ou Status de Laudo.
                       </p>
                     </div>
 
-                    {/* View Switcher & Per Page Selector */}
-                    <div className="flex items-center gap-3">
+                    {/* Actions, View Switcher & Per Page Selector */}
+                    <div className="flex items-center flex-wrap gap-3">
+                      <button
+                        onClick={handleOpenAddPatient}
+                        className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-cyan-500/20 transition cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" /> Novo Paciente
+                      </button>
+
                       <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
                         <button
                           onClick={() => setPatientViewMode('table')}
@@ -1723,12 +1837,12 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         <select
                           value={patientPerPage}
                           onChange={(e) => setPatientPerPage(Number(e.target.value))}
-                          className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
+                          className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-200 font-mono text-xs focus:outline-none focus:border-cyan-500"
                         >
                           <option value={10}>10</option>
                           <option value={25}>25</option>
                           <option value={50}>50</option>
-                          <option value={100}>100</option>
+                          <option value={100}>100 por página</option>
                         </select>
                       </div>
                     </div>
@@ -1778,7 +1892,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
                         }`}
                       >
-                        Com CPF (1.543)
+                        Com CPF
                       </button>
 
                       <button
@@ -1790,6 +1904,17 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         }`}
                       >
                         Com Data Nasc
+                      </button>
+
+                      <button
+                        onClick={() => setPatientFilterType('has_laudo')}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer border ${
+                          patientFilterType === 'has_laudo'
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm'
+                            : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                        }`}
+                      >
+                        Com Laudo / Exame
                       </button>
 
                       <button
@@ -1812,14 +1937,22 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                     <Database className="w-10 h-10 text-slate-600 mx-auto" />
                     <h4 className="text-sm font-bold text-slate-300">Nenhum paciente encontrado</h4>
                     <p className="text-xs text-slate-400 max-w-md mx-auto">
-                      Não encontramos nenhum registro correspondente a "{patientSearchQuery}". Verifique a digitação do CPF, Nome ou Data de Nascimento.
+                      Não encontramos nenhum registro correspondente aos filtros atuais. Verifique a digitação ou cadastre um novo paciente.
                     </p>
-                    <button
-                      onClick={() => { setPatientSearchQuery(''); setPatientFilterType('all'); }}
-                      className="px-4 py-2 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold hover:bg-cyan-500/30 transition cursor-pointer"
-                    >
-                      Limpar Filtros de Busca
-                    </button>
+                    <div className="flex items-center justify-center gap-3 pt-2">
+                      <button
+                        onClick={() => { setPatientSearchQuery(''); setPatientFilterType('all'); }}
+                        className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold hover:bg-slate-700 transition cursor-pointer"
+                      >
+                        Limpar Filtros
+                      </button>
+                      <button
+                        onClick={handleOpenAddPatient}
+                        className="px-4 py-2 rounded-xl bg-cyan-500 text-slate-950 font-extrabold text-xs hover:bg-cyan-400 transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Plus className="w-4 h-4" /> Cadastrar Paciente
+                      </button>
+                    </div>
                   </div>
                 ) : patientViewMode === 'table' ? (
                   /* Elegant Data Table */
@@ -1866,8 +1999,24 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                               className="py-3 px-4 cursor-pointer hover:text-cyan-400 transition"
                             >
                               <div className="flex items-center gap-1.5">
-                                <span>Data de Nascimento</span>
+                                <span>Data Nasc</span>
                                 {patientSortField === 'birthDate' ? (
+                                  patientSortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-cyan-400" /> : <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
+                                ) : (
+                                  <ArrowUpDown className="w-3 h-3 text-slate-600" />
+                                )}
+                              </div>
+                            </th>
+
+                            {/* Column: Laudos / Exames */}
+                            <th 
+                              onClick={() => handleSortToggle('hasLaudo')}
+                              className="py-3 px-4 cursor-pointer hover:text-cyan-400 transition"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <FileText className="w-3 h-3 text-slate-500" />
+                                <span>Status de Laudo</span>
+                                {patientSortField === 'hasLaudo' ? (
                                   patientSortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-cyan-400" /> : <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
                                 ) : (
                                   <ArrowUpDown className="w-3 h-3 text-slate-600" />
@@ -1900,7 +2049,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             </th>
 
                             {/* Column: Actions */}
-                            <th className="py-3 px-4 text-right">Ação</th>
+                            <th className="py-3 px-4 text-right">Ações</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60 text-xs">
@@ -1908,6 +2057,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             const globalIndex = (patientPage - 1) * patientPerPage + idx + 1;
                             const age = calculateAge(pt.birthDate);
                             const hasValidCpf = pt.cpf && pt.cpf.trim().length > 0;
+                            const laudoCount = (pt.examHistory?.length || 0) + (pt.lastExam ? 1 : 0);
 
                             return (
                               <tr key={idx} className="hover:bg-slate-800/50 transition-colors group">
@@ -1955,12 +2105,26 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                       <span>{pt.birthDate}</span>
                                       {age !== null && (
                                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
-                                          {age} anos
+                                          {age}a
                                         </span>
                                       )}
                                     </div>
                                   ) : (
                                     <span className="text-slate-600 text-[11px] italic">N/A</span>
+                                  )}
+                                </td>
+
+                                {/* Status de Laudo */}
+                                <td className="py-3 px-4 font-mono">
+                                  {laudoCount > 0 ? (
+                                    <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-bold text-[11px] inline-flex items-center gap-1">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                      {laudoCount === 1 ? '1 Exame' : `${laudoCount} Exames`}
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-0.5 rounded bg-slate-800/80 text-slate-500 border border-slate-700/50 text-[11px] inline-flex items-center gap-1">
+                                      Sem Laudo
+                                    </span>
                                   )}
                                 </td>
 
@@ -1985,7 +2149,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                 {/* City / UF */}
                                 <td className="py-3 px-4 text-slate-300">
                                   {pt.city || pt.state ? (
-                                    <span className="truncate max-w-[140px] block">
+                                    <span className="truncate max-w-[130px] block">
                                       {[pt.city, pt.state].filter(Boolean).join(' - ')}
                                     </span>
                                   ) : (
@@ -1995,20 +2159,37 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
                                 {/* Actions */}
                                 <td className="py-3 px-4 text-right">
-                                  <button
-                                    onClick={() => {
-                                      if (pt.cpf) setCpf(pt.cpf);
-                                      setPatientName(pt.name);
-                                      if (pt.birthDate) setBirthDate(pt.birthDate);
-                                      if (pt.phone) setPatientPhone(pt.phone);
-                                      if (pt.lastExam) setExamDate(pt.lastExam);
-                                      setSelectedPatientExams(pt.examHistory || []);
-                                      setActiveTab('generator');
-                                    }}
-                                    className="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
-                                  >
-                                    <FileText className="w-3 h-3" /> Gerar Laudo
-                                  </button>
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      onClick={() => {
+                                        if (pt.cpf) setCpf(pt.cpf);
+                                        setPatientName(pt.name);
+                                        if (pt.birthDate) setBirthDate(pt.birthDate);
+                                        if (pt.phone) setPatientPhone(pt.phone);
+                                        if (pt.lastExam) setExamDate(pt.lastExam);
+                                        setSelectedPatientExams(pt.examHistory || []);
+                                        setActiveTab('generator');
+                                      }}
+                                      className="px-2.5 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition inline-flex items-center gap-1 cursor-pointer shadow-sm"
+                                      title="Carregar dados no gerador de laudos"
+                                    >
+                                      <FileText className="w-3 h-3" /> Gerar Laudo
+                                    </button>
+                                    <button
+                                      onClick={() => handleOpenEditPatient(pt)}
+                                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+                                      title="Editar paciente"
+                                    >
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeletePatient(pt)}
+                                      className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-rose-100 border border-rose-800/50 transition cursor-pointer"
+                                      title="Excluir paciente"
+                                    >
+                                      <Trash className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -2035,20 +2216,36 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           <div><strong className="text-slate-400">Cidade:</strong> {[pt.city, pt.state].filter(Boolean).join(' - ') || 'Porto Velho - RO'}</div>
                         </div>
 
-                        <button
-                          onClick={() => {
-                            if (pt.cpf) setCpf(pt.cpf);
-                            setPatientName(pt.name);
-                            if (pt.birthDate) setBirthDate(pt.birthDate);
-                            if (pt.phone) setPatientPhone(pt.phone);
-                            if (pt.lastExam) setExamDate(pt.lastExam);
-                            setSelectedPatientExams(pt.examHistory || []);
-                            setActiveTab('generator');
-                          }}
-                          className="w-full py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <FileText className="w-3.5 h-3.5" /> Carregar no Gerador de Laudos
-                        </button>
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            onClick={() => {
+                              if (pt.cpf) setCpf(pt.cpf);
+                              setPatientName(pt.name);
+                              if (pt.birthDate) setBirthDate(pt.birthDate);
+                              if (pt.phone) setPatientPhone(pt.phone);
+                              if (pt.lastExam) setExamDate(pt.lastExam);
+                              setSelectedPatientExams(pt.examHistory || []);
+                              setActiveTab('generator');
+                            }}
+                            className="flex-1 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <FileText className="w-3.5 h-3.5" /> Gerar Laudo
+                          </button>
+                          <button
+                            onClick={() => handleOpenEditPatient(pt)}
+                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+                            title="Editar paciente"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeletePatient(pt)}
+                            className="p-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 hover:text-rose-100 border border-rose-800/50 transition cursor-pointer"
+                            title="Excluir paciente"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2350,6 +2547,145 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                     className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold shadow-md cursor-pointer"
                   >
                     Salvar Permissões
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Patient CRUD Modal (Cadastrar / Editar Paciente) */}
+        {isPatientModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+            <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col">
+              {/* Modal Header */}
+              <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950/50 to-slate-900 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                    {editingPatientIndex !== null ? <Edit2 className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-white">
+                      {editingPatientIndex !== null ? 'Editar Cadastro do Paciente' : 'Cadastrar Novo Paciente'}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Preencha os dados do paciente para salvar na base de dados da clínica.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsPatientModalOpen(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Form */}
+              <form onSubmit={handleSavePatient} className="p-6 space-y-4 text-xs">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Nome Completo do Paciente *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={patientFormData.name}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, name: e.target.value })}
+                    placeholder="Ex: MARIA DA SILVA SOUZA"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                      CPF (11 dígitos)
+                    </label>
+                    <input
+                      type="text"
+                      value={patientFormData.cpf}
+                      onChange={(e) => {
+                        const formatted = formatDateMask(e.target.value);
+                        setPatientFormData({ ...patientFormData, cpf: formatted });
+                      }}
+                      placeholder="000.000.000-00"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                      Data de Nascimento
+                    </label>
+                    <input
+                      type="text"
+                      value={patientFormData.birthDate}
+                      onChange={(e) => {
+                        const formatted = formatDateMask(e.target.value);
+                        setPatientFormData({ ...patientFormData, birthDate: formatted });
+                      }}
+                      placeholder="DD/MM/AAAA"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                      Telefone / WhatsApp
+                    </label>
+                    <input
+                      type="text"
+                      value={patientFormData.phone}
+                      onChange={(e) => setPatientFormData({ ...patientFormData, phone: e.target.value })}
+                      placeholder="(69) 99999-9999"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                      UF (Estado)
+                    </label>
+                    <input
+                      type="text"
+                      value={patientFormData.state}
+                      onChange={(e) => setPatientFormData({ ...patientFormData, state: e.target.value.toUpperCase() })}
+                      placeholder="RO"
+                      maxLength={2}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 uppercase"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                    Cidade
+                  </label>
+                  <input
+                    type="text"
+                    value={patientFormData.city}
+                    onChange={(e) => setPatientFormData({ ...patientFormData, city: e.target.value })}
+                    placeholder="Porto Velho"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                  />
+                </div>
+
+                <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsPatientModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-cyan-500/20 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Save className="w-4 h-4" /> Salvar Paciente
                   </button>
                 </div>
               </form>
