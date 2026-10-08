@@ -73,13 +73,24 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
     signPdfBtn: "Assinar & Gerar PDF Timbrado"
   };
 
-  // Authentication State with localStorage session persistence across page reloads (F5)
+  // Authentication State with 30-minute idle session auto-logout security (LGPD compliance)
+  const MAX_SESSION_IDLE_MS = 30 * 60 * 1000; // 30 minutes timeout
+
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     try {
       if (typeof window === 'undefined') return false;
       const savedSession = localStorage.getItem('neuro_auth_user');
       if (savedSession) {
         const sessionObj = JSON.parse(savedSession);
+        const now = Date.now();
+        const lastActivity = sessionObj.lastActivityTimestamp || sessionObj.loginTimestamp || 0;
+        
+        // Auto-logout if session has expired (older than 30 minutes)
+        if (now - lastActivity > MAX_SESSION_IDLE_MS) {
+          localStorage.removeItem('neuro_auth_user');
+          return false;
+        }
+
         if (sessionObj && sessionObj.email) {
           const cleanEmail = sessionObj.email.toLowerCase().trim();
           const authRecord = AUTHORIZED_EMAILS.find(a => a.email.toLowerCase() === cleanEmail);
