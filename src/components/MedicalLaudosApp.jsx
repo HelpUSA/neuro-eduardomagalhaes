@@ -104,7 +104,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
       if (savedSession) {
         const sessionObj = JSON.parse(savedSession);
         const now = Date.now();
-        const lastActivity = sessionObj.lastActivityTimestamp || sessionObj.loginTimestamp || 0;
+        const lastActivity = sessionObj.lastActivityTimestamp || sessionObj.loginTimestamp || sessionObj.time || 0;
         
         // Auto-logout if session has expired (older than 30 minutes)
         if (now - lastActivity > MAX_SESSION_IDLE_MS) {
@@ -593,7 +593,14 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       const userRole = authRecord.role;
       const userName = googleUser.name ? `${googleUser.name} (${cleanEmail})` : authRecord.name;
 
-      const sessionObj = { email: cleanEmail, role: userRole, name: userName, time: Date.now() };
+      const sessionObj = { 
+        email: cleanEmail, 
+        role: userRole, 
+        name: userName, 
+        loginTimestamp: Date.now(), 
+        lastActivityTimestamp: Date.now(), 
+        time: Date.now() 
+      };
       localStorage.setItem('neuro_auth_user', JSON.stringify(sessionObj));
 
       const isPanelUrl = new URLSearchParams(window.location.search).get('panel') === 'open';
@@ -770,6 +777,68 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     setLoginError('');
     localStorage.removeItem('neuro_auth_user');
   };
+
+  // Monitoramento Ativo de Inatividade em Tempo Real (LGPD - Auto-logout após 30 min)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    // 1. Atualizador de atividade do usuário com throttling (15 segundos)
+    let lastUpdate = Date.now();
+    const handleUserActivity = () => {
+      const now = Date.now();
+      if (now - lastUpdate > 15000) {
+        lastUpdate = now;
+        try {
+          const saved = localStorage.getItem('neuro_auth_user');
+          if (saved) {
+            const sess = JSON.parse(saved);
+            sess.lastActivityTimestamp = now;
+            localStorage.setItem('neuro_auth_user', JSON.stringify(sess));
+          }
+        } catch (e) {}
+      }
+    };
+
+    // 2. Verificador periódico contínuo (a cada 10 segundos)
+    const checkSessionExpiration = () => {
+      try {
+        const saved = localStorage.getItem('neuro_auth_user');
+        if (!saved) {
+          handleLogout();
+          return;
+        }
+        const sess = JSON.parse(saved);
+        const now = Date.now();
+        const lastActive = sess.lastActivityTimestamp || sess.loginTimestamp || sess.time || 0;
+        
+        if (now - lastActive > MAX_SESSION_IDLE_MS) {
+          console.log('[SECURITY] Sessão médica encerrada por inatividade (> 30 min).');
+          handleLogout();
+          alert('🔒 Sua sessão foi encerrada automaticamente por inatividade (tempo limite de 30 minutos atingido). Por favor, realize o login novamente para garantir a segurança dos dados dos pacientes.');
+        }
+      } catch (e) {
+        handleLogout();
+      }
+    };
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(evt => window.addEventListener(evt, handleUserActivity, { passive: true }));
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkSessionExpiration();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const intervalId = setInterval(checkSessionExpiration, 10000);
+
+    return () => {
+      events.forEach(evt => window.removeEventListener(evt, handleUserActivity));
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(intervalId);
+    };
+  }, [isAuthenticated]);
 
   const handleOpenAddUser = () => {
     setEditingUserId(null);
@@ -1321,6 +1390,14 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                     🌐 Site Principal
                   </button>
                 )}
+
+                <div 
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium" 
+                  title="Sessão médica protegida: encerramento automático após 30 minutos de inatividade"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Auto-logout 30 min</span>
+                </div>
 
                 <button
                   onClick={handleLogout}
