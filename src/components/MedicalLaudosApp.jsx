@@ -10,6 +10,27 @@ import {
 import jsPDF from 'jspdf';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
 import { INITIAL_PATIENT_DATABASE, formatCPF, findPatientByCPF, fetchCpfOnlineData } from '../data/patientDatabase';
+import { TIMBRADO_HEADER, TIMBRADO_FOOTER } from '../data/timbradoImages';
+
+// Utility: Calculate patient age from DD/MM/YYYY birth date
+const calculateAge = (bDate) => {
+  if (!bDate) return '';
+  const parts = bDate.split('/');
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const year = parseInt(parts[2], 10);
+    if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+      const birth = new Date(year, month, day);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const m = today.getMonth() - birth.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+      if (age >= 0 && age < 130) return `${age} anos`;
+    }
+  }
+  return bDate;
+};
 
 // Utility: Format input digits into DD/MM/YYYY mask
 const formatDateMask = (value) => {
@@ -967,115 +988,179 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   };
 
   const handleGeneratePdf = () => {
-    const doc = new jsPDF();
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, 210, 32, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(15);
-    doc.setFont('helvetica', 'bold');
-    doc.text('CLÍNICA DE NEUROLOGIA DR. EDUARDO MAGALHÃES', 14, 15);
-    doc.setFontSize(9.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(56, 189, 248);
-    doc.text('Neurologia & Neurofisiologia Clínica | Laudo de Exame Oficial', 14, 23);
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
 
-    doc.setFillColor(248, 250, 252);
-    doc.rect(14, 38, 182, 36, 'F');
-    doc.setDrawColor(203, 213, 225);
-    doc.rect(14, 38, 182, 36, 'S');
+    const primaryBlue = [0, 37, 69]; // #002545 (Oficial Clínica)
+    const textDark = [30, 41, 59];    // #1e293b
+    const mutedText = [71, 85, 105];  // #475569
+    const dividerColor = [203, 213, 225];
 
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(9.5);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`PACIENTE: ${patientName}`, 18, 46);
-    doc.text(`DATA NASC: ${birthDate}`, 120, 46);
-    doc.text(`SOLICITANTE: ${requestingDoctor}`, 18, 53);
-    doc.text(`DATA DO EXAME: ${examDate}`, 120, 53);
-    doc.text(`EMISSÃO LAUDO: ${reportIssueDate}`, 18, 60);
-    doc.text(`WHATSAPP PACIENTE: ${patientPhone}`, 120, 60);
-
-    // Calculate PDF body font size dynamically based on editorFontSize (default 15px -> 9.8pt in PDF)
-    const pdfBodyFontSize = Number((8.5 * (editorFontSize / 13)).toFixed(1));
-    const pdfLineHeight = Number((pdfBodyFontSize * 0.52).toFixed(1));
-
-    let y = 84;
-    const addBlock = (title, text) => {
-      if (!text) return;
-      if (y > 260) {
-        doc.addPage();
-        y = 20;
+    // Helper: desenha cabeçalho e rodapé oficiais timbrados
+    const drawPageChrome = () => {
+      if (TIMBRADO_HEADER) {
+        doc.addImage(TIMBRADO_HEADER, 'PNG', 0, 0, 210, 71.8);
       }
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
-      doc.setTextColor(3, 105, 161);
-      doc.text(title, 14, y);
-      y += 6;
+      if (TIMBRADO_FOOTER) {
+        doc.addImage(TIMBRADO_FOOTER, 'JPEG', 36.5, 273, 137, 12.3);
+      }
+    };
 
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(pdfBodyFontSize);
-      doc.setTextColor(30, 41, 59);
+    // Página 1
+    drawPageChrome();
 
-      const lines = doc.splitTextToSize(text, 182);
-      lines.forEach((line) => {
-        if (y > 270) {
-          doc.addPage();
-          y = 20;
+    const mainTitle = 'LAUDO MÉDICO NEUROLÓGICO';
+    const subTitle = (selectedTemplate?.title || 'ELETROENCEFALOGRAMA EM VIGÍLIA').toUpperCase();
+
+    // Título Principal e Subtítulo Centralizados
+    doc.setFont('times', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(...primaryBlue);
+    doc.text(mainTitle, 105, 84, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.text(subTitle, 105, 90, { align: 'center' });
+
+    // Caixa de Identificação do Paciente (sem campo de profissão nem sexo, conforme solicitação NEU-119)
+    doc.setFont('times', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...mutedText);
+    doc.text('PACIENTE', 25, 98);
+
+    doc.setFontSize(12);
+    doc.setTextColor(...primaryBlue);
+    doc.text((patientName || 'PACIENTE NÃO INFORMADO').toUpperCase(), 25, 103.5);
+
+    // Linha divisória sutil
+    doc.setDrawColor(...dividerColor);
+    doc.setLineWidth(0.2);
+    doc.line(25, 106, 185, 106);
+
+    // 4 Colunas: IDENTIFICAÇÃO (CPF) | IDADE | MÉDICO SOLICITANTE | DATA DO ATENDIMENTO
+    const colYLabel = 110;
+    const colYVal = 114.5;
+
+    doc.setFontSize(7);
+    doc.setTextColor(...mutedText);
+    doc.text('IDENTIFICAÇÃO', 25, colYLabel);
+    doc.text('IDADE', 68, colYLabel);
+    doc.text('MÉDICO SOLICITANTE', 105, colYLabel);
+    doc.text('DATA DO ATENDIMENTO', 152, colYLabel);
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(9.5);
+    doc.setTextColor(...textDark);
+    doc.text(patientCpf || '---', 25, colYVal);
+    doc.text(calculateAge(birthDate) || '---', 68, colYVal);
+    doc.text(requestingDoctor || 'O Próprio', 105, colYVal);
+    doc.text(examDate || reportIssueDate || '---', 152, colYVal);
+
+    doc.line(25, 118, 185, 118);
+
+    // Controle de altura e fluxo do corpo do texto
+    let y = 125;
+    const maxY = 260;
+    const pageTopBodyY = 86;
+
+    const checkPageBreak = (neededHeight) => {
+      if (y + neededHeight > maxY) {
+        doc.addPage();
+        drawPageChrome();
+        y = pageTopBodyY;
+        return true;
+      }
+      return false;
+    };
+
+    const addSection = (secTitle, secContent) => {
+      if (!secContent || !secContent.trim()) return;
+
+      checkPageBreak(12);
+
+      doc.setFont('times', 'bold');
+      doc.setFontSize(10.5);
+      doc.setTextColor(...primaryBlue);
+      doc.text(secTitle.toUpperCase() + ':', 25, y);
+      y += 5.5;
+
+      doc.setFont('times', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...textDark);
+
+      const paragraphs = secContent.split('\n');
+      paragraphs.forEach((para) => {
+        if (!para.trim()) {
+          y += 3;
+          return;
         }
-        doc.text(line, 14, y);
-        y += pdfLineHeight;
+        const lines = doc.splitTextToSize(para.trim(), 160);
+        lines.forEach((line) => {
+          checkPageBreak(5);
+          doc.text(line, 25, y);
+          y += 4.8;
+        });
+        y += 2.5;
       });
-      y += 5;
+      y += 4;
     };
 
     if (editorMode === 'unified') {
-      addBlock('CORPO TÉCNICO & LAUDO DIAGNÓSTICO:', fullReportText);
+      addSection('CORPO TÉCNICO & LAUDO DIAGNÓSTICO', fullReportText);
     } else {
-      addBlock('NEUROCONDUÇÃO MOTORA:', motorConduction);
-      addBlock('NEUROCONDUÇÃO SENSITIVA:', sensoryConduction);
-      addBlock('ONDA F:', fWave);
-      addBlock('ELETROMIOGRAFIA / REGISTRO CEREBRAL:', emgText);
-
-      if (y > 240) {
-        doc.addPage();
-        y = 20;
-      }
-      doc.setFillColor(240, 249, 255);
-      doc.setDrawColor(2, 132, 199);
-      doc.setFontSize(pdfBodyFontSize);
-      const concLines = doc.splitTextToSize(conclusion, 174);
-      const bh = concLines.length * pdfLineHeight + 14;
-      doc.rect(14, y, 182, bh, 'FD');
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(2, 132, 199);
-      doc.text('CONCLUSÃO MÉDICA:', 18, y + 7);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(15, 23, 42);
-      let yConc = y + 13;
-      concLines.forEach((cline) => {
-        doc.text(cline, 18, yConc);
-        yConc += pdfLineHeight;
-      });
-
-      y += bh + 15;
+      addSection('NEUROCONDUÇÃO MOTORA', motorConduction);
+      addSection('NEUROCONDUÇÃO SENSITIVA', sensoryConduction);
+      addSection('ONDA F', fWave);
+      addSection('ELETROMIOGRAFIA / REGISTRO CEREBRAL', emgText);
+      addSection('CONCLUSÃO DIAGNÓSTICA', conclusion);
     }
 
-    if (y > 250) {
-      doc.addPage();
-      y = 30;
-    }
-    doc.setDrawColor(148, 163, 184);
-    doc.line(70, y, 140, y);
+    // Bloco de Assinatura Médica Oficial
+    checkPageBreak(38);
     y += 4;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(15, 23, 42);
-    doc.text('Dr. Eduardo Magalhães', 105, y, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`Neurologista & Neurofisiologista | CRM-RO  •  Emissão: ${reportIssueDate}`, 105, y + 4, { align: 'center' });
 
-    doc.save(`Laudo_Oficial_${patientName.replace(/\s+/g, '_')}.pdf`);
+    const cityDate = `Porto Velho - RO, ${reportIssueDate || examDate || '09 de outubro de 2026'}.`;
+    doc.setFont('times', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...textDark);
+    doc.text(cityDate, 25, y);
+    y += 14;
+
+    doc.setDrawColor(...mutedText);
+    doc.setLineWidth(0.3);
+    doc.line(70, y, 140, y);
+    y += 4.5;
+
+    doc.setFont('times', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...primaryBlue);
+    doc.text('Dr. Eduardo José Cunha Magalhães', 105, y, { align: 'center' });
+    y += 4.5;
+
+    doc.setFont('times', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...mutedText);
+    doc.text('Médico Neurologista • CRM-RO 2103 • RQE 504', 105, y, { align: 'center' });
+
+    // Segunda etapa: aplica numeração de páginas e subcabeçalhos
+    const totalPages = doc.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setFont('times', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...primaryBlue);
+
+      if (p === 1) {
+        doc.text(`Página ${p} de ${totalPages}`, 185, 77, { align: 'right' });
+      } else {
+        doc.text(`Paciente: ${(patientName || '').toUpperCase()}`, 25, 77);
+        doc.text(`${mainTitle} - ${subTitle}  •  Página ${p} de ${totalPages}`, 185, 77, { align: 'right' });
+      }
+    }
+
+    doc.save(`Laudo_Oficial_${(patientName || 'Paciente').replace(/\s+/g, '_')}.pdf`);
   };
 
   const handleSendWhatsApp = () => {
