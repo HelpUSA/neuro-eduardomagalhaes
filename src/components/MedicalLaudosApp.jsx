@@ -1510,51 +1510,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 <span>ENTRAR COM O GOOGLE</span>
               </button>
 
-              <div className="relative my-3">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800"></div></div>
-                <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-slate-900 px-3 text-slate-500 font-bold">Ou acesse com e-mail e senha</span></div>
-              </div>
 
-              {/* Password Login Option */}
-              <form onSubmit={handlePasswordLogin} className="space-y-2.5 text-left">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-400 mb-1 uppercase tracking-wider">E-mail Cadastrado</label>
-                  <input
-                    type="email"
-                    required
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="eduardojcmagalhaes@gmail.com"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Senha</label>
-                  <input
-                    type="password"
-                    required
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={!isCaptchaVerified}
-                  className={`w-full py-2.5 px-4 rounded-xl font-bold uppercase tracking-wider text-xs transition cursor-pointer flex items-center justify-center gap-2 ${
-                    isCaptchaVerified
-                      ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                  }`}
-                >
-                  <Key className="w-4 h-4" /> <span>Entrar no Sistema</span>
-                </button>
-              </form>
-
-              <p className="text-[11px] text-slate-500 text-center font-medium">
-                Autenticação vinculada aos e-mails autorizados <span className="text-cyan-400 font-bold">eduardojcmagalhaes@gmail.com</span> e <span className="text-purple-400 font-bold">helpus.ecommerce@gmail.com</span>.
-              </p>
             </div>
           </div>
         ) : (
