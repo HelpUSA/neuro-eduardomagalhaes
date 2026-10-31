@@ -489,6 +489,152 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     }
   };
 
+  // Estados do Importador Nativo de Laudos em Word (.docx / .doc)
+  const [wordImportBanner, setWordImportBanner] = useState(null);
+  const [isProcessingDocx, setIsProcessingDocx] = useState(false);
+  const wordFileInputRef = useRef(null);
+
+  // Parser Inteligente de Laudos Word (.docx)
+  const parseWordDocumentContent = (rawText, fileName = '') => {
+    let extractedPatient = '';
+    let extractedExamDate = '';
+    let extractedBirthDate = '';
+    let extractedDoctor = '';
+    let extractedConclusion = '';
+    let extractedMotor = '';
+    let extractedSensory = '';
+    let extractedFWave = '';
+    let extractedEmg = '';
+
+    // 1. Nome do Paciente
+    const patMatch = rawText.match(/(?:PACIENTE|NOME(?:\s+DO\s+PACIENTE)?):\s*([^\n\r]+)/i);
+    if (patMatch) {
+      let clean = patMatch[1].replace(/salvo\s+neste\s+pc/ig, '').trim();
+      clean = clean.replace(/\s+\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4}.*$/, '').trim();
+      extractedPatient = clean.toUpperCase().trim();
+    } else if (fileName) {
+      const cleanFileName = fileName.replace(/\.docx?$/i, '').trim();
+      const nameParts = cleanFileName.split(/[-_]/);
+      if (nameParts[0] && nameParts[0].trim().length > 3) {
+        extractedPatient = nameParts[0].trim().toUpperCase();
+      }
+    }
+
+    // 2. Data do Exame
+    const dateMatch = rawText.match(/(?:DATA(?:\s+DO\s+EXAME)?):\s*(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})/i)
+      || rawText.match(/PACIENTE:[^\n\r]+?(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})/i)
+      || rawText.match(/\b(\d{2})[\/\-](\d{2})[\/\-](\d{4})\b/);
+    if (dateMatch) {
+      extractedExamDate = (dateMatch[1] || dateMatch[0]).replace(/-/g, '/').replace(/\./g, '/').trim();
+    } else {
+      extractedExamDate = new Date().toLocaleDateString('pt-BR');
+    }
+
+    // 3. Data de Nascimento
+    const dobMatch = rawText.match(/(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})\s+\d+\s*anos/i)
+      || rawText.match(/(?:NASC(?:IMENTO)?|DN):\s*(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})/i);
+    if (dobMatch) {
+      extractedBirthDate = (dobMatch[1] || dobMatch[0]).replace(/-/g, '/').replace(/\./g, '/').trim();
+    }
+
+    // 4. Médico Solicitante
+    const docMatch = rawText.match(/(?:M[EÉ]DICO\s+SOLICITANTE|SOLICITANTE):\s*([^\n\r]+)/i)
+      || rawText.match(/(DR[A]?\.?\s+[A-ZÀ-Ú\s]+(?:\s*-\s*CRM[^\n\r]*)?)/i);
+    if (docMatch) {
+      extractedDoctor = (docMatch[1] || docMatch[0]).trim();
+    }
+
+    // 5. Seções Técnicas
+    const motorMatch = rawText.match(/NEUROCONDU[ÇC][ÃA]O\s+MOTORA:?\s*([\s\S]*?)(?=NEUROCONDU[ÇC][ÃA]O\s+SENSITIVA|ONDA\s+F|ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
+    if (motorMatch) extractedMotor = motorMatch[1].trim();
+
+    const sensoryMatch = rawText.match(/NEUROCONDU[ÇC][ÃA]O\s+SENSITIVA:?\s*([\s\S]*?)(?=ONDA\s+F|ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
+    if (sensoryMatch) extractedSensory = sensoryMatch[1].trim();
+
+    const fWaveMatch = rawText.match(/ONDA\s+F:?\s*([\s\S]*?)(?=ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
+    if (fWaveMatch) extractedFWave = fWaveMatch[1].trim();
+
+    const emgMatch = rawText.match(/ELETROMIOGRAFIA:?\s*([\s\S]*?)(?=CONCLUS[ÃA]O|$)/i);
+    if (emgMatch) extractedEmg = emgMatch[1].trim();
+
+    // 6. Conclusão
+    const concMatch = rawText.match(/CONCLUS[ÃA]O:?\s*([\s\S]*?)$/i);
+    if (concMatch) {
+      extractedConclusion = concMatch[1].trim();
+    } else {
+      extractedConclusion = rawText.trim();
+    }
+
+    // Cruzamento automático com a base de 1.739 pacientes
+    let matchedInDb = null;
+    if (extractedPatient) {
+      const cleanSearchName = extractedPatient.toLowerCase().trim();
+      matchedInDb = patientDb.find(p => p.name && p.name.toLowerCase().trim() === cleanSearchName)
+        || patientDb.find(p => p.name && (p.name.toLowerCase().includes(cleanSearchName) || cleanSearchName.includes(p.name.toLowerCase())));
+    }
+
+    if (extractedPatient) setPatientName(extractedPatient);
+    if (extractedExamDate) setExamDate(extractedExamDate);
+    if (extractedBirthDate) setBirthDate(extractedBirthDate);
+    if (extractedDoctor) setRequestingDoctor(extractedDoctor);
+    if (extractedMotor) setMotorConduction(extractedMotor);
+    if (extractedSensory) setSensoryConduction(extractedSensory);
+    if (extractedFWave) setFWave(extractedFWave);
+    if (extractedEmg) setEmgText(extractedEmg);
+    if (extractedConclusion) setConclusion(extractedConclusion);
+
+    if (matchedInDb) {
+      if (matchedInDb.cpf) setCpf(matchedInDb.cpf);
+      if (matchedInDb.birthDate && !extractedBirthDate) setBirthDate(matchedInDb.birthDate);
+      if (matchedInDb.phone || matchedInDb.mobilePhone) setPatientPhone(matchedInDb.phone || matchedInDb.mobilePhone);
+    }
+
+    updateFullReportText(rawText.trim());
+
+    setWordImportBanner({
+      fileName,
+      patientName: extractedPatient,
+      examDate: extractedExamDate,
+      doctor: extractedDoctor,
+      matchedInDb: Boolean(matchedInDb),
+      patientCpf: matchedInDb?.cpf || '',
+      patientPhone: matchedInDb?.phone || matchedInDb?.mobilePhone || '',
+    });
+  };
+
+  const handleWordFileUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessingDocx(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      let extractedText = '';
+
+      if (file.name.toLowerCase().endsWith('.docx') || file.name.toLowerCase().endsWith('.doc')) {
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        extractedText = result.value || '';
+      } else {
+        const textDecoder = new TextDecoder('utf-8');
+        extractedText = textDecoder.decode(arrayBuffer);
+      }
+
+      if (!extractedText.trim()) {
+        alert("⚠️ O arquivo selecionado está vazio ou não pôde ter seu texto extraído.");
+        setIsProcessingDocx(false);
+        return;
+      }
+
+      parseWordDocumentContent(extractedText, file.name);
+    } catch (err) {
+      console.error('Erro ao ler arquivo Word:', err);
+      alert("⚠️ Erro ao processar o arquivo Word: " + (err.message || err));
+    } finally {
+      setIsProcessingDocx(false);
+      if (wordFileInputRef.current) wordFileInputRef.current.value = '';
+    }
+  };
+
   const [wordImportText, setWordImportText] = useState('');
   const [showWordImporter, setShowWordImporter] = useState(false);
   const [attachedTracingsFile, setAttachedTracingsFile] = useState('Graficos_Aparelho_ENMG_Clelia.pdf');
