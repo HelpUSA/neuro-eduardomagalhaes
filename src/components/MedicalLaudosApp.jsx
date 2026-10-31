@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   X, Search, PlusCircle, FileText, Send, UserPlus, ShieldCheck, Lock, 
   Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, ChevronDown, ChevronLeft,
   Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw, Upload, Database, LogOut, CheckCircle2,
   Maximize2, Minimize2, Bold, Italic, Underline, Save, History, Type, Undo, Redo, RotateCcw, RotateCw, UserCheck, ShieldAlert, Calendar,
-  ArrowUpDown, ArrowUp, ArrowDown, Filter, Phone, MapPin, Grid, List, Copy, ExternalLink, Plus, Edit2, Trash
+  ArrowUpDown, ArrowUp, ArrowDown, Filter, Phone, MapPin, Grid, List, Copy, ExternalLink, Plus, Edit2, Trash, FileUp, UploadCloud
 } from 'lucide-react';
 import jsPDF from 'jspdf';
+import mammoth from 'mammoth';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
 import { INITIAL_PATIENT_DATABASE, formatCPF, findPatientByCPF, fetchCpfOnlineData } from '../data/patientDatabase';
 import { TIMBRADO_HEADER, TIMBRADO_FOOTER } from '../data/timbradoImages';
@@ -100,14 +101,16 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     try {
       if (typeof window === 'undefined') return false;
-      const savedSession = localStorage.getItem('neuro_auth_user');
+      // Dr. Eduardo: Sessão médica estrita - verificar sessionStorage ativo (encerra ao fechar aba/navegador)
+      const savedSession = sessionStorage.getItem('neuro_auth_user');
       if (savedSession) {
         const sessionObj = JSON.parse(savedSession);
         const now = Date.now();
         const lastActivity = sessionObj.lastActivityTimestamp || sessionObj.loginTimestamp || sessionObj.time || 0;
         
-        // Auto-logout if session has expired (older than 30 minutes)
+        // Auto-logout se a sessão expirou (> 30 minutos)
         if (now - lastActivity > MAX_SESSION_IDLE_MS) {
+          sessionStorage.removeItem('neuro_auth_user');
           localStorage.removeItem('neuro_auth_user');
           return false;
         }
@@ -132,7 +135,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
   const [currentUserRole, setCurrentUserRole] = useState(() => {
     try {
       if (typeof window === 'undefined') return 'doctor';
-      const savedSession = localStorage.getItem('neuro_auth_user');
+      const savedSession = sessionStorage.getItem('neuro_auth_user') || localStorage.getItem('neuro_auth_user');
       if (savedSession) {
         const sessionObj = JSON.parse(savedSession);
         if (sessionObj && sessionObj.role) return sessionObj.role;
@@ -144,7 +147,7 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
   const [currentUserName, setCurrentUserName] = useState(() => {
     try {
       if (typeof window === 'undefined') return 'Dr. Eduardo Magalhães';
-      const savedSession = localStorage.getItem('neuro_auth_user');
+      const savedSession = sessionStorage.getItem('neuro_auth_user') || localStorage.getItem('neuro_auth_user');
       if (savedSession) {
         const sessionObj = JSON.parse(savedSession);
         if (sessionObj && sessionObj.name) return sessionObj.name;
@@ -601,6 +604,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
         lastActivityTimestamp: Date.now(), 
         time: Date.now() 
       };
+      sessionStorage.setItem('neuro_auth_user', JSON.stringify(sessionObj));
       localStorage.setItem('neuro_auth_user', JSON.stringify(sessionObj));
 
       const isPanelUrl = new URLSearchParams(window.location.search).get('panel') === 'open';
@@ -775,7 +779,36 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     setIsAuthenticated(false);
     setIsCaptchaVerified(false);
     setLoginError('');
+    sessionStorage.removeItem('neuro_auth_user');
     localStorage.removeItem('neuro_auth_user');
+  };
+
+  const handlePasswordLogin = (e) => {
+    if (e) e.preventDefault();
+    if (!isCaptchaVerified) {
+      setLoginError('Por favor, confirme a verificação de segurança (Não sou um robô) antes de continuar.');
+      return;
+    }
+    const cleanEmail = loginEmail.toLowerCase().trim();
+    const emp = employees.find(emp => emp.email.toLowerCase() === cleanEmail);
+    if (!emp || emp.password !== loginPassword) {
+      setLoginError('E-mail ou senha incorretos. Verifique suas credenciais.');
+      return;
+    }
+    const sessionObj = {
+      email: emp.email,
+      role: emp.role,
+      name: emp.name,
+      loginTimestamp: Date.now(),
+      lastActivityTimestamp: Date.now(),
+      time: Date.now()
+    };
+    sessionStorage.setItem('neuro_auth_user', JSON.stringify(sessionObj));
+    localStorage.setItem('neuro_auth_user', JSON.stringify(sessionObj));
+    setCurrentUserRole(emp.role);
+    setCurrentUserName(emp.name);
+    setIsAuthenticated(true);
+    setLoginError('');
   };
 
   // Monitoramento Ativo de Inatividade em Tempo Real (LGPD - Auto-logout após 30 min)
@@ -802,7 +835,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     // 2. Verificador periódico contínuo (a cada 10 segundos)
     const checkSessionExpiration = () => {
       try {
-        const saved = localStorage.getItem('neuro_auth_user');
+        const saved = sessionStorage.getItem('neuro_auth_user') || localStorage.getItem('neuro_auth_user');
         if (!saved) {
           handleLogout();
           return;
@@ -1253,8 +1286,12 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
         
         {!isStandalonePage && (
           <button
-            onClick={onClose}
-            className="absolute top-5 right-5 p-2 rounded-full bg-slate-900 text-slate-400 hover:text-white transition z-20 cursor-pointer"
+            onClick={() => {
+              handleLogout();
+              if (onClose) onClose();
+            }}
+            title="Fechar e Bloquear Painel"
+            className="absolute top-5 right-5 p-2 rounded-full bg-slate-900 text-slate-400 hover:text-white transition z-20 cursor-pointer hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
           </button>
@@ -1326,6 +1363,48 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 </svg>
                 <span>ENTRAR COM O GOOGLE</span>
               </button>
+
+              <div className="relative my-3">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800"></div></div>
+                <div className="relative flex justify-center text-[10px] uppercase"><span className="bg-slate-900 px-3 text-slate-500 font-bold">Ou acesse com e-mail e senha</span></div>
+              </div>
+
+              {/* Password Login Option */}
+              <form onSubmit={handlePasswordLogin} className="space-y-2.5 text-left">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1 uppercase tracking-wider">E-mail Cadastrado</label>
+                  <input
+                    type="email"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="eduardojcmagalhaes@gmail.com"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1 uppercase tracking-wider">Senha</label>
+                  <input
+                    type="password"
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={!isCaptchaVerified}
+                  className={`w-full py-2.5 px-4 rounded-xl font-bold uppercase tracking-wider text-xs transition cursor-pointer flex items-center justify-center gap-2 ${
+                    isCaptchaVerified
+                      ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black shadow-lg shadow-cyan-500/20'
+                      : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                  }`}
+                >
+                  <Key className="w-4 h-4" /> <span>Entrar no Sistema</span>
+                </button>
+              </form>
 
               <p className="text-[11px] text-slate-500 text-center font-medium">
                 Autenticação vinculada aos e-mails autorizados <span className="text-cyan-400 font-bold">eduardojcmagalhaes@gmail.com</span> e <span className="text-purple-400 font-bold">helpus.ecommerce@gmail.com</span>.
@@ -1401,10 +1480,10 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
                 <button
                   onClick={handleLogout}
-                  title="Encerrar Sessão"
-                  className="p-2.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 transition flex items-center gap-1.5 font-bold text-xs cursor-pointer"
+                  title="Encerrar Sessão e Bloquear Acesso"
+                  className="px-3.5 py-2 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition flex items-center gap-1.5 font-bold text-xs cursor-pointer shadow-sm hover:shadow"
                 >
-                  <LogOut className="w-4 h-4" /> <span>Sair</span>
+                  <LogOut className="w-4 h-4 text-rose-400" /> <span>Sair / Bloquear</span>
                 </button>
               </div>
             </div>
@@ -1608,6 +1687,109 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                       <span className="text-[11px] text-slate-400 font-medium">
                         {isTreeVisible ? 'Árvore Visível à Esquerda' : '✨ Área de Edição Expandida em 100% da Tela'}
                       </span>
+                    </div>
+
+                    {/* Importador Nativo de Laudos em Word (.docx) */}
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-slate-900/80 to-indigo-950/40 border-2 border-cyan-500/30 shadow-lg space-y-3">
+                      <input
+                        type="file"
+                        ref={wordFileInputRef}
+                        onChange={handleWordFileUpload}
+                        accept=".docx,.doc,.txt"
+                        className="hidden"
+                      />
+
+                      <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 shadow-md">
+                            <FileUp className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                                Importador Direto de Laudo Word (.docx)
+                              </h4>
+                              <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
+                                Dr. Eduardo Magalhães
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              Carregue o arquivo <code className="text-cyan-300 bg-slate-950/80 px-1 py-0.5 rounded">.docx</code> do laudo gerado no consultório para preenchimento automático completo.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => wordFileInputRef.current?.click()}
+                            disabled={isProcessingDocx}
+                            className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg shadow-cyan-500/20 cursor-pointer disabled:opacity-50"
+                          >
+                            {isProcessingDocx ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>Lendo Word...</span>
+                              </>
+                            ) : (
+                              <>
+                                <UploadCloud className="w-4 h-4" />
+                                <span>📥 Carregar Laudo (.docx)</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Dropzone & Quick Info */}
+                      <div
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                            handleWordFileUpload({ target: { files: e.dataTransfer.files } });
+                          }
+                        }}
+                        onClick={() => wordFileInputRef.current?.click()}
+                        className="p-3 rounded-xl border border-dashed border-cyan-500/40 hover:border-cyan-400 bg-slate-950/50 hover:bg-slate-950/80 transition cursor-pointer text-center text-xs text-slate-400 flex items-center justify-center gap-2"
+                      >
+                        <FileText className="w-4 h-4 text-cyan-400" />
+                        <span>Arraste e solte o arquivo <strong>.docx</strong> aqui ou clique para selecionar na pasta local</span>
+                      </div>
+
+                      {/* Success / Details Banner */}
+                      {wordImportBanner && (
+                        <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs space-y-1.5 shadow-md">
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold flex items-center gap-2 text-emerald-200">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                              Arquivo Processado: {wordImportBanner.fileName}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setWordImportBanner(null)}
+                              className="text-emerald-400 hover:text-emerald-200 text-[10px] font-bold underline cursor-pointer"
+                            >
+                              Ocultar Aviso
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-slate-300">
+                            <div>👤 <strong>Paciente:</strong> {wordImportBanner.patientName || 'Identificado no texto'}</div>
+                            <div>📅 <strong>Data do Exame:</strong> {wordImportBanner.examDate || 'Hoje'}</div>
+                            <div>👨‍⚕️ <strong>Solicitante:</strong> {wordImportBanner.doctor || 'Identificado no texto'}</div>
+                          </div>
+                          {wordImportBanner.matchedInDb ? (
+                            <div className="text-[11px] text-cyan-300 font-bold bg-cyan-950/40 px-2 py-1 rounded border border-cyan-500/30">
+                              ✨ Paciente localizado na base cadastral de 1.739 pacientes! CPF ({wordImportBanner.patientCpf}) e Telefone preenchidos automaticamente.
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-amber-300 bg-amber-950/30 px-2 py-1 rounded border border-amber-500/30">
+                              ℹ️ Dados do paciente extraídos do laudo. Se desejar salvá-lo na base permanente, clique em "Salvar Paciente".
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
