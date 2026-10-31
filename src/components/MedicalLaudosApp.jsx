@@ -730,9 +730,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     }, 600);
   };
 
-  const processGoogleUserInfo = (googleUser, pendingTab = null) => {
+  const processGoogleUserInfo = (googleUser) => {
     if (!googleUser || !googleUser.email) {
-      if (pendingTab && !pendingTab.closed) pendingTab.close();
       return false;
     }
     const cleanEmail = googleUser.email.toLowerCase().trim();
@@ -753,36 +752,16 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       sessionStorage.setItem('neuro_auth_user', JSON.stringify(sessionObj));
       localStorage.setItem('neuro_auth_user', JSON.stringify(sessionObj));
 
-      const isPanelUrl = new URLSearchParams(window.location.search).get('panel') === 'open';
-
-      if (!isPanelUrl) {
-        // Landing page tab: Redirect pending tab to the panel URL
-        const panelLocation = `${window.location.origin}${window.location.pathname}?panel=open`;
-        if (pendingTab && !pendingTab.closed) {
-          pendingTab.location.href = panelLocation;
-        } else {
-          window.open(panelLocation, '_blank');
-        }
-
-        // Keep landing page tab clean & close login modal on main tab
-        setIsAuthenticated(false);
-        setLoginError('');
-        if (onClose) onClose();
-      } else {
-        // We are already on the ?panel=open tab
-        setCurrentUserRole(userRole);
-        setCurrentUserName(userName);
-        setIsAuthenticated(true);
-        setLoginError('');
-      }
+      // Autentica diretamente na mesma aba/modal sem abrir segunda janela desnecessária
+      setCurrentUserRole(userRole);
+      setCurrentUserName(userName);
+      setIsAuthenticated(true);
+      setLoginError('');
       return true;
     } else {
-      // Unauthorized email! Close pending tab & show error on current modal
-      if (pendingTab && !pendingTab.closed) {
-        pendingTab.close();
-      }
       setIsAuthenticated(false);
-      setLoginError(`⛔ Acesso Negado: O e-mail (${googleUser.email}) não possui permissão para acessar o sistema. Apenas os e-mails autorizados (eduardojcmagalhaes@gmail.com e helpus.ecommerce@gmail.com) possuem permissão de acesso.`);
+      setLoginError(`⛔ Acesso Negado: O e-mail (${googleUser.email}) não possui permissão para acessar o sistema.`);
+      sessionStorage.removeItem('neuro_auth_user');
       localStorage.removeItem('neuro_auth_user');
       return false;
     }
@@ -831,39 +810,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
     setLoginError('');
 
-    const isPanelUrl = new URLSearchParams(window.location.search).get('panel') === 'open';
-    let pendingTab = null;
-
-    if (!isPanelUrl) {
-      pendingTab = window.open('about:blank', '_blank');
-      if (pendingTab) {
-        pendingTab.document.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <meta charset="utf-8" />
-              <title>Carregando Painel Dr. Eduardo Magalhães...</title>
-              <style>
-                body { background: #020617; color: #38bdf8; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-                .card { background: #0f172a; padding: 36px; border-radius: 24px; border: 1px solid #1e293b; text-align: center; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); }
-                .spinner { width: 44px; height: 44px; border: 4px solid #1e293b; border-top-color: #38bdf8; border-radius: 50%; animation: spin 0.9s linear infinite; margin: 0 auto 20px; }
-                @keyframes spin { to { transform: rotate(360deg); } }
-                h2 { margin: 0 0 10px; color: #f8fafc; font-size: 19px; font-weight: 800; }
-                p { margin: 0; color: #94a3b8; font-size: 13.5px; line-height: 1.5; }
-              </style>
-            </head>
-            <body>
-              <div class="card">
-                <div class="spinner"></div>
-                <h2>Autenticando Conta Google...</h2>
-                <p>Por favor, selecione sua conta na janela do Google para abrir o Painel do Consultório.</p>
-              </div>
-            </body>
-          </html>
-        `);
-      }
-    }
-
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '812202824664-s716306ibb7c15jh7aok2v0lfnuocpkn.apps.googleusercontent.com';
 
     // Official Google Identity Services GIS SDK Client
@@ -880,18 +826,15 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                   headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
                 });
                 const googleUser = await res.json();
-                processGoogleUserInfo(googleUser, pendingTab);
+                processGoogleUserInfo(googleUser);
               } catch (fetchErr) {
                 console.error('Erro ao consultar API do Google UserInfo:', fetchErr);
-                if (pendingTab && !pendingTab.closed) pendingTab.close();
+                setLoginError('Erro ao consultar dados da conta Google. Tente novamente.');
               }
-            } else {
-              if (pendingTab && !pendingTab.closed) pendingTab.close();
             }
           },
           error_callback: (err) => {
             console.warn('Google OAuth popup fechado ou cancelado:', err);
-            if (pendingTab && !pendingTab.closed) pendingTab.close();
           }
         });
         client.requestAccessToken({ prompt: 'select_account' });
