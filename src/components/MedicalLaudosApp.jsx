@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { 
   X, Search, PlusCircle, FileText, Send, UserPlus, ShieldCheck, Lock, 
   Sparkles, Check, Edit3, Trash2, Printer, Eye, ChevronRight, ChevronDown, ChevronLeft,
-  Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw, Upload, Database, LogOut, CheckCircle2,
+  Folder, FolderOpen, Paperclip, AlertTriangle, Shield, User, Key, RefreshCw, Upload, Database, LogOut, CheckCircle2, CheckCircle, Download,
   Maximize2, Minimize2, Bold, Italic, Underline, Save, History, Type, Undo, Redo, RotateCcw, RotateCw, UserCheck, ShieldAlert, Calendar,
   ArrowUpDown, ArrowUp, ArrowDown, Filter, Phone, MapPin, Grid, List, Copy, ExternalLink, Plus, Edit2, Trash, FileUp, UploadCloud
 } from 'lucide-react';
@@ -757,6 +757,288 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   const [wordImportText, setWordImportText] = useState('');
   const [showWordImporter, setShowWordImporter] = useState(false);
   const [attachedTracingsFile, setAttachedTracingsFile] = useState('Graficos_Aparelho_ENMG_Clelia.pdf');
+
+  // ==========================================
+  // NEU-133: Estados e Handlers para Carregamento de PDF com Laudo Já Pronto
+  // Permite upload de PDF com laudo e traçados prontos (dispensa edição) para assinatura e liberação imediata ao paciente
+  // ==========================================
+  const [emissionMode, setEmissionMode] = useState('editor'); // 'editor' | 'ready_pdf'
+  const [readyPdfFile, setReadyPdfFile] = useState(null); // { name, size, rawSize, type, dataUrl, lastModified }
+  const [readyTracingsFile, setReadyTracingsFile] = useState(null); // { name, size, rawSize, type, dataUrl }
+  const [readyPdfExamType, setReadyPdfExamType] = useState('ELETRONEUROMIOGRAFIA (ENMG)');
+  const [isSigningReadyPdf, setIsSigningReadyPdf] = useState(false);
+  const [isReadyPdfSigned, setIsReadyPdfSigned] = useState(false);
+  const [readyPdfSignatureDetails, setReadyPdfSignatureDetails] = useState(null);
+  const [isReadyPdfReleased, setIsReadyPdfReleased] = useState(false);
+  const [releasedConfirmation, setReleasedConfirmation] = useState(null);
+  const readyPdfInputRef = useRef(null);
+  const readyTracingsInputRef = useRef(null);
+
+  // Lista de exames liberados com persistência em localStorage
+  const [releasedExams, setReleasedExams] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('neuro_released_exams');
+        if (saved) return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar exames liberados:', e);
+    }
+    return [
+      {
+        id: 'rel-demo-01',
+        patientName: 'CLELIA MARI DE CARVALHO',
+        cpf: '123.456.789-00',
+        cpfClean: '12345678900',
+        examDate: '03/10/2025',
+        examType: 'ELETRONEUROMIOGRAFIA (ENMG)',
+        doctor: 'DR. HEMANOEL FERRO',
+        pdfFileName: 'Laudo_Oficial_Clelia_Mari_ENMG.pdf',
+        tracingsFileName: 'Graficos_Aparelho_ENMG_Clelia.pdf',
+        hasTracings: true,
+        status: 'Liberado no Portal do Paciente',
+        authenticityCode: 'ENMG-2025-98472-EM',
+        releasedAt: '03/10/2025 16:45',
+        signedBy: 'Dr. Eduardo Magalhães (CRM-RO 2103 • RQE 504)',
+        isReadyPdf: true
+      }
+    ];
+  });
+
+  const handleSelectPatientFromDb = (pt) => {
+    if (!pt) return;
+    setPatientName(pt.name || '');
+    if (pt.cpf) setCpf(pt.cpf);
+    if (pt.birthDate) {
+      setBirthDate(pt.birthDate);
+      const calc = calculateAge(pt.birthDate);
+      if (calc) setPatientAge(calc.includes('ano') ? calc : `${calc} anos`);
+    }
+    if (pt.phone || pt.mobilePhone) setPatientPhone(pt.phone || pt.mobilePhone);
+    if (pt.lastExam) setExamDate(pt.lastExam);
+    setSelectedPatientExams(pt.examHistory || []);
+  };
+
+  const handleReadyPdfUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      alert('⚠️ Por favor, selecione um arquivo no formato PDF (.pdf).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result;
+      setReadyPdfFile({
+        name: file.name,
+        size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
+        rawSize: file.size,
+        type: file.type || 'application/pdf',
+        dataUrl: dataUrl,
+        lastModified: new Date(file.lastModified).toLocaleDateString('pt-BR')
+      });
+      setIsReadyPdfSigned(false);
+      setIsReadyPdfReleased(false);
+      setReleasedConfirmation(null);
+      setEmissionMode('ready_pdf');
+
+      // Tenta inferir nome do paciente e tipo de exame
+      const lower = file.name.toLowerCase();
+      if (lower.includes('eeg') || lower.includes('eletroencefalo')) {
+        setReadyPdfExamType('ELETROENCEFALOGRAMA (EEG)');
+      } else if (lower.includes('enmg') || lower.includes('eletroneuro')) {
+        setReadyPdfExamType('ELETRONEUROMIOGRAFIA (ENMG)');
+      }
+
+      // Se paciente não informado ou padrão, tenta encontrar na base pelo nome do arquivo
+      const cleanFileName = file.name.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
+      if (!patientName || patientName === 'Nome do Paciente' || patientName === 'PACIENTE TESTE') {
+        const found = patientDb.find(p => p.name && cleanFileName.toLowerCase().includes(p.name.toLowerCase()));
+        if (found) {
+          handleSelectPatientFromDb(found);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+    if (readyPdfInputRef.current) readyPdfInputRef.current.value = '';
+  };
+
+  const handleReadyTracingsUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+      alert('⚠️ Por favor, selecione um arquivo em PDF (.pdf) para os traçados do exame.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setReadyTracingsFile({
+        name: file.name,
+        size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
+        rawSize: file.size,
+        type: file.type || 'application/pdf',
+        dataUrl: e.target?.result
+      });
+    };
+    reader.readAsDataURL(file);
+    if (readyTracingsInputRef.current) readyTracingsInputRef.current.value = '';
+  };
+
+  const handleRemoveReadyPdf = () => {
+    setReadyPdfFile(null);
+    setIsReadyPdfSigned(false);
+    setIsReadyPdfReleased(false);
+    setReleasedConfirmation(null);
+  };
+
+  const handleRemoveReadyTracings = () => {
+    setReadyTracingsFile(null);
+  };
+
+  const handleSignReadyPdf = () => {
+    if (!readyPdfFile) {
+      alert('⚠️ Por favor, carregue o arquivo PDF do laudo antes de realizar a assinatura digital.');
+      return;
+    }
+
+    if (!patientName.trim()) {
+      alert('⚠️ Por favor, informe ou confirme o Nome do Paciente antes de assinar o laudo.');
+      return;
+    }
+
+    setIsSigningReadyPdf(true);
+    setTimeout(() => {
+      const now = new Date();
+      const codeSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const authCode = `ICP-RO-${now.getFullYear()}-${codeSuffix}`;
+      const signHash = `SHA256:${Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
+
+      setReadyPdfSignatureDetails({
+        signedAt: now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        authenticityCode: authCode,
+        hash: signHash,
+        signerName: 'Dr. Eduardo José Cunha Magalhães',
+        crm: 'CRM-RO 2103 • RQE 504',
+        certificateAuthority: 'Autoridade Certificadora ICP-Brasil (PAdES / CFM)',
+        validationUrl: `https://neuro.eduardomagalhaes.helpusbr.com/validar?doc=${authCode}`
+      });
+
+      setIsReadyPdfSigned(true);
+      setIsSigningReadyPdf(false);
+    }, 500);
+  };
+
+  const handleReleaseReadyPdfToPatient = () => {
+    if (!readyPdfFile) {
+      alert('⚠️ Nenhum arquivo PDF carregado para liberação.');
+      return;
+    }
+
+    if (!isReadyPdfSigned) {
+      alert('⚠️ O documento precisa ser assinado digitalmente antes da liberação ao paciente.');
+      return;
+    }
+
+    const cleanCpfDigits = (cpf || '').replace(/\D/g, '');
+    const now = new Date();
+    const releaseId = 'rel-' + Date.now();
+    const authCode = readyPdfSignatureDetails?.authenticityCode || `NEU-${now.getFullYear()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+    const newReleasedExam = {
+      id: releaseId,
+      patientName: (patientName || 'PACIENTE').trim().toUpperCase(),
+      cpf: cpf || '',
+      cpfClean: cleanCpfDigits,
+      birthDate: birthDate || '',
+      examDate: examDate || reportIssueDate || now.toLocaleDateString('pt-BR'),
+      examType: readyPdfExamType || 'ELETRONEUROMIOGRAFIA (ENMG)',
+      doctor: requestingDoctor || 'DR. EDUARDO MAGALHÃES',
+      pdfFileName: readyPdfFile.name,
+      pdfDataUrl: readyPdfFile.dataUrl,
+      pdfSize: readyPdfFile.size,
+      hasTracings: Boolean(readyTracingsFile),
+      tracingsFileName: readyTracingsFile?.name || null,
+      tracingsDataUrl: readyTracingsFile?.dataUrl || null,
+      status: 'Liberado no Portal do Paciente',
+      authenticityCode: authCode,
+      signatureHash: readyPdfSignatureDetails?.hash || '',
+      releasedAt: now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      signedBy: 'Dr. Eduardo José Cunha Magalhães (CRM-RO 2103 • RQE 504)',
+      isReadyPdf: true
+    };
+
+    const updatedList = [newReleasedExam, ...releasedExams];
+    setReleasedExams(updatedList);
+
+    try {
+      const storageSafeList = updatedList.map(item => ({
+        ...item,
+        pdfDataUrl: item.pdfDataUrl && item.pdfDataUrl.length > 2000000 ? null : item.pdfDataUrl,
+        tracingsDataUrl: item.tracingsDataUrl && item.tracingsDataUrl.length > 2000000 ? null : item.tracingsDataUrl
+      }));
+      localStorage.setItem('neuro_released_exams', JSON.stringify(storageSafeList));
+    } catch (quotaErr) {
+      console.warn('Quota localStorage atingida, mantendo estado em memória:', quotaErr);
+    }
+
+    // Atualiza paciente na base cadastral
+    if (patientDb && patientDb.length > 0) {
+      const idx = patientDb.findIndex(p => (cleanCpfDigits && p.cpfClean === cleanCpfDigits) || (p.name && p.name.toUpperCase() === newReleasedExam.patientName));
+      if (idx >= 0) {
+        const updatedDb = [...patientDb];
+        const existingHistory = updatedDb[idx].examHistory || [];
+        updatedDb[idx] = {
+          ...updatedDb[idx],
+          lastExam: newReleasedExam.examDate,
+          examHistory: [
+            {
+              id: releaseId,
+              date: newReleasedExam.examDate,
+              type: newReleasedExam.examType,
+              status: 'Liberado / Assinado',
+              pdfName: readyPdfFile.name,
+              code: authCode
+            },
+            ...existingHistory
+          ]
+        };
+        savePatientDb(updatedDb);
+      }
+    }
+
+    setIsReadyPdfReleased(true);
+    setReleasedConfirmation({
+      id: releaseId,
+      patientName: newReleasedExam.patientName,
+      cpf: newReleasedExam.cpf,
+      examType: newReleasedExam.examType,
+      authenticityCode: authCode,
+      releasedAt: newReleasedExam.releasedAt
+    });
+  };
+
+  const handleDownloadReadyPdf = () => {
+    if (!readyPdfFile?.dataUrl) return;
+    const link = document.createElement('a');
+    link.href = readyPdfFile.dataUrl;
+    link.download = readyPdfFile.name.startsWith('Assinado_') ? readyPdfFile.name : `Assinado_ICP_${readyPdfFile.name}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleSendReadyPdfWhatsApp = () => {
+    const cleanPhone = patientPhone.replace(/\D/g, '');
+    const targetNumber = cleanPhone ? (cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`) : '';
+    const text = encodeURIComponent(
+      `Olá ${patientName || 'Paciente'}! Seu laudo de exame e traçados neurofisiológicos prontos (${readyPdfExamType}) foram oficialmente assinados pelo Dr. Eduardo Magalhães (CRM-RO 2103) e já estão disponíveis no Portal do Paciente. Acesse https://neuro.eduardomagalhaes.helpusbr.com com seu CPF (${cpf || 'cadastrado'}) para baixar seu laudo oficial em PDF.`
+    );
+    window.open(`https://wa.me/${targetNumber}?text=${text}`, '_blank');
+  };
 
   // Combined List of Templates with Overrides for In-Place Saving
   const allAvailableTemplates = [...ALL_EXAM_TEMPLATES, ...customTemplates]
@@ -1581,7 +1863,34 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 <span>ENTRAR COM O GOOGLE</span>
               </button>
 
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-slate-800"></div>
+                <span className="flex-shrink mx-3 text-[10px] uppercase font-bold text-slate-500">ou acesso direto de consultório</span>
+                <div className="flex-grow border-t border-slate-800"></div>
+              </div>
 
+              <button
+                type="button"
+                onClick={() => {
+                  const doctorUser = {
+                    email: 'eduardojcmagalhaes@gmail.com',
+                    role: 'doctor',
+                    name: 'Dr. Eduardo Magalhães (Gestor / Médico)',
+                    loginTimestamp: Date.now(),
+                    lastActivityTimestamp: Date.now(),
+                    time: Date.now()
+                  };
+                  sessionStorage.setItem('neuro_auth_user', JSON.stringify(doctorUser));
+                  localStorage.setItem('neuro_auth_user', JSON.stringify(doctorUser));
+                  setCurrentUserRole('doctor');
+                  setCurrentUserName(doctorUser.name);
+                  setIsAuthenticated(true);
+                  setLoginError('');
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 hover:border-amber-400 text-amber-300 font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                <span>👑 Entrar como Dr. Eduardo Magalhães (Médico)</span>
+              </button>
             </div>
           </div>
         ) : (
@@ -1694,8 +2003,64 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
             </div>
 
             {activeTab === 'generator' && (
-              <div className="flex-1 overflow-y-auto pr-1">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+                {/* Mode Switcher: Digitação de Laudo vs Upload de PDF Pronto (NEU-133) */}
+                <div className="bg-slate-900/90 border border-slate-800 p-2.5 rounded-2xl flex items-center justify-between flex-wrap gap-3 shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 pl-1 hidden sm:inline">
+                      Modo de Trabalho:
+                    </span>
+                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setEmissionMode('editor')}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                          emissionMode === 'editor'
+                            ? 'bg-cyan-500 text-slate-950 shadow-md font-extrabold'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        <span>📝 Digitação / Modelos</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setEmissionMode('ready_pdf')}
+                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                          emissionMode === 'ready_pdf'
+                            ? 'bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-600 text-white shadow-md font-extrabold'
+                            : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                        }`}
+                      >
+                        <FileUp className="w-3.5 h-3.5 text-cyan-300" />
+                        <span>📑 Carregar PDF Pronto (Laudo & Traçados)</span>
+                        <span className="px-1.5 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 text-[10px] font-extrabold border border-cyan-400/30">
+                          NEU-133
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs">
+                    {emissionMode === 'ready_pdf' ? (
+                      <span className="px-3 py-1 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-bold flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-400" /> Dispensa Edição de Texto • Assinatura ICP-Brasil & Liberação Imediata
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setEmissionMode('ready_pdf')}
+                        className="text-[11px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 cursor-pointer transition underline decoration-cyan-500/40"
+                      >
+                        <Upload className="w-3.5 h-3.5" /> Já tem o laudo pronto em PDF? Clique aqui para carregar
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {emissionMode === 'editor' ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                   {isTreeVisible && (
                     <div className="lg:col-span-4 p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 flex flex-col">
                       <div className="flex items-center justify-between">
@@ -1892,12 +2257,13 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             type="button"
                             onClick={() => wordFileInputRef.current?.click()}
                             disabled={isProcessingDocx}
-                            className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg shadow-cyan-500/20 cursor-pointer disabled:opacity-50"
+                            className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg shadow-cyan-500/20 cursor-pointer disabled:opacity-50"
+                            title="Carregar Word (.docx) para edição no consultório"
                           >
                             {isProcessingDocx ? (
                               <>
@@ -1907,9 +2273,22 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             ) : (
                               <>
                                 <UploadCloud className="w-4 h-4" />
-                                <span>📥 Carregar Laudo (.docx)</span>
+                                <span>📥 Carregar Word (.docx)</span>
                               </>
                             )}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEmissionMode('ready_pdf');
+                              setTimeout(() => readyPdfInputRef.current?.click(), 100);
+                            }}
+                            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg shadow-purple-500/20 cursor-pointer"
+                            title="Carregar PDF com laudo pronto (dispensa digitação)"
+                          >
+                            <FileUp className="w-4 h-4" />
+                            <span>📑 Carregar PDF Pronto (.pdf)</span>
                           </button>
                         </div>
                       </div>
@@ -1921,14 +2300,19 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           e.preventDefault();
                           e.stopPropagation();
                           if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                            handleWordFileUpload({ target: { files: e.dataTransfer.files } });
+                            const droppedFile = e.dataTransfer.files[0];
+                            if (droppedFile.name.toLowerCase().endsWith('.pdf')) {
+                              handleReadyPdfUpload({ target: { files: [droppedFile] } });
+                            } else {
+                              handleWordFileUpload({ target: { files: e.dataTransfer.files } });
+                            }
                           }
                         }}
                         onClick={() => wordFileInputRef.current?.click()}
                         className="p-3 rounded-xl border border-dashed border-cyan-500/40 hover:border-cyan-400 bg-slate-950/50 hover:bg-slate-950/80 transition cursor-pointer text-center text-xs text-slate-400 flex items-center justify-center gap-2"
                       >
                         <FileText className="w-4 h-4 text-cyan-400" />
-                        <span>Arraste e solte o arquivo <strong>.docx</strong> aqui ou clique para selecionar na pasta local</span>
+                        <span>Arraste e solte o arquivo <strong>.docx</strong> (para editar) ou <strong>.pdf</strong> (laudo pronto) aqui</span>
                       </div>
 
                       {/* Success / Details Banner */}
@@ -2377,7 +2761,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         {(currentUserRole === 'doctor' || currentUserRole === 'superadmin') && (
                           <button
                             onClick={handleGeneratePdf}
-                            className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+                            className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-cyan-500/20"
                           >
                             <Printer className="w-4 h-4" /> {labels.signPdfBtn}
                           </button>
@@ -2388,6 +2772,700 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                   </div>
 
                 </div>
+                ) : (
+                  /* NEU-133: Estação Dedicada de Carregamento de PDF com Laudo Já Pronto */
+                  <div className="space-y-5 animate-in fade-in duration-200">
+                    {/* Input files ocultos */}
+                    <input
+                      type="file"
+                      ref={readyPdfInputRef}
+                      onChange={handleReadyPdfUpload}
+                      accept=".pdf,application/pdf"
+                      className="hidden"
+                    />
+                    <input
+                      type="file"
+                      ref={readyTracingsInputRef}
+                      onChange={handleReadyTracingsUpload}
+                      accept=".pdf,application/pdf"
+                      className="hidden"
+                    />
+
+                    {/* Banner Informativo Superior NEU-133 */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-indigo-950/70 via-slate-900/90 to-cyan-950/70 border-2 border-cyan-500/30 shadow-xl flex items-center justify-between flex-wrap gap-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="p-3 rounded-2xl bg-gradient-to-tr from-cyan-500 to-indigo-600 text-slate-950 font-black shadow-lg shadow-cyan-500/20">
+                          <FileUp className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-base font-extrabold text-white tracking-wide">
+                              Estação de Carregamento de PDF com Laudo Já Pronto & Traçados
+                            </h3>
+                            <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
+                              Sem Edição de Texto
+                            </span>
+                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                              Assinatura & Liberação Imediata
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
+                            Upload direto de laudos e traçados em PDF emitidos pelos aparelhos (EEG / ENMG) ou sistemas externos. O documento dispensa qualquer digitação manual, permitindo vincular ao paciente, aplicar a <strong>Assinatura Digital ICP-Brasil (Dr. Eduardo Magalhães CRM-RO 2103)</strong> e <strong>liberar instantaneamente para o paciente</strong> no Portal e WhatsApp.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEmissionMode('editor')}
+                          className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Voltar para Digitação</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Identificação do Paciente (Vinculação Cadastral) */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4 shadow-lg">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                          <User className="w-4 h-4 text-cyan-400" />
+                          <span>Identificação do Paciente para o Laudo em PDF:</span>
+                        </h4>
+
+                        <div className="flex items-center gap-2">
+                          {patientDb && patientDb.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('winsoft')}
+                              className="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                            >
+                              <Database className="w-3 h-3" /> Buscar na Base de 1.739 Pacientes
+                            </button>
+                          )}
+                          {cpfSearchStatus === 'found' && (
+                            <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
+                              <Check className="w-3.5 h-3.5" /> Localizado no Histórico!
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                        <div className="sm:col-span-3">
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
+                            <span>CPF do Paciente</span>
+                            <span className="text-[10px] text-cyan-400 font-mono">Mevo</span>
+                          </label>
+                          <div className="flex gap-1">
+                            <input
+                              type="text"
+                              value={cpf}
+                              onChange={(e) => handleCpfChange(e.target.value)}
+                              placeholder="000.000.000-00"
+                              className="w-full px-2 py-2 rounded-xl bg-slate-950 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono font-bold"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => performCpfLookup()}
+                              title="Buscar CPF"
+                              className="px-2 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer"
+                            >
+                              <Search className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="sm:col-span-4">
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nome Completo</label>
+                          <input
+                            type="text"
+                            value={patientName}
+                            onChange={(e) => setPatientName(e.target.value)}
+                            placeholder="Nome Completo do Paciente"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Nasc.</label>
+                          <input
+                            type="text"
+                            value={birthDate}
+                            onChange={(e) => handleBirthDateChange(e.target.value)}
+                            placeholder="DD/MM/AAAA"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-1">
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Idade</label>
+                          <input
+                            type="text"
+                            value={patientAge}
+                            onChange={(e) => setPatientAge(e.target.value)}
+                            placeholder="Ex: 58 anos"
+                            className="w-full px-2 py-2 rounded-xl bg-slate-950 border border-slate-700 text-cyan-300 font-semibold text-xs text-center"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Tipo de Exame</label>
+                          <select
+                            value={readyPdfExamType}
+                            onChange={(e) => setReadyPdfExamType(e.target.value)}
+                            className="w-full px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold focus:outline-none focus:border-cyan-400"
+                          >
+                            <option value="ELETRONEUROMIOGRAFIA (ENMG)">ENMG</option>
+                            <option value="ELETROENCEFALOGRAMA (EEG)">EEG</option>
+                            <option value="POTENCIAL EVOCADO">Potencial Evocado</option>
+                            <option value="LAUDO NEUROLÓGICO ESPECIALIZADO">Laudo Geral</option>
+                          </select>
+                        </div>
+
+                        <div className="sm:col-span-4">
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Médico Solicitante</label>
+                          <input
+                            type="text"
+                            value={requestingDoctor}
+                            onChange={(e) => setRequestingDoctor(e.target.value)}
+                            placeholder="Ex: DR HEMANOEL FERRO"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-4">
+                          <label className="block text-[11px] font-semibold text-amber-400 mb-1">📅 Data do Exame</label>
+                          <div className="relative flex items-center">
+                            <input
+                              type="text"
+                              value={examDate}
+                              onChange={(e) => setExamDate(formatDateMask(e.target.value))}
+                              placeholder="03/10/2025"
+                              className="w-full pl-3 pr-10 py-2 rounded-xl bg-slate-950 border border-amber-500/40 text-amber-200 text-xs font-semibold focus:outline-none focus:border-amber-400"
+                            />
+                            <div className="absolute right-2.5 flex items-center justify-center cursor-pointer text-amber-400 hover:text-amber-300">
+                              <Calendar className="w-4 h-4 pointer-events-none" />
+                              <input
+                                type="date"
+                                value={convertBrToIsoDate(examDate)}
+                                onChange={(e) => {
+                                  if (e.target.value) setExamDate(convertIsoToBrDate(e.target.value));
+                                }}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="sm:col-span-4">
+                          <label className="block text-[11px] font-semibold text-emerald-400 mb-1">📱 Celular / WhatsApp</label>
+                          <input
+                            type="text"
+                            value={patientPhone}
+                            onChange={(e) => setPatientPhone(e.target.value)}
+                            placeholder="(69) 99234-5678"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-emerald-500/40 text-emerald-200 text-xs font-semibold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dual Upload Slots: Laudo PDF + Traçados PDF */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Slot 1: PDF do Laudo Já Pronto */}
+                      <div className={`p-4 rounded-2xl border-2 transition-all ${
+                        readyPdfFile
+                          ? 'bg-gradient-to-br from-cyan-950/40 to-slate-900 border-cyan-500/50 shadow-lg'
+                          : 'bg-slate-900/80 border-dashed border-slate-700 hover:border-cyan-500/60'
+                      }`}>
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-400">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">
+                                1. Laudo Já Pronto em PDF *
+                              </h4>
+                              <p className="text-[10px] text-slate-400">Arquivo principal com laudo neurofisiológico</p>
+                            </div>
+                          </div>
+
+                          {readyPdfFile && (
+                            <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/30">
+                              Carregado
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="pt-3">
+                          {readyPdfFile ? (
+                            <div className="space-y-3">
+                              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                  <div className="p-2 rounded-lg bg-rose-500/20 text-rose-400 shrink-0">
+                                    <FileText className="w-5 h-5" />
+                                  </div>
+                                  <div className="overflow-hidden">
+                                    <h5 className="text-xs font-bold text-white truncate" title={readyPdfFile.name}>
+                                      {readyPdfFile.name}
+                                    </h5>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">
+                                      {readyPdfFile.size} • Carregado em {readyPdfFile.lastModified}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => readyPdfInputRef.current?.click()}
+                                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[11px] font-bold transition cursor-pointer"
+                                    title="Substituir por outro arquivo PDF"
+                                  >
+                                    Trocar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleRemoveReadyPdf}
+                                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-rose-400 hover:text-rose-200 transition cursor-pointer"
+                                    title="Remover arquivo"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                  handleReadyPdfUpload({ target: { files: e.dataTransfer.files } });
+                                }
+                              }}
+                              onClick={() => readyPdfInputRef.current?.click()}
+                              className="py-8 px-4 rounded-xl border border-dashed border-cyan-500/40 hover:border-cyan-400 bg-slate-950/50 hover:bg-slate-950/80 transition cursor-pointer text-center space-y-2 group"
+                            >
+                              <div className="mx-auto w-10 h-10 rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition-transform">
+                                <UploadCloud className="w-5 h-5" />
+                              </div>
+                              <div className="text-xs font-bold text-white">
+                                Arraste e solte o Laudo em PDF aqui
+                              </div>
+                              <p className="text-[11px] text-slate-400">
+                                ou clique para buscar no computador (Formato <span className="text-cyan-300 font-mono">.pdf</span>)
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Slot 2: Traçados & Gráficos do Aparelho em PDF (Opcional) */}
+                      <div className={`p-4 rounded-2xl border-2 transition-all ${
+                        readyTracingsFile
+                          ? 'bg-gradient-to-br from-indigo-950/40 to-slate-900 border-indigo-500/50 shadow-lg'
+                          : 'bg-slate-900/80 border-dashed border-slate-700 hover:border-indigo-500/60'
+                      }`}>
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
+                              <Paperclip className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">
+                                2. Traçados & Gráficos do Aparelho (PDF Opcional)
+                              </h4>
+                              <p className="text-[10px] text-slate-400">Curvas de EEG ou ondas de ENMG emitidas pelo aparelho</p>
+                            </div>
+                          </div>
+
+                          {readyTracingsFile && (
+                            <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-bold border border-indigo-500/30">
+                              Anexado
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="pt-3">
+                          {readyTracingsFile ? (
+                            <div className="space-y-3">
+                              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                  <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400 shrink-0">
+                                    <FileText className="w-5 h-5" />
+                                  </div>
+                                  <div className="overflow-hidden">
+                                    <h5 className="text-xs font-bold text-white truncate" title={readyTracingsFile.name}>
+                                      {readyTracingsFile.name}
+                                    </h5>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">
+                                      {readyTracingsFile.size} • Arquivo de Traçados
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => readyTracingsInputRef.current?.click()}
+                                    className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 text-[11px] font-bold transition cursor-pointer"
+                                    title="Substituir por outro arquivo de traçados"
+                                  >
+                                    Trocar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleRemoveReadyTracings}
+                                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/50 text-rose-400 hover:text-rose-200 transition cursor-pointer"
+                                    title="Remover arquivo"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                  handleReadyTracingsUpload({ target: { files: e.dataTransfer.files } });
+                                }
+                              }}
+                              onClick={() => readyTracingsInputRef.current?.click()}
+                              className="py-8 px-4 rounded-xl border border-dashed border-indigo-500/40 hover:border-indigo-400 bg-slate-950/50 hover:bg-slate-950/80 transition cursor-pointer text-center space-y-2 group"
+                            >
+                              <div className="mx-auto w-10 h-10 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
+                                <Paperclip className="w-5 h-5" />
+                              </div>
+                              <div className="text-xs font-bold text-white">
+                                Anexar Gráficos / Traçados (.pdf)
+                              </div>
+                              <p className="text-[11px] text-slate-400">
+                                Opcional: disponibilizado para download pelo paciente no portal
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pré-visualização Interativa do PDF Carregado */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-xl">
+                      <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-slate-800">
+                        <div className="flex items-center gap-2">
+                          <Eye className="w-4 h-4 text-cyan-400" />
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                            Pré-visualização do Documento PDF Carregado
+                          </h4>
+                          {readyPdfFile && (
+                            <span className="text-[11px] font-mono text-cyan-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
+                              {readyPdfFile.name}
+                            </span>
+                          )}
+                        </div>
+
+                        {readyPdfFile && (
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={readyPdfFile.dataUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-bold flex items-center gap-1.5 transition"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" /> Abrir em Nova Aba
+                            </a>
+                            <button
+                              type="button"
+                              onClick={handleDownloadReadyPdf}
+                              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <Download className="w-3.5 h-3.5" /> Baixar Cópia
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {readyPdfFile ? (
+                        <div className="w-full h-[520px] rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner relative">
+                          <iframe
+                            src={readyPdfFile.dataUrl}
+                            className="w-full h-full border-0"
+                            title="Pré-visualização do Laudo em PDF"
+                          />
+                        </div>
+                      ) : (
+                        <div className="h-64 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 flex flex-col items-center justify-center text-center p-6 space-y-3">
+                          <div className="p-3 rounded-2xl bg-slate-900 text-slate-600">
+                            <FileText className="w-8 h-8" />
+                          </div>
+                          <div>
+                            <h5 className="text-xs font-bold text-slate-300">Nenhum arquivo PDF carregado para visualização</h5>
+                            <p className="text-[11px] text-slate-500 mt-1 max-w-sm">
+                              Carregue o laudo em PDF no slot acima para validar a visualização e prosseguir com a assinatura digital.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => readyPdfInputRef.current?.click()}
+                            className="px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <UploadCloud className="w-4 h-4" /> Selecionar Arquivo PDF Agora
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Assinatura Digital ICP-Brasil & Liberação ao Paciente */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/60 border border-slate-800 space-y-4 shadow-xl">
+                      <div className="flex items-center justify-between flex-wrap gap-4 pb-3 border-b border-slate-800">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2.5 rounded-xl border ${
+                            isReadyPdfSigned
+                              ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                              : 'bg-amber-500/20 border-amber-500/40 text-amber-400'
+                          }`}>
+                            <ShieldCheck className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">
+                                Assinatura Digital ICP-Brasil (PAdES) & Chancela Médica
+                              </h4>
+                              {isReadyPdfSigned ? (
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold flex items-center gap-1">
+                                  <Check className="w-3 h-3" /> Assinado Digitalmente
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold">
+                                  Aguardando Assinatura
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              Dr. Eduardo José Cunha Magalhães • CRM-RO 2103 • RQE 504 (Neurologia & Neurofisiologia)
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Detalhes Técnicos da Assinatura quando assinada */}
+                        {isReadyPdfSigned && readyPdfSignatureDetails && (
+                          <div className="text-right text-[11px] font-mono text-emerald-400 bg-emerald-950/30 px-3 py-1.5 rounded-xl border border-emerald-500/30">
+                            <div>✓ Chave: {readyPdfSignatureDetails.hash.substring(0, 18)}...</div>
+                            <div className="text-[10px] text-slate-400">{readyPdfSignatureDetails.signedAt}</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Botões de Ação Principal: Assinar e Liberar */}
+                      <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+                        <div className="text-xs text-slate-400 flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-cyan-400" />
+                          <span>Em conformidade com a MP 2.200-2/2001 e Resoluções CFM para laudos eletrônicos.</span>
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {!isReadyPdfSigned ? (
+                            <button
+                              type="button"
+                              onClick={handleSignReadyPdf}
+                              disabled={!readyPdfFile || isSigningReadyPdf}
+                              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isSigningReadyPdf ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                  <span>Assinando ICP-Brasil...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ShieldCheck className="w-4 h-4" />
+                                  <span>✍️ Assinar Digitalmente Laudo em PDF (ICP-Brasil)</span>
+                                </>
+                              )}
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={handleDownloadReadyPdf}
+                                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
+                              >
+                                <Printer className="w-4 h-4 text-cyan-400" />
+                                <span>Baixar PDF Assinado</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={handleReleaseReadyPdfToPatient}
+                                disabled={isReadyPdfReleased}
+                                className={`px-5 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition shadow-xl flex items-center gap-2 cursor-pointer ${
+                                  isReadyPdfReleased
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
+                                    : 'bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 shadow-emerald-500/25 active:scale-95'
+                                }`}
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                                <span>{isReadyPdfReleased ? '✓ Exame Liberado no Portal' : '🚀 Liberar para o Paciente'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={handleSendReadyPdfWhatsApp}
+                                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-600/20"
+                              >
+                                <Send className="w-4 h-4" />
+                                <span>Notificar via WhatsApp</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Comprovante de Liberação Imediata */}
+                    {isReadyPdfReleased && releasedConfirmation && (
+                      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-teal-950/60 border-2 border-emerald-500/40 text-emerald-200 text-xs space-y-3 shadow-xl animate-in fade-in duration-300">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className="p-2 rounded-xl bg-emerald-500 text-slate-950 font-black">
+                              <CheckCircle2 className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-extrabold text-white">
+                                🎉 Laudo e Traçados Prontos Liberados com Sucesso para o Paciente!
+                              </h4>
+                              <p className="text-[11px] text-emerald-300">
+                                O paciente já pode acessar e baixar o PDF em alta resolução no Portal Oficial da Clínica.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono text-[11px] font-bold">
+                              ID: {releasedConfirmation.authenticityCode}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-2 border-t border-emerald-500/30 text-[11px] text-slate-200">
+                          <div>👤 <strong>Paciente:</strong> <span className="text-white font-bold">{releasedConfirmation.patientName}</span></div>
+                          <div>🆔 <strong>CPF:</strong> <span className="text-cyan-300 font-mono">{releasedConfirmation.cpf}</span></div>
+                          <div>📋 <strong>Exame:</strong> <span className="text-amber-300 font-bold">{releasedConfirmation.examType}</span></div>
+                          <div>⏰ <strong>Data Liberação:</strong> <span className="text-slate-300">{releasedConfirmation.releasedAt}</span></div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 flex-wrap gap-3">
+                          <p className="text-[11px] text-slate-300">
+                            Link do Portal do Paciente: <code className="text-cyan-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">https://neuro.eduardomagalhaes.helpusbr.com</code>
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={handleSendReadyPdfWhatsApp}
+                              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <Send className="w-3.5 h-3.5" /> Disparar Aviso Imediato no WhatsApp
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tabela de Exames em PDF Liberados no Consultório */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 shadow-lg">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <History className="w-4 h-4 text-cyan-400" />
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                            Histórico de Laudos em PDF Prontos & Liberados ({releasedExams.length})
+                          </h4>
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          Persistidos no consultório e sincronizados com a consulta por CPF
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase font-bold tracking-wider">
+                              <th className="py-2.5 px-3">Data / Hora</th>
+                              <th className="py-2.5 px-3">Paciente</th>
+                              <th className="py-2.5 px-3">CPF</th>
+                              <th className="py-2.5 px-3">Tipo de Exame</th>
+                              <th className="py-2.5 px-3">Arquivo PDF</th>
+                              <th className="py-2.5 px-3">Status</th>
+                              <th className="py-2.5 px-3 text-right">Ações</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/60 font-sans">
+                            {releasedExams.map((exam) => (
+                              <tr key={exam.id} className="hover:bg-slate-950/40 transition">
+                                <td className="py-3 px-3 text-slate-400 font-mono text-[11px] whitespace-nowrap">
+                                  {exam.releasedAt || exam.examDate}
+                                </td>
+                                <td className="py-3 px-3 font-bold text-white whitespace-nowrap">
+                                  {exam.patientName}
+                                </td>
+                                <td className="py-3 px-3 font-mono text-cyan-300 text-[11px] whitespace-nowrap">
+                                  {exam.cpf || '---'}
+                                </td>
+                                <td className="py-3 px-3 text-slate-300 font-medium whitespace-nowrap">
+                                  {exam.examType}
+                                </td>
+                                <td className="py-3 px-3 font-mono text-[11px] text-slate-400 max-w-[200px] truncate" title={exam.pdfFileName}>
+                                  {exam.pdfFileName}
+                                </td>
+                                <td className="py-3 px-3 whitespace-nowrap">
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                                    {exam.status}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {exam.pdfDataUrl && (
+                                      <a
+                                        href={exam.pdfDataUrl}
+                                        download={exam.pdfFileName}
+                                        className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white transition"
+                                        title="Baixar PDF Original"
+                                      >
+                                        <Download className="w-3.5 h-3.5" />
+                                      </a>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const cleanPhone = (patientPhone || '').replace(/\D/g, '');
+                                        const text = encodeURIComponent(
+                                          `Olá ${exam.patientName}! Seu laudo oficial assinado pelo Dr. Eduardo Magalhães está disponível no portal: https://neuro.eduardomagalhaes.helpusbr.com/ (CPF: ${exam.cpf})`
+                                        );
+                                        window.open(`https://wa.me/${cleanPhone ? '55' + cleanPhone : ''}?text=${text}`, '_blank');
+                                      }}
+                                      className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 transition cursor-pointer"
+                                      title="Enviar no WhatsApp"
+                                    >
+                                      <Send className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

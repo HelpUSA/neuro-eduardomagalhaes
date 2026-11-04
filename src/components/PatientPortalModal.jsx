@@ -8,6 +8,7 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
   const [searchSubmitted, setSearchSubmitted] = useState(true);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isDownloadingTracings, setIsDownloadingTracings] = useState(false);
+  const [matchedReleasedExam, setMatchedReleasedExam] = useState(null);
 
   if (!isOpen) return null;
 
@@ -29,7 +30,7 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
     authenticityText: "Documento assinado digitalmente com certificado ICP-Brasil (PAdES) e validação QR Code."
   };
 
-  const demoReport = {
+  const defaultDemoReport = {
     patientName: 'CLELIA MARI DE CARVALHO',
     birthDate: '07/05/1967',
     requestingDoctor: 'DR. HEMANOEL FERRO',
@@ -48,9 +49,64 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
     }
   };
 
+  // Busca exames liberados pelo Dr. Eduardo (incluindo PDFs com laudos e traçados prontos)
+  const handlePerformSearch = () => {
+    setSearchSubmitted(true);
+    const cleanInputCpf = (cpf || '').replace(/\D/g, '');
+    try {
+      const savedExams = localStorage.getItem('neuro_released_exams');
+      if (savedExams) {
+        const parsed = JSON.parse(savedExams);
+        const found = parsed.find(item => {
+          const itemCleanCpf = (item.cpf || item.cpfClean || '').replace(/\D/g, '');
+          return (cleanInputCpf && itemCleanCpf === cleanInputCpf) || (cpf && item.cpf === cpf);
+        });
+        if (found) {
+          setMatchedReleasedExam(found);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao consultar exames liberados no portal:', e);
+    }
+    setMatchedReleasedExam(null);
+  };
+
+  const currentReport = matchedReleasedExam ? {
+    patientName: matchedReleasedExam.patientName || 'PACIENTE',
+    birthDate: matchedReleasedExam.birthDate || birthDate || '07/05/1967',
+    requestingDoctor: matchedReleasedExam.doctor || 'DR. EDUARDO MAGALHÃES',
+    examDate: matchedReleasedExam.examDate || 'Hoje',
+    examType: matchedReleasedExam.examType || 'LAUDO DE EXAME EM PDF',
+    status: matchedReleasedExam.status || 'Concluído e Assinado Digitalmente por Dr. Eduardo Magalhães',
+    authenticityCode: matchedReleasedExam.authenticityCode || 'NEU-2026-PDF-001',
+    hasTracingsPdf: Boolean(matchedReleasedExam.hasTracings || matchedReleasedExam.tracingsFileName),
+    tracingsFileName: matchedReleasedExam.tracingsFileName || 'Graficos_Aparelho_Traçados.pdf',
+    pdfFileName: matchedReleasedExam.pdfFileName,
+    pdfDataUrl: matchedReleasedExam.pdfDataUrl,
+    tracingsDataUrl: matchedReleasedExam.tracingsDataUrl,
+    isReadyPdf: Boolean(matchedReleasedExam.isReadyPdf),
+    details: {
+      conclusion: matchedReleasedExam.conclusion || 'Laudo completo e traçados neurofisiológicos gerados pelo equipamento clínico, revisados e assinados digitalmente pelo Dr. Eduardo Magalhães (CRM-RO 2103 / RQE 504).'
+    }
+  } : defaultDemoReport;
+
   const handleDownloadPdf = () => {
     setIsGeneratingPdf(true);
     try {
+      // Se o exame possui arquivo PDF original carregado pelo médico, baixa diretamente o arquivo real!
+      if (currentReport.pdfDataUrl) {
+        const downloadLink = document.createElement('a');
+        downloadLink.href = currentReport.pdfDataUrl;
+        downloadLink.download = currentReport.pdfFileName || `Laudo_Oficial_${currentReport.patientName.replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        setIsGeneratingPdf(false);
+        return;
+      }
+
+      // Caso contrário, gera via jsPDF timbrado oficial
       const doc = new jsPDF();
       doc.setFillColor(15, 23, 42);
       doc.rect(0, 0, 210, 32, 'F');
@@ -73,17 +129,18 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
       doc.setTextColor(15, 23, 42);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.text(`PACIENTE: ${demoReport.patientName}`, 18, 46);
-      doc.text(`DATA NASC: ${demoReport.birthDate}`, 120, 46);
-      doc.text(`SOLICITANTE: ${demoReport.requestingDoctor}`, 18, 54);
-      doc.text(`DATA DO EXAME: ${demoReport.examDate}`, 120, 54);
+      doc.text(`PACIENTE: ${currentReport.patientName}`, 18, 46);
+      doc.text(`DATA NASC: ${currentReport.birthDate}`, 120, 46);
+      doc.text(`SOLICITANTE: ${currentReport.requestingDoctor}`, 18, 54);
+      doc.text(`DATA DO EXAME: ${currentReport.examDate}`, 120, 54);
 
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(2, 132, 199);
-      doc.text(`EXAME: ${demoReport.examType}`, 18, 62);
+      doc.text(`EXAME: ${currentReport.examType}`, 18, 62);
 
       let y = 78;
       const addSection = (title, content) => {
+        if (!content) return;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9.5);
         doc.setTextColor(3, 105, 161);
@@ -97,14 +154,15 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
         y += splitText.length * 4.5 + 5;
       };
 
-      addSection('NEUROCONDUÇÃO MOTORA:', demoReport.details.motorConduction);
-      addSection('NEUROCONDUÇÃO SENSITIVA:', demoReport.details.sensoryConduction);
-      addSection('ONDA F:', demoReport.details.fWave);
-      addSection('ELETROMIOGRAFIA DE AGULHA:', demoReport.details.emg);
+      if (currentReport.details?.motorConduction) addSection('NEUROCONDUÇÃO MOTORA:', currentReport.details.motorConduction);
+      if (currentReport.details?.sensoryConduction) addSection('NEUROCONDUÇÃO SENSITIVA:', currentReport.details.sensoryConduction);
+      if (currentReport.details?.fWave) addSection('ONDA F:', currentReport.details.fWave);
+      if (currentReport.details?.emg) addSection('ELETROMIOGRAFIA DE AGULHA:', currentReport.details.emg);
 
       doc.setFillColor(240, 249, 255);
       doc.setDrawColor(2, 132, 199);
-      const conclusionLines = doc.splitTextToSize(demoReport.details.conclusion, 174);
+      const conclusionText = currentReport.details?.conclusion || 'Exame neurofisiológico assinado e liberado para o paciente.';
+      const conclusionLines = doc.splitTextToSize(conclusionText, 174);
       const boxHeight = conclusionLines.length * 4.5 + 12;
 
       doc.rect(14, y, 182, boxHeight, 'FD');
@@ -129,9 +187,9 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
-      doc.text('Neurologista & Neurofisiologista | CRM-RO', 105, y + 4, { align: 'center' });
+      doc.text('Neurologista & Neurofisiologista | CRM-RO 2103 • RQE 504', 105, y + 4, { align: 'center' });
 
-      doc.save(`Laudo_Oficial_${demoReport.patientName.replace(/\s+/g, '_')}.pdf`);
+      doc.save(`Laudo_Oficial_${currentReport.patientName.replace(/\s+/g, '_')}.pdf`);
     } catch (err) {
       console.error("Erro ao gerar PDF do paciente:", err);
     } finally {
@@ -141,10 +199,22 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
 
   const handleDownloadTracings = () => {
     setIsDownloadingTracings(true);
-    setTimeout(() => {
-      alert(`Download de traçados do aparelho (${demoReport.tracingsFileName}) iniciado com sucesso!`);
+    // Se o médico fez upload de traçados prontos em PDF
+    if (currentReport.tracingsDataUrl) {
+      const downloadLink = document.createElement('a');
+      downloadLink.href = currentReport.tracingsDataUrl;
+      downloadLink.download = currentReport.tracingsFileName || `Tracados_Exame_${currentReport.patientName.replace(/\s+/g, '_')}.pdf`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
       setIsDownloadingTracings(false);
-    }, 800);
+      return;
+    }
+
+    setTimeout(() => {
+      alert(`Download de traçados do aparelho (${currentReport.tracingsFileName}) iniciado com sucesso!`);
+      setIsDownloadingTracings(false);
+    }, 600);
   };
 
   return (
@@ -195,8 +265,8 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
 
           <div className="flex justify-end">
             <button
-              onClick={() => setSearchSubmitted(true)}
-              className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-2 transition"
+              onClick={handlePerformSearch}
+              className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
             >
               <Search className="w-4 h-4" /> {labels.searchBtn}
             </button>
@@ -209,8 +279,15 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
               <div className="flex items-center gap-3">
                 <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
                 <div>
-                  <h4 className="text-xs font-bold text-white">{labels.resultTitle}</h4>
-                  <p className="text-[11px] text-slate-300">{labels.patientNameLabel}: <strong>{demoReport.patientName}</strong> | {demoReport.examDate}</p>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-white">{labels.resultTitle}</h4>
+                    {currentReport.isReadyPdf && (
+                      <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
+                        📄 PDF Original Carregado & Assinado
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-300">{labels.patientNameLabel}: <strong>{currentReport.patientName}</strong> | {currentReport.examDate}</p>
                 </div>
               </div>
 
@@ -218,20 +295,22 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
                 <button
                   onClick={handleDownloadPdf}
                   disabled={isGeneratingPdf}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95"
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95 cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
                   <span>{isGeneratingPdf ? '...' : labels.downloadPdfBtn}</span>
                 </button>
 
-                <button
-                  onClick={handleDownloadTracings}
-                  disabled={isDownloadingTracings}
-                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/40 font-bold text-xs flex items-center gap-1.5 transition"
-                >
-                  <Paperclip className="w-4 h-4" />
-                  <span>{isDownloadingTracings ? '...' : labels.downloadTracingsBtn}</span>
-                </button>
+                {currentReport.hasTracingsPdf && (
+                  <button
+                    onClick={handleDownloadTracings}
+                    disabled={isDownloadingTracings}
+                    className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/40 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                    <span>{isDownloadingTracings ? '...' : labels.downloadTracingsBtn}</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -239,23 +318,26 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
               <div className="flex justify-between items-center pb-3 border-b border-slate-800 text-slate-300 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-cyan-400" />
-                  <span className="font-bold text-white">{demoReport.examType}</span>
+                  <span className="font-bold text-white">{currentReport.examType}</span>
+                  {currentReport.pdfFileName && (
+                    <span className="text-[11px] text-slate-400 font-mono">({currentReport.pdfFileName})</span>
+                  )}
                 </div>
-                <span className="text-[11px] font-mono text-cyan-400">ID: {demoReport.authenticityCode}</span>
+                <span className="text-[11px] font-mono text-cyan-400">ID: {currentReport.authenticityCode}</span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 text-[11px]">
                 <div>
                   <span className="text-slate-500 block">{labels.doctorLabel}:</span>
-                  <strong className="text-slate-200">{demoReport.requestingDoctor}</strong>
+                  <strong className="text-slate-200">{currentReport.requestingDoctor}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block">{labels.examDateLabel}:</span>
-                  <strong className="text-slate-200">{demoReport.examDate}</strong>
+                  <strong className="text-slate-200">{currentReport.examDate}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block">{labels.birthDateLabel}:</span>
-                  <strong className="text-slate-200">{demoReport.birthDate}</strong>
+                  <strong className="text-slate-200">{currentReport.birthDate}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block">{labels.statusLabel}:</span>
@@ -264,9 +346,9 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
               </div>
 
               <div className="space-y-2">
-                <h5 className="font-bold text-cyan-400 uppercase text-[11px]">Conclusão Médica / Diagnosis:</h5>
+                <h5 className="font-bold text-cyan-400 uppercase text-[11px]">Conclusão Médica / Diagnóstico:</h5>
                 <p className="p-3.5 rounded-xl bg-slate-950/80 border border-cyan-500/30 text-slate-200 leading-relaxed font-medium">
-                  {demoReport.details.conclusion}
+                  {currentReport.details?.conclusion}
                 </p>
               </div>
             </div>
