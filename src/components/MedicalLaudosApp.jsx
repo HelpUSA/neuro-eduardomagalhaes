@@ -428,10 +428,19 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
   const [patientName, setPatientName] = useState('CLELIA MARI DE CARVALHO');
   const [cpf, setCpf] = useState('123.456.789-00');
   const [birthDate, setBirthDate] = useState('07/05/1967');
+  const [patientAge, setPatientAge] = useState('58 anos');
   const [requestingDoctor, setRequestingDoctor] = useState('DR HEMANOEL FERRO');
   const [examDate, setExamDate] = useState('03/10/2025');
   const [reportIssueDate, setReportIssueDate] = useState(() => new Date().toLocaleDateString('pt-BR'));
   const [patientPhone, setPatientPhone] = useState('(69) 99234-5678');
+
+  const handleBirthDateChange = (val) => {
+    setBirthDate(val);
+    const calc = calculateAge(val);
+    if (calc !== null) {
+      setPatientAge(`${calc} anos`);
+    }
+  };
   
   const [motorConduction, setMotorConduction] = useState('Realizada em nervos ulnares e medianos. Observamos amplitudes conservadas, com velocidades de condução normais, e latências distais limítrofes em medianos.');
   const [sensoryConduction, setSensoryConduction] = useState('Realizada em nervos ulnares, medianos e radiais. Em nervos medianos observamos potenciais de ação com latências prolongadas, velocidades de condução diminuídas e amplitudes normais.');
@@ -494,24 +503,119 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   const [isProcessingDocx, setIsProcessingDocx] = useState(false);
   const wordFileInputRef = useRef(null);
 
-  // Parser Inteligente de Laudos Word (.docx)
+  // Parser Inteligente de Laudos Word (.docx / .doc)
   const parseWordDocumentContent = (rawText, fileName = '') => {
+    if (!rawText) return;
+
+    // Normaliza quebras de linha e espaços não separáveis comuns em arquivos Word (.docx)
+    const normalizedText = rawText
+      .replace(/\u00A0/g, ' ')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+
     let extractedPatient = '';
-    let extractedExamDate = '';
+    let extractedCpf = '';
     let extractedBirthDate = '';
+    let extractedAge = '';
     let extractedDoctor = '';
+    let extractedExamDate = '';
     let extractedConclusion = '';
     let extractedMotor = '';
     let extractedSensory = '';
     let extractedFWave = '';
     let extractedEmg = '';
 
-    // 1. Nome do Paciente
-    const patMatch = rawText.match(/(?:PACIENTE|NOME(?:\s+DO\s+PACIENTE)?):\s*([^\n\r]+)/i);
+    // Cabeçalho clínico para isolar dados do paciente (primeiros 3500 caracteres)
+    const cleanHeader = normalizedText.slice(0, 3500);
+
+    // Formatação de CPF para padrão brasileiro 000.000.000-00
+    const formatCpfDigits = (digits) => {
+      const clean = String(digits || '').replace(/\D/g, '');
+      if (clean.length === 11) {
+        return `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6, 9)}-${clean.slice(9, 11)}`;
+      }
+      return digits;
+    };
+
+    // Normalização de Datas para o padrão DD/MM/AAAA
+    const normalizeDateStr = (dateStr) => {
+      if (!dateStr) return '';
+      const parts = dateStr.replace(/[\.\-]/g, '/').split('/');
+      if (parts.length === 3) {
+        let [d, m, y] = parts.map(p => p.trim());
+        if (d.length === 1) d = '0' + d;
+        if (m.length === 1) m = '0' + m;
+        if (y.length === 2) {
+          y = parseInt(y, 10) > 30 ? '19' + y : '20' + y;
+        }
+        return `${d}/${m}/${y}`;
+      }
+      return dateStr.trim();
+    };
+
+    // Auxiliar para limpar delimitadores e rótulos seguintes em células/tabelas Word
+    const stripTrailingLabels = (str) => {
+      return str
+        .replace(/[\t]+.*$/s, '')
+        .replace(/\s+(?:CPF|C\.?P\.?F\.?|NASC(?:IMENTO)?|DT\.?\s*NASC|D\.?N\.?|DATA|IDADE|SOLICITANTE|SOLICITA[ÇC][ÃA]O|M[EÉ]DICO|CONV[EÊ]NIO|REGISTRO|PRONTU[AÁ]RIO|ATENDIMENTO|SEXO|LEITO|QUARTO|HORA|DR[A]?\.?)[\s:：\-\t].*$/i, '')
+        .replace(/^["'\s]+|["'\s:;,]+$/g, '')
+        .trim();
+    };
+
+    // 1. CPF (Cadastro de Pessoa Física)
+    const cpfLabeledMatch = cleanHeader.match(/(?:CPF|C\.?P\.?F\.?|DOC(?:UMENTO)?|IDENTIFICA[ÇC][ÃA]O)[\s:：\-\t]+([0-9\.\-\s]{11,18})/i)
+      || cleanHeader.match(/(?:CPF|C\.?P\.?F\.?|DOC(?:UMENTO)?|IDENTIFICA[ÇC][ÃA]O)[\s:：\-\t]*[\r\n]+\s*([0-9\.\-\s]{11,18})/i);
+
+    if (cpfLabeledMatch) {
+      const digits = cpfLabeledMatch[1].replace(/\D/g, '');
+      if (digits.length === 11) {
+        extractedCpf = formatCpfDigits(digits);
+      }
+    }
+
+    if (!extractedCpf) {
+      const cpfDirectMatch = cleanHeader.match(/\b(\d{3}\.\d{3}\.\d{3}-\d{2})\b/);
+      if (cpfDirectMatch) {
+        extractedCpf = cpfDirectMatch[1];
+      }
+    }
+
+    // 2. Data de Nascimento
+    const dobLabeledMatch = cleanHeader.match(/(?:DATA(?:\s+DE)?\s+NASC(?:IMENTO)?|DT\.?\s*NASC\.?|D\.?N\.?|NASC(?:IMENTO)?|NASCID[OA](?:\s+EM)?)[\s:：\-\t]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i)
+      || cleanHeader.match(/(?:DATA(?:\s+DE)?\s+NASC(?:IMENTO)?|DT\.?\s*NASC\.?|D\.?N\.?|NASC(?:IMENTO)?|NASCID[OA](?:\s+EM)?)[\s:：\-\t]*[\r\n]+\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i)
+      || cleanHeader.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})\s*[\(\[]?\s*\d+\s*(?:anos|a\b)/i);
+
+    if (dobLabeledMatch) {
+      extractedBirthDate = normalizeDateStr(dobLabeledMatch[1]);
+    }
+
+    // 3. Idade (Extração direta ou cálculo a partir da data de nascimento)
+    const ageLabeledMatch = cleanHeader.match(/(?:IDADE|FAIXA\s+ET[AÁ]RIA)[\s:：\-\t]+(\d{1,3}(?:\s*(?:anos|ano|a\b))?)/i)
+      || cleanHeader.match(/(?:IDADE|FAIXA\s+ET[AÁ]RIA)[\s:：\-\t]*[\r\n]+\s*(\d{1,3}(?:\s*(?:anos|ano|a\b))?)/i)
+      || cleanHeader.match(/[\(\[]\s*(\d{1,3})\s*(?:anos|ano|a\b)\s*[\)\]]/i)
+      || cleanHeader.match(/\b(\d{1,3})\s*(?:anos|ano)\b/i);
+
+    if (ageLabeledMatch) {
+      let rawAge = ageLabeledMatch[1].trim();
+      extractedAge = /^\d+$/.test(rawAge) ? `${rawAge} anos` : rawAge;
+    } else if (extractedBirthDate) {
+      const calc = calculateAge(extractedBirthDate);
+      if (calc !== null) {
+        extractedAge = `${calc} anos`;
+      }
+    }
+
+    // 4. Nome Completo do Paciente
+    const patMatch = cleanHeader.match(/(?:PACIENTE|NOME(?:\s+DO\s+PACIENTE|\s+COMPLETO)?)[\s:：\-\t]+([^\r\n]+)/i)
+      || cleanHeader.match(/(?:PACIENTE|NOME(?:\s+DO\s+PACIENTE|\s+COMPLETO)?)[\s:：\-\t]*[\r\n]+\s*([^\r\n]+)/i);
+
     if (patMatch) {
-      let clean = patMatch[1].replace(/salvo\s+neste\s+pc/ig, '').trim();
+      let clean = stripTrailingLabels(patMatch[1].trim());
+      clean = clean.replace(/salvo\s+neste\s+pc/ig, '').trim();
       clean = clean.replace(/\s+\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4}.*$/, '').trim();
-      extractedPatient = clean.toUpperCase().trim();
+      if (clean.length > 2 && !/^(?:RESULTADOS|ELETRONEUROMIOGRAFIA|LAUDO|CONCLUSAO)/i.test(clean)) {
+        extractedPatient = clean.toUpperCase().trim();
+      }
     } else if (fileName) {
       const cleanFileName = fileName.replace(/\.docx?$/i, '').trim();
       const nameParts = cleanFileName.split(/[-_]/);
@@ -520,84 +624,99 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       }
     }
 
-    // 2. Data do Exame
-    const dateMatch = rawText.match(/(?:DATA(?:\s+DO\s+EXAME)?):\s*(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})/i)
-      || rawText.match(/PACIENTE:[^\n\r]+?(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})/i)
-      || rawText.match(/\b(\d{2})[\/\-](\d{2})[\/\-](\d{4})\b/);
-    if (dateMatch) {
-      extractedExamDate = (dateMatch[1] || dateMatch[0]).replace(/-/g, '/').replace(/\./g, '/').trim();
-    } else {
-      extractedExamDate = new Date().toLocaleDateString('pt-BR');
-    }
+    // 5. Médico Solicitante
+    const docMatch = cleanHeader.match(/(?:M[EÉ]DICO\s+SOLICITANTE|SOLICITANTE|SOLICITA[ÇC][ÃA]O|SOLICITADO\s+POR)[\s:：\-\t]+([^\r\n]+)/i)
+      || cleanHeader.match(/(?:M[EÉ]DICO\s+SOLICITANTE|SOLICITANTE|SOLICITA[ÇC][ÃA]O|SOLICITADO\s+POR)[\s:：\-\t]*[\r\n]+\s*([^\r\n]+)/i)
+      || cleanHeader.match(/(DR[A]?\.?\s+[A-ZÀ-Ú\s\.\-]+(?:\s*-\s*CRM[^\n\r\t]*)?)/i);
 
-    // 3. Data de Nascimento
-    const dobMatch = rawText.match(/(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})\s+\d+\s*anos/i)
-      || rawText.match(/(?:NASC(?:IMENTO)?|DN):\s*(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})/i);
-    if (dobMatch) {
-      extractedBirthDate = (dobMatch[1] || dobMatch[0]).replace(/-/g, '/').replace(/\./g, '/').trim();
-    }
-
-    // 4. Médico Solicitante
-    const docMatch = rawText.match(/(?:M[EÉ]DICO\s+SOLICITANTE|SOLICITANTE):\s*([^\n\r]+)/i)
-      || rawText.match(/(DR[A]?\.?\s+[A-ZÀ-Ú\s]+(?:\s*-\s*CRM[^\n\r]*)?)/i);
     if (docMatch) {
-      extractedDoctor = (docMatch[1] || docMatch[0]).trim();
+      let cleanDoc = stripTrailingLabels(docMatch[1] || docMatch[0]);
+      if (cleanDoc.length > 2) {
+        extractedDoctor = cleanDoc.toUpperCase().trim();
+      }
     }
 
-    // 5. Seções Técnicas
-    const motorMatch = rawText.match(/NEUROCONDU[ÇC][ÃA]O\s+MOTORA:?\s*([\s\S]*?)(?=NEUROCONDU[ÇC][ÃA]O\s+SENSITIVA|ONDA\s+F|ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
+    // 6. Data do Exame
+    const dateMatch = cleanHeader.match(/(?:DATA(?:\s+DO\s+EXAME|\s+DO\s+ATENDIMENTO|\s+DA\s+REALIZA[ÇC][ÃA]O)?|DT\.?\s*EXAME|DATA\s+DE\s+ATENDIMENTO)[\s:：\-\t]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i)
+      || cleanHeader.match(/(?:DATA(?:\s+DO\s+EXAME|\s+DO\s+ATENDIMENTO|\s+DA\s+REALIZA[ÇC][ÃA]O)?|DT\.?\s*EXAME)[\s:：\-\t]*[\r\n]+\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i)
+      || cleanHeader.match(/\bDATA:?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
+
+    if (dateMatch) {
+      extractedExamDate = normalizeDateStr(dateMatch[1]);
+    } else {
+      const allDates = [...cleanHeader.matchAll(/\b(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})\b/g)].map(m => normalizeDateStr(m[1]));
+      const nonBirthDate = allDates.find(d => d !== extractedBirthDate);
+      extractedExamDate = nonBirthDate || new Date().toLocaleDateString('pt-BR');
+    }
+
+    // 7. Seções Técnicas
+    const motorMatch = normalizedText.match(/NEUROCONDU[ÇC][ÃA]O\s+MOTORA:?\s*([\s\S]*?)(?=NEUROCONDU[ÇC][ÃA]O\s+SENSITIVA|ONDA\s+F|ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
     if (motorMatch) extractedMotor = motorMatch[1].trim();
 
-    const sensoryMatch = rawText.match(/NEUROCONDU[ÇC][ÃA]O\s+SENSITIVA:?\s*([\s\S]*?)(?=ONDA\s+F|ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
+    const sensoryMatch = normalizedText.match(/NEUROCONDU[ÇC][ÃA]O\s+SENSITIVA:?\s*([\s\S]*?)(?=ONDA\s+F|ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
     if (sensoryMatch) extractedSensory = sensoryMatch[1].trim();
 
-    const fWaveMatch = rawText.match(/ONDA\s+F:?\s*([\s\S]*?)(?=ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
+    const fWaveMatch = normalizedText.match(/ONDA\s+F:?\s*([\s\S]*?)(?=ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
     if (fWaveMatch) extractedFWave = fWaveMatch[1].trim();
 
-    const emgMatch = rawText.match(/ELETROMIOGRAFIA:?\s*([\s\S]*?)(?=CONCLUS[ÃA]O|$)/i);
+    const emgMatch = normalizedText.match(/ELETROMIOGRAFIA:?\s*([\s\S]*?)(?=CONCLUS[ÃA]O|$)/i);
     if (emgMatch) extractedEmg = emgMatch[1].trim();
 
-    // 6. Conclusão
-    const concMatch = rawText.match(/CONCLUS[ÃA]O:?\s*([\s\S]*?)$/i);
+    // 8. Conclusão
+    const concMatch = normalizedText.match(/CONCLUS[ÃA]O:?\s*([\s\S]*?)$/i);
     if (concMatch) {
       extractedConclusion = concMatch[1].trim();
     } else {
-      extractedConclusion = rawText.trim();
+      extractedConclusion = normalizedText.trim();
     }
 
     // Cruzamento automático com a base de 1.739 pacientes
     let matchedInDb = null;
-    if (extractedPatient) {
+    if (extractedCpf) {
+      matchedInDb = findPatientByCPF(patientDb, extractedCpf);
+    }
+    if (!matchedInDb && extractedPatient) {
       const cleanSearchName = extractedPatient.toLowerCase().trim();
       matchedInDb = patientDb.find(p => p.name && p.name.toLowerCase().trim() === cleanSearchName)
         || patientDb.find(p => p.name && (p.name.toLowerCase().includes(cleanSearchName) || cleanSearchName.includes(p.name.toLowerCase())));
     }
 
+    if (matchedInDb) {
+      if (!extractedCpf && matchedInDb.cpf) extractedCpf = matchedInDb.cpf;
+      if (!extractedBirthDate && matchedInDb.birthDate) {
+        extractedBirthDate = matchedInDb.birthDate;
+        const calc = calculateAge(matchedInDb.birthDate);
+        if (!extractedAge && calc !== null) extractedAge = `${calc} anos`;
+      }
+      if (!extractedDoctor && matchedInDb.requestingDoctor) extractedDoctor = matchedInDb.requestingDoctor;
+      if (matchedInDb.phone || matchedInDb.mobilePhone) setPatientPhone(matchedInDb.phone || matchedInDb.mobilePhone);
+    }
+
+    // Transcrição completa para os estados do Laudo
     if (extractedPatient) setPatientName(extractedPatient);
-    if (extractedExamDate) setExamDate(extractedExamDate);
+    if (extractedCpf) setCpf(extractedCpf);
     if (extractedBirthDate) setBirthDate(extractedBirthDate);
+    if (extractedAge) setPatientAge(extractedAge);
     if (extractedDoctor) setRequestingDoctor(extractedDoctor);
+    if (extractedExamDate) setExamDate(extractedExamDate);
     if (extractedMotor) setMotorConduction(extractedMotor);
     if (extractedSensory) setSensoryConduction(extractedSensory);
     if (extractedFWave) setFWave(extractedFWave);
     if (extractedEmg) setEmgText(extractedEmg);
     if (extractedConclusion) setConclusion(extractedConclusion);
 
-    if (matchedInDb) {
-      if (matchedInDb.cpf) setCpf(matchedInDb.cpf);
-      if (matchedInDb.birthDate && !extractedBirthDate) setBirthDate(matchedInDb.birthDate);
-      if (matchedInDb.phone || matchedInDb.mobilePhone) setPatientPhone(matchedInDb.phone || matchedInDb.mobilePhone);
-    }
-
-    updateFullReportText(rawText.trim());
+    updateFullReportText(normalizedText.trim());
 
     setWordImportBanner({
       fileName,
       patientName: extractedPatient,
-      examDate: extractedExamDate,
+      cpf: extractedCpf,
+      birthDate: extractedBirthDate,
+      age: extractedAge,
       doctor: extractedDoctor,
+      examDate: extractedExamDate,
       matchedInDb: Boolean(matchedInDb),
-      patientCpf: matchedInDb?.cpf || '',
+      patientCpf: extractedCpf || matchedInDb?.cpf || '',
       patientPhone: matchedInDb?.phone || matchedInDb?.mobilePhone || '',
     });
   };
@@ -1064,6 +1183,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     if (found) {
       setPatientName(found.name);
       setBirthDate(found.birthDate);
+      const calc = calculateAge(found.birthDate);
+      if (calc !== null) setPatientAge(`${calc} anos`);
       if (found.requestingDoctor) setRequestingDoctor(found.requestingDoctor);
       if (found.phone) setPatientPhone(found.phone);
       if (found.lastExam) setExamDate(found.lastExam);
@@ -1076,7 +1197,11 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     const onlineData = await fetchCpfOnlineData(targetCpf);
     if (onlineData && onlineData.name) {
       setPatientName(onlineData.name);
-      if (onlineData.birthDate) setBirthDate(onlineData.birthDate);
+      if (onlineData.birthDate) {
+        setBirthDate(onlineData.birthDate);
+        const calc = calculateAge(onlineData.birthDate);
+        if (calc !== null) setPatientAge(`${calc} anos`);
+      }
       setCpfSearchStatus('found_online');
       setSelectedPatientExams([]);
     } else {
@@ -1244,8 +1369,11 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     doc.setFont('times', 'normal');
     doc.setFontSize(9.5);
     doc.setTextColor(...textDark);
-    doc.text(patientCpf || '---', 25, colYVal);
-    doc.text(calculateAge(birthDate) || '---', 68, colYVal);
+    doc.text(cpf || '---', 25, colYVal);
+    const resolvedPdfAge = patientAge
+      ? (patientAge.toLowerCase().includes('ano') ? patientAge : `${patientAge} anos`)
+      : (calculateAge(birthDate) ? `${calculateAge(birthDate)} anos` : '---');
+    doc.text(resolvedPdfAge, 68, colYVal);
     doc.text(requestingDoctor || 'O Próprio', 105, colYVal);
     doc.text(examDate || reportIssueDate || '---', 152, colYVal);
 
@@ -1819,18 +1947,20 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                               Ocultar Aviso
                             </button>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-slate-300">
-                            <div>👤 <strong>Paciente:</strong> {wordImportBanner.patientName || 'Identificado no texto'}</div>
-                            <div>📅 <strong>Data do Exame:</strong> {wordImportBanner.examDate || 'Hoje'}</div>
-                            <div>👨‍⚕️ <strong>Solicitante:</strong> {wordImportBanner.doctor || 'Identificado no texto'}</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 pt-1 text-[11px] text-slate-300">
+                            <div>👤 <strong>Paciente:</strong> <span className="text-white font-bold">{wordImportBanner.patientName || 'Identificado no texto'}</span></div>
+                            <div>🆔 <strong>CPF:</strong> <span className="text-cyan-300 font-mono font-bold">{wordImportBanner.cpf || wordImportBanner.patientCpf || 'Não informado'}</span></div>
+                            <div>🎂 <strong>Nasc. / Idade:</strong> <span className="text-white font-medium">{wordImportBanner.birthDate || 'N/A'}{wordImportBanner.age ? ` (${wordImportBanner.age})` : ''}</span></div>
+                            <div>👨‍⚕️ <strong>Solicitante:</strong> <span className="text-white font-medium">{wordImportBanner.doctor || 'Identificado no texto'}</span></div>
+                            <div>📅 <strong>Data Exame:</strong> <span className="text-amber-300 font-medium">{wordImportBanner.examDate || 'Hoje'}</span></div>
                           </div>
                           {wordImportBanner.matchedInDb ? (
                             <div className="text-[11px] text-cyan-300 font-bold bg-cyan-950/40 px-2 py-1 rounded border border-cyan-500/30">
-                              ✨ Paciente localizado na base cadastral de 1.739 pacientes! CPF ({wordImportBanner.patientCpf}) e Telefone preenchidos automaticamente.
+                              ✨ Paciente localizado na base cadastral de 1.739 pacientes! CPF ({wordImportBanner.patientCpf || wordImportBanner.cpf}) e Telefone preenchidos automaticamente.
                             </div>
                           ) : (
                             <div className="text-[11px] text-amber-300 bg-amber-950/30 px-2 py-1 rounded border border-amber-500/30">
-                              ℹ️ Dados do paciente extraídos do laudo. Se desejar salvá-lo na base permanente, clique em "Salvar Paciente".
+                              ℹ️ Dados do paciente extraídos e transcritos com sucesso do documento Word. Se desejar salvá-lo na base permanente, clique em "Salvar Paciente".
                             </div>
                           )}
                         </div>
@@ -1841,7 +1971,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
                           <User className="w-4 h-4 text-cyan-400" />
-                          <span>Dados Cadastrais do Paciente (Busca por CPF):</span>
+                          <span>Dados Cadastrais do Paciente (Transcrição Automática e Busca por CPF):</span>
                         </h4>
 
                         <div className="flex items-center gap-2">
@@ -1878,8 +2008,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
-                        <div className="sm:col-span-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                        <div className="sm:col-span-3">
                           <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
                             <span>CPF</span>
                             <span className="text-[10px] text-cyan-400 font-mono">Mevo</span>
@@ -1896,34 +2026,47 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                               type="button"
                               onClick={() => performCpfLookup()}
                               title="Buscar CPF"
-                              className="px-2 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0"
+                              className="px-2 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer"
                             >
                               <Search className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
 
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-3">
                           <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nome Completo</label>
                           <input
                             type="text"
                             value={patientName}
                             onChange={(e) => setPatientName(e.target.value)}
+                            placeholder="Nome Completo do Paciente"
                             className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
                           />
                         </div>
 
-                        <div className="sm:col-span-1">
+                        <div className="sm:col-span-2">
                           <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Nasc.</label>
                           <input
                             type="text"
                             value={birthDate}
-                            onChange={(e) => setBirthDate(e.target.value)}
+                            onChange={(e) => handleBirthDateChange(e.target.value)}
+                            placeholder="DD/MM/AAAA"
                             className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
                           />
                         </div>
 
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-1">
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Idade</label>
+                          <input
+                            type="text"
+                            value={patientAge}
+                            onChange={(e) => setPatientAge(e.target.value)}
+                            placeholder="Ex: 58 anos"
+                            className="w-full px-2 py-2 rounded-xl bg-slate-950 border border-slate-700 text-cyan-300 font-semibold text-xs text-center"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-3">
                           <label className="block text-[11px] font-semibold text-slate-400 mb-1">Médico Solicitante</label>
                           <input
                             type="text"
@@ -1934,7 +2077,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           />
                         </div>
 
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-4">
                           <label className="block text-[11px] font-semibold text-amber-400 mb-1">📅 Data do Exame</label>
                           <div className="relative flex items-center">
                             <input
@@ -1958,7 +2101,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           </div>
                         </div>
 
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-4">
                           <label className="block text-[11px] font-semibold text-cyan-400 mb-1">✍️ Emissão / Assinatura do Laudo</label>
                           <div className="relative flex items-center">
                             <input
@@ -1982,7 +2125,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           </div>
                         </div>
 
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-4">
                           <label className="block text-[11px] font-semibold text-emerald-400 mb-1">📱 Tel / WhatsApp do Paciente</label>
                           <input
                             type="text"
@@ -2629,7 +2772,11 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                       onClick={() => {
                                         if (pt.cpf) setCpf(pt.cpf);
                                         setPatientName(pt.name);
-                                        if (pt.birthDate) setBirthDate(pt.birthDate);
+                                        if (pt.birthDate) {
+                                          setBirthDate(pt.birthDate);
+                                          const calc = calculateAge(pt.birthDate);
+                                          if (calc !== null) setPatientAge(`${calc} anos`);
+                                        }
                                         if (pt.phone) setPatientPhone(pt.phone);
                                         if (pt.lastExam) setExamDate(pt.lastExam);
                                         setSelectedPatientExams(pt.examHistory || []);
@@ -2686,7 +2833,11 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             onClick={() => {
                               if (pt.cpf) setCpf(pt.cpf);
                               setPatientName(pt.name);
-                              if (pt.birthDate) setBirthDate(pt.birthDate);
+                              if (pt.birthDate) {
+                                setBirthDate(pt.birthDate);
+                                const calc = calculateAge(pt.birthDate);
+                                if (calc !== null) setPatientAge(`${calc} anos`);
+                              }
                               if (pt.phone) setPatientPhone(pt.phone);
                               if (pt.lastExam) setExamDate(pt.lastExam);
                               setSelectedPatientExams(pt.examHistory || []);
