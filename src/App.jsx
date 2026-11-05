@@ -14,7 +14,10 @@ import { translations } from './i18n/translations';
 
 export default function App() {
   const [lang, setLang] = useState('pt');
-  const [isPatientPortalOpen, setIsPatientPortalOpen] = useState(false);
+  const [isPatientPortalOpen, setIsPatientPortalOpen] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('portal') === '1' || Boolean(params.get('login'));
+  });
   const [isDoctorPanelOpen, setIsDoctorPanelOpen] = useState(false);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState(false);
 

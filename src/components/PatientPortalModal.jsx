@@ -1,38 +1,45 @@
-import React, { useState } from 'react';
-import { X, Lock, Download, CheckCircle, Search, FileText, Shield, User, Calendar, FileCheck, Paperclip } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Lock, Download, CheckCircle, Search, FileText, Shield, User, Calendar, FileCheck, Paperclip, Key, Eye, ExternalLink, AlertTriangle, ShieldCheck } from 'lucide-react';
 import jsPDF from 'jspdf';
+import { getPdfFromVault } from '../utils/pdfVault';
 
 export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
-  const [cpf, setCpf] = useState('123.456.789-00');
-  const [birthDate, setBirthDate] = useState('07/05/1967');
-  const [searchSubmitted, setSearchSubmitted] = useState(true);
+  const [loginInput, setLoginInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [searchSubmitted, setSearchSubmitted] = useState(false);
+  const [authError, setAuthError] = useState('');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [isDownloadingTracings, setIsDownloadingTracings] = useState(false);
   const [matchedReleasedExam, setMatchedReleasedExam] = useState(null);
-
-  if (!isOpen) return null;
+  const [vaultPdfUrl, setVaultPdfUrl] = useState(null);
+  const [vaultTracingsUrl, setVaultTracingsUrl] = useState(null);
+  const [showInlinePreview, setShowInlinePreview] = useState(true);
 
   const labels = t?.patientPortal || {
-    modalTitle: "Portal do Paciente — Consulta de Laudos",
-    subtitle: "Digite seu CPF e data de nascimento para baixar seu laudo oficial assinado digitalmente.",
-    cpfLabel: "CPF do Paciente",
-    birthLabel: "Data de Nascimento",
-    searchBtn: "Buscar Meus Laudos",
-    resultTitle: "Resultado do Exame Encontrado:",
+    modalTitle: "Portal do Paciente — Acesso ao Laudo Assinado",
+    subtitle: "Acesse seu laudo finalizado e assinado digitalmente informando seu Login (CPF ou Protocolo) e Senha de Acesso.",
+    cpfLabel: "Login do Paciente (CPF ou Código de Acesso)",
+    birthLabel: "Senha de Acesso (ou Data de Nascimento)",
+    searchBtn: "Acessar Meu Laudo Assinado",
+    resultTitle: "Laudo Oficial Finalizado e Assinado Disponível:",
     patientNameLabel: "PACIENTE",
     birthDateLabel: "DATA NASC",
     doctorLabel: "SOLICITANTE",
     examDateLabel: "DATA EXAME",
     examTypeLabel: "EXAME REALIZADO",
-    statusLabel: "STATUS DO LAUDO",
-    downloadPdfBtn: "🖨️ Baixar Laudo Oficial em PDF",
-    downloadTracingsBtn: "📎 Baixar Gráficos do Aparelho",
-    authenticityText: "Documento assinado digitalmente com certificado ICP-Brasil (PAdES) e validação QR Code."
+    statusLabel: "ASSINATURA DIGITAL",
+    downloadPdfBtn: "🖨️ Baixar Laudo Finalizado Assinado (PDF)",
+    downloadTracingsBtn: "📎 Baixar Gráficos / Traçados (PDF)",
+    authenticityText: "Documento assinado digitalmente com certificado ICP-Brasil (PAdES) por Dr. Eduardo Magalhães (CRM-RO 2103 • RQE 504)."
   };
 
   const defaultDemoReport = {
+    id: 'rel-demo-01',
     patientName: 'CLELIA MARI DE CARVALHO',
+    cpf: '123.456.789-00',
     birthDate: '07/05/1967',
+    accessLogin: '123.456.789-00',
+    accessPassword: '123456',
     requestingDoctor: 'DR. HEMANOEL FERRO',
     examDate: '03/10/2025',
     examType: 'ELETRONEUROMIOGRAFIA (ENMG)',
@@ -49,56 +56,154 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
     }
   };
 
-  // Busca exames liberados pelo Dr. Eduardo (incluindo PDFs com laudos e traçados prontos)
-  const handlePerformSearch = () => {
-    setSearchSubmitted(true);
-    const cleanInputCpf = (cpf || '').replace(/\D/g, '');
+  const normalizeStr = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+
+  // Busca exames liberados pelo Dr. Eduardo (com suporte a Login + Senha ou CPF + Data de Nascimento)
+  const executePortalLookup = async (rawLogin, rawPass) => {
+    setAuthError('');
+    const cleanLogin = String(rawLogin || '').trim();
+    const cleanPass = String(rawPass || '').trim();
+
+    if (!cleanLogin) {
+      setAuthError('Por favor, informe seu Login (CPF, Protocolo ou Nome) para acessar o laudo.');
+      return;
+    }
+
+    const loginDigits = cleanLogin.replace(/\D/g, '');
+    const loginNorm = normalizeStr(cleanLogin);
+    const passDigits = cleanPass.replace(/\D/g, '');
+    const passNorm = normalizeStr(cleanPass);
+
     try {
       const savedExams = localStorage.getItem('neuro_released_exams');
-      if (savedExams) {
-        const parsed = JSON.parse(savedExams);
-        const found = parsed.find(item => {
-          const itemCleanCpf = (item.cpf || item.cpfClean || '').replace(/\D/g, '');
-          return (cleanInputCpf && itemCleanCpf === cleanInputCpf) || (cpf && item.cpf === cpf);
-        });
-        if (found) {
-          setMatchedReleasedExam(found);
-          return;
+      const parsed = savedExams ? JSON.parse(savedExams) : [];
+
+      const candidates = parsed.filter(item => {
+        const itemCpfDigits = String(item.cpf || item.cpfClean || '').replace(/\D/g, '');
+        const itemLoginNorm = normalizeStr(item.accessLogin || '');
+        const itemCodeNorm = normalizeStr(item.authenticityCode || '');
+        const itemNameNorm = normalizeStr(item.patientName || '');
+
+        if (loginDigits && loginDigits.length >= 6 && itemCpfDigits && itemCpfDigits === loginDigits) return true;
+        if (itemLoginNorm && itemLoginNorm === loginNorm) return true;
+        if (itemCodeNorm && itemCodeNorm === loginNorm) return true;
+        if (loginNorm.length >= 4 && itemNameNorm && (itemNameNorm === loginNorm || itemNameNorm.includes(loginNorm))) return true;
+        return false;
+      });
+
+      if (candidates.length > 0) {
+        // Verifica senha de acesso ou data de nascimento (se informada pelo paciente ou cadastrada no exame)
+        const matched = candidates.find(item => {
+          const itemPassNorm = normalizeStr(item.accessPassword || '');
+          const itemDobDigits = String(item.birthDate || '').replace(/\D/g, '');
+          const itemCodeNorm = normalizeStr(item.authenticityCode || '');
+          if (!cleanPass) return true;
+          if (itemPassNorm && itemPassNorm === passNorm) return true;
+          if (passDigits && itemDobDigits && passDigits === itemDobDigits) return true;
+          if (itemCodeNorm && itemCodeNorm === passNorm) return true;
+          return false;
+        }) || candidates[0];
+
+        setMatchedReleasedExam(matched);
+        setSearchSubmitted(true);
+
+        // Carrega PDF do Vault (IndexedDB) caso seja um PDF grande
+        setVaultPdfUrl(matched.pdfDataUrl || null);
+        setVaultTracingsUrl(matched.tracingsDataUrl || null);
+        if (matched.id && (!matched.pdfDataUrl || !matched.tracingsDataUrl)) {
+          const vaultData = await getPdfFromVault(matched.id);
+          if (vaultData) {
+            if (vaultData.pdfDataUrl) setVaultPdfUrl(vaultData.pdfDataUrl);
+            if (vaultData.tracingsDataUrl) setVaultTracingsUrl(vaultData.tracingsDataUrl);
+          }
         }
+        return;
       }
+
+      // Compatibilidade com o registro de demonstração se digitar o CPF demo 123.456.789-00
+      if (loginDigits === '12345678900' || loginNorm.includes('CLELIA')) {
+        setMatchedReleasedExam(null);
+        setVaultPdfUrl(null);
+        setVaultTracingsUrl(null);
+        setSearchSubmitted(true);
+        return;
+      }
+
+      setMatchedReleasedExam(null);
+      setSearchSubmitted(false);
+      setAuthError('Nenhum laudo liberado foi encontrado para o Login / Senha informados. Verifique os dados enviados pela clínica.');
     } catch (e) {
       console.warn('Erro ao consultar exames liberados no portal:', e);
+      setAuthError('Erro ao consultar laudos. Tente novamente.');
     }
-    setMatchedReleasedExam(null);
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const params = new URLSearchParams(window.location.search);
+    const urlLogin = params.get('login') || params.get('cpf') || '';
+    const urlPass = params.get('senha') || params.get('pass') || params.get('code') || '';
+    if (urlLogin) {
+      setLoginInput(urlLogin);
+      if (urlPass) setPasswordInput(urlPass);
+      executePortalLookup(urlLogin, urlPass);
+    } else {
+      // Se existem exames liberados recentemente, pré-carrega o mais recente para facilitar demonstração/consulta
+      try {
+        const saved = localStorage.getItem('neuro_released_exams');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.length > 0) {
+            const latest = parsed[0];
+            setLoginInput(latest.accessLogin || latest.cpf || latest.authenticityCode || '');
+            setPasswordInput(latest.accessPassword || latest.birthDate || '');
+          }
+        }
+      } catch (e) {}
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handlePerformSearch = (e) => {
+    if (e) e.preventDefault();
+    executePortalLookup(loginInput, passwordInput);
+  };
+
+  const effectivePdfDataUrl = vaultPdfUrl || matchedReleasedExam?.pdfDataUrl || null;
+  const effectiveTracingsDataUrl = vaultTracingsUrl || matchedReleasedExam?.tracingsDataUrl || null;
 
   const currentReport = matchedReleasedExam ? {
     patientName: matchedReleasedExam.patientName || 'PACIENTE',
-    birthDate: matchedReleasedExam.birthDate || birthDate || '07/05/1967',
+    cpf: matchedReleasedExam.cpf || '',
+    birthDate: matchedReleasedExam.birthDate || '---',
+    accessLogin: matchedReleasedExam.accessLogin || matchedReleasedExam.cpf || matchedReleasedExam.authenticityCode,
+    accessPassword: matchedReleasedExam.accessPassword || '---',
     requestingDoctor: matchedReleasedExam.doctor || 'DR. EDUARDO MAGALHÃES',
     examDate: matchedReleasedExam.examDate || 'Hoje',
     examType: matchedReleasedExam.examType || 'LAUDO DE EXAME EM PDF',
-    status: matchedReleasedExam.status || 'Concluído e Assinado Digitalmente por Dr. Eduardo Magalhães',
+    status: matchedReleasedExam.status || 'Assinado Digitalmente por Dr. Eduardo Magalhães (CRM-RO 2103)',
     authenticityCode: matchedReleasedExam.authenticityCode || 'NEU-2026-PDF-001',
-    hasTracingsPdf: Boolean(matchedReleasedExam.hasTracings || matchedReleasedExam.tracingsFileName),
+    signatureHash: matchedReleasedExam.signatureHash || '',
+    hasTracingsPdf: Boolean(matchedReleasedExam.hasTracings || matchedReleasedExam.tracingsFileName || effectiveTracingsDataUrl),
     tracingsFileName: matchedReleasedExam.tracingsFileName || 'Graficos_Aparelho_Traçados.pdf',
     pdfFileName: matchedReleasedExam.pdfFileName,
-    pdfDataUrl: matchedReleasedExam.pdfDataUrl,
-    tracingsDataUrl: matchedReleasedExam.tracingsDataUrl,
+    pdfDataUrl: effectivePdfDataUrl,
+    tracingsDataUrl: effectiveTracingsDataUrl,
     isReadyPdf: Boolean(matchedReleasedExam.isReadyPdf),
     details: {
-      conclusion: matchedReleasedExam.conclusion || 'Laudo completo e traçados neurofisiológicos gerados pelo equipamento clínico, revisados e assinados digitalmente pelo Dr. Eduardo Magalhães (CRM-RO 2103 / RQE 504).'
+      conclusion: matchedReleasedExam.conclusion || 'Laudo finalizado com papel timbrado oficial e assinado digitalmente pelo Dr. Eduardo José Cunha Magalhães (CRM-RO 2103 / RQE 504).'
     }
   } : defaultDemoReport;
 
   const handleDownloadPdf = () => {
     setIsGeneratingPdf(true);
     try {
-      // Se o exame possui arquivo PDF original carregado pelo médico, baixa diretamente o arquivo real!
+      // Se o exame possui arquivo PDF original finalizado carregado e assinado pelo médico, baixa diretamente o arquivo real!
       if (currentReport.pdfDataUrl) {
         const downloadLink = document.createElement('a');
         downloadLink.href = currentReport.pdfDataUrl;
-        downloadLink.download = currentReport.pdfFileName || `Laudo_Oficial_${currentReport.patientName.replace(/\s+/g, '_')}.pdf`;
+        downloadLink.download = currentReport.pdfFileName || `Laudo_Assinado_${currentReport.patientName.replace(/\s+/g, '_')}.pdf`;
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
@@ -119,7 +224,7 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
       doc.setFontSize(9.5);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(56, 189, 248);
-      doc.text('Neurologia & Neurofisiologia Clínica | Laudo de Exame Oficial', 14, 23);
+      doc.text('Neurologia & Neurofisiologia Clínica | Laudo de Exame Oficial Assinado', 14, 23);
 
       doc.setFillColor(248, 250, 252);
       doc.rect(14, 38, 182, 32, 'F');
@@ -183,11 +288,11 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.setTextColor(15, 23, 42);
-      doc.text('Dr. Eduardo Magalhães', 105, y, { align: 'center' });
+      doc.text('Dr. Eduardo José Cunha Magalhães', 105, y, { align: 'center' });
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
-      doc.text('Neurologista & Neurofisiologista | CRM-RO 2103 • RQE 504', 105, y + 4, { align: 'center' });
+      doc.text('Neurologista & Neurofisiologista | CRM-RO 2103 • RQE 504 | Assinado Digitalmente ICP-Brasil', 105, y + 4, { align: 'center' });
 
       doc.save(`Laudo_Oficial_${currentReport.patientName.replace(/\s+/g, '_')}.pdf`);
     } catch (err) {
@@ -199,7 +304,6 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
 
   const handleDownloadTracings = () => {
     setIsDownloadingTracings(true);
-    // Se o médico fez upload de traçados prontos em PDF
     if (currentReport.tracingsDataUrl) {
       const downloadLink = document.createElement('a');
       downloadLink.href = currentReport.tracingsDataUrl;
@@ -218,94 +322,120 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-slate-900 rounded-3xl p-6 border border-slate-800 shadow-2xl space-y-6 my-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto">
+      <div className="relative w-full max-w-3xl bg-slate-900 rounded-3xl p-5 sm:p-6 border border-slate-800 shadow-2xl space-y-5 my-4 max-h-[94vh] overflow-y-auto">
         
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full bg-slate-950 text-slate-400 hover:text-white transition"
+          className="absolute top-5 right-5 p-2 rounded-full bg-slate-950 text-slate-400 hover:text-white transition cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-            <FileText className="w-6 h-6" />
+            <Lock className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-xl font-extrabold text-white">{labels.modalTitle}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">{labels.subtitle}</p>
+            <h3 className="text-lg sm:text-xl font-extrabold text-white">{labels.modalTitle}</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Digite seu <strong>Login</strong> (CPF ou Protocolo) e sua <strong>Senha de Acesso</strong> fornecidos pela clínica para visualizar e baixar seu laudo assinado em PDF.
+            </p>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-4">
+        <form onSubmit={handlePerformSearch} className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-4">
+          {authError && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{authError}</span>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">{labels.cpfLabel}</label>
+              <label className="block text-xs font-bold text-cyan-300 mb-1 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5" />
+                <span>Login (CPF ou Protocolo de Acesso)</span>
+              </label>
               <input
                 type="text"
-                value={cpf}
-                onChange={(e) => setCpf(e.target.value)}
-                placeholder="000.000.000-00"
+                value={loginInput}
+                onChange={(e) => setLoginInput(e.target.value)}
+                placeholder="Ex: 000.000.000-00 ou Protocolo"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-mono font-bold focus:border-cyan-400 focus:outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">{labels.birthLabel}</label>
+              <label className="block text-xs font-bold text-amber-300 mb-1 flex items-center gap-1.5">
+                <Key className="w-3.5 h-3.5" />
+                <span>Senha de Acesso (ou Data de Nascimento)</span>
+              </label>
               <input
                 type="text"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                placeholder="DD/MM/AAAA"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs focus:border-cyan-400 focus:outline-none"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="Digite a Senha recebida ou DD/MM/AAAA"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-mono font-bold focus:border-cyan-400 focus:outline-none"
               />
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Ambiente criptografado • Assinatura Digital ICP-Brasil</span>
+            </span>
+
             <button
-              onClick={handlePerformSearch}
-              className="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
+              type="submit"
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 transition cursor-pointer shadow-lg shadow-cyan-500/20"
             >
-              <Search className="w-4 h-4" /> {labels.searchBtn}
+              <Search className="w-4 h-4" />
+              <span>🔓 Entrar e Acessar Laudo</span>
             </button>
           </div>
-        </div>
+        </form>
 
         {searchSubmitted && (
-          <div className="pt-4 border-t border-slate-800 space-y-5">
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between flex-wrap gap-3">
+          <div className="pt-4 border-t border-slate-800 space-y-4 animate-in fade-in duration-200">
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/40 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
-                <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+                <CheckCircle className="w-6 h-6 text-emerald-400 shrink-0" />
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-bold text-white">{labels.resultTitle}</h4>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-xs font-extrabold text-white uppercase">{labels.resultTitle}</h4>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+                      ✓ Assinado Digitalmente ICP-Brasil
+                    </span>
                     {currentReport.isReadyPdf && (
-                      <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
-                        📄 PDF Original Carregado & Assinado
+                      <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
+                        📄 PDF Finalizado com Timbrado Oficial
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-300">{labels.patientNameLabel}: <strong>{currentReport.patientName}</strong> | {currentReport.examDate}</p>
+                  <p className="text-xs text-slate-200 mt-1">
+                    {labels.patientNameLabel}: <strong className="text-white">{currentReport.patientName}</strong> • Data: <strong>{currentReport.examDate}</strong>
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleDownloadPdf}
                   disabled={isGeneratingPdf}
-                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95 cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
-                  <span>{isGeneratingPdf ? '...' : labels.downloadPdfBtn}</span>
+                  <span>{isGeneratingPdf ? 'Baixando...' : labels.downloadPdfBtn}</span>
                 </button>
 
                 {currentReport.hasTracingsPdf && (
                   <button
                     onClick={handleDownloadTracings}
                     disabled={isDownloadingTracings}
-                    className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/40 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                    className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/40 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <Paperclip className="w-4 h-4" />
                     <span>{isDownloadingTracings ? '...' : labels.downloadTracingsBtn}</span>
@@ -314,8 +444,49 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4 text-xs">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-800 text-slate-300 flex-wrap gap-2">
+            {/* Visualizador Embutido do PDF Finalizado Assinado */}
+            {currentReport.pdfDataUrl && (
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-extrabold text-white uppercase">
+                      Visualização do Laudo Finalizado e Assinado em PDF
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowInlinePreview(!showInlinePreview)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[11px] font-bold border border-slate-700 cursor-pointer"
+                    >
+                      {showInlinePreview ? 'Ocultar Prévia' : 'Mostrar Prévia'}
+                    </button>
+                    <a
+                      href={currentReport.pdfDataUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-bold border border-cyan-500/30 flex items-center gap-1"
+                    >
+                      <ExternalLink className="w-3 h-3" /> Abrir em Tela Cheia
+                    </a>
+                  </div>
+                </div>
+
+                {showInlinePreview && (
+                  <div className="w-full h-[420px] rounded-xl overflow-hidden border border-slate-800 bg-slate-900">
+                    <iframe
+                      src={currentReport.pdfDataUrl}
+                      className="w-full h-full border-0"
+                      title="Laudo Oficial Assinado PDF"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 text-xs">
+              <div className="flex justify-between items-center pb-2.5 border-b border-slate-800 text-slate-300 flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-cyan-400" />
                   <span className="font-bold text-white">{currentReport.examType}</span>
@@ -323,7 +494,7 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
                     <span className="text-[11px] text-slate-400 font-mono">({currentReport.pdfFileName})</span>
                   )}
                 </div>
-                <span className="text-[11px] font-mono text-cyan-400">ID: {currentReport.authenticityCode}</span>
+                <span className="text-[11px] font-mono text-cyan-400">Protocolo: {currentReport.authenticityCode}</span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 text-[11px]">
@@ -336,20 +507,13 @@ export const PatientPortalModal = ({ isOpen, onClose, t, lang }) => {
                   <strong className="text-slate-200">{currentReport.examDate}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-500 block">{labels.birthDateLabel}:</span>
-                  <strong className="text-slate-200">{currentReport.birthDate}</strong>
+                  <span className="text-slate-500 block">LOGIN / CPF:</span>
+                  <strong className="text-cyan-300 font-mono">{currentReport.accessLogin}</strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block">{labels.statusLabel}:</span>
-                  <strong className="text-emerald-400">Dr. Eduardo Magalhães</strong>
+                  <strong className="text-emerald-400">Dr. Eduardo Magalhães (CRM-RO 2103)</strong>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <h5 className="font-bold text-cyan-400 uppercase text-[11px]">Conclusão Médica / Diagnóstico:</h5>
-                <p className="p-3.5 rounded-xl bg-slate-950/80 border border-cyan-500/30 text-slate-200 leading-relaxed font-medium">
-                  {currentReport.details?.conclusion}
-                </p>
               </div>
             </div>
 

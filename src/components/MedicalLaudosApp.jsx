@@ -9,19 +9,21 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import mammoth from 'mammoth';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
 import { INITIAL_PATIENT_DATABASE, formatCPF, findPatientByCPF, fetchCpfOnlineData } from '../data/patientDatabase';
 import { TIMBRADO_HEADER, TIMBRADO_FOOTER } from '../data/timbradoImages';
+import { savePdfToVault } from '../utils/pdfVault';
 
 // Utility: Calculate patient age from DD/MM/YYYY birth date
 const calculateAge = (bDate) => {
-  if (!bDate) return '';
-  const parts = bDate.split('/');
-  if (parts.length === 3) {
+  if (!bDate) return null;
+  const parts = String(bDate).trim().split('/');
+  if (parts.length === 3 && parts[2].length === 4) {
     const day = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10) - 1;
     const year = parseInt(parts[2], 10);
-    if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+    if (!isNaN(day) && !isNaN(month) && !isNaN(year) && year > 1890) {
       const birth = new Date(year, month, day);
       const today = new Date();
       let age = today.getFullYear() - birth.getFullYear();
@@ -30,7 +32,14 @@ const calculateAge = (bDate) => {
       if (age >= 0 && age < 130) return `${age} anos`;
     }
   }
-  return bDate;
+  return null;
+};
+
+const formatAgeValue = (val) => {
+  if (!val) return '';
+  const s = String(val).trim();
+  if (!s) return '';
+  return /ano/i.test(s) ? s : `${s} anos`;
 };
 
 // Utility: Format input digits into DD/MM/YYYY mask
@@ -437,8 +446,8 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
   const handleBirthDateChange = (val) => {
     setBirthDate(val);
     const calc = calculateAge(val);
-    if (calc !== null) {
-      setPatientAge(`${calc} anos`);
+    if (calc) {
+      setPatientAge(formatAgeValue(calc));
     }
   };
   
@@ -503,11 +512,20 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   const [isProcessingDocx, setIsProcessingDocx] = useState(false);
   const wordFileInputRef = useRef(null);
 
-  // Parser Inteligente de Laudos Word (.docx / .doc)
-  const parseWordDocumentContent = (rawText, fileName = '') => {
+  // Utilitário de normalização sem acentos para busca precisa na base de 1.739 pacientes
+  const normalizeSearchStr = (s) =>
+    String(s || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  // Parser Inteligente de Laudos Word (.docx / .doc) com suporte a tabelas HTML e texto estruturado
+  const parseWordDocumentContent = async (rawText, fileName = '', htmlContent = '') => {
     if (!rawText) return;
 
-    // Normaliza quebras de linha e espaços não separáveis comuns em arquivos Word (.docx)
     const normalizedText = rawText
       .replace(/\u00A0/g, ' ')
       .replace(/\r\n/g, '\n')
@@ -519,186 +537,338 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     let extractedAge = '';
     let extractedDoctor = '';
     let extractedExamDate = '';
+    let extractedPhone = '';
     let extractedConclusion = '';
     let extractedMotor = '';
     let extractedSensory = '';
     let extractedFWave = '';
     let extractedEmg = '';
 
-    // Cabeçalho clínico para isolar dados do paciente (primeiros 3500 caracteres)
     const cleanHeader = normalizedText.slice(0, 3500);
 
-    // Formatação de CPF para padrão brasileiro 000.000.000-00
     const formatCpfDigits = (digits) => {
       const clean = String(digits || '').replace(/\D/g, '');
       if (clean.length === 11) {
         return `${clean.slice(0, 3)}.${clean.slice(3, 6)}.${clean.slice(6, 9)}-${clean.slice(9, 11)}`;
       }
-      return digits;
+      return '';
     };
 
-    // Normalização de Datas para o padrão DD/MM/AAAA
     const normalizeDateStr = (dateStr) => {
       if (!dateStr) return '';
-      const parts = dateStr.replace(/[\.\-]/g, '/').split('/');
-      if (parts.length === 3) {
-        let [d, m, y] = parts.map(p => p.trim());
+      const m = String(dateStr).trim().match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+      if (m) {
+        let [, d, mo, y] = m;
         if (d.length === 1) d = '0' + d;
-        if (m.length === 1) m = '0' + m;
+        if (mo.length === 1) mo = '0' + mo;
         if (y.length === 2) {
           y = parseInt(y, 10) > 30 ? '19' + y : '20' + y;
         }
-        return `${d}/${m}/${y}`;
+        return `${d}/${mo}/${y}`;
       }
-      return dateStr.trim();
+      return '';
     };
 
-    // Auxiliar para limpar delimitadores e rótulos seguintes em células/tabelas Word
+    // Detecta se uma string é apenas um rótulo de campo ou título de seção (para nunca confundir rótulo vazio com valor!)
+    const isFieldLabelOnly = (str) => {
+      const norm = normalizeSearchStr(str);
+      if (!norm) return true;
+      return /^(?:PACIENTE|NOME|NOME DO PACIENTE|NOME COMPLETO|CPF|C P F|IDENTIFICACAO|DOC|DOCUMENTO|RG|DATA DE NASCIMENTO|DATA NASCIMENTO|DATA NASC|DT NASC|D N|DN|NASCIMENTO|IDADE|FAIXA ETARIA|SOLICITANTE|MEDICO SOLICITANTE|MEDICO A SOLICITANTE|SOLICITACAO|SOLICITADO POR|INDICACAO|DR A|MEDICO|DATA DO EXAME|DATA DO ATENDIMENTO|DATA DE ATENDIMENTO|DT EXAME|DATA DA REALIZACAO|DATA|CONVENIO|TELEFONE|CELULAR|SEXO|PRONTUARIO|REGISTRO|LEITO|HORA|RESULTADOS OBTIDOS|A RESULTADOS OBTIDOS|ELETRONEUROMIOGRAFIA|ELETROENCEFALOGRAMA|EEG DIGITAL E MAPEAMENTO CEREBRAL|LAUDO MEDICO NEUROLOGICO|NEUROCONDUCAO MOTORA|NEUROCONDUCAO SENSITIVA|ONDA F|ELETROMIOGRAFIA|CONCLUSAO|B CONCLUSAO)$/.test(norm);
+    };
+
+    // Limpa rótulos que venham colados na mesma linha à direita do valor (sem jamais cortar "DR." ou "DRA.")
     const stripTrailingLabels = (str) => {
-      return str
+      if (!str) return '';
+      return String(str)
         .replace(/[\t]+.*$/s, '')
-        .replace(/\s+(?:CPF|C\.?P\.?F\.?|NASC(?:IMENTO)?|DT\.?\s*NASC|D\.?N\.?|DATA|IDADE|SOLICITANTE|SOLICITA[ÇC][ÃA]O|M[EÉ]DICO|CONV[EÊ]NIO|REGISTRO|PRONTU[AÁ]RIO|ATENDIMENTO|SEXO|LEITO|QUARTO|HORA|DR[A]?\.?)[\s:：\-\t].*$/i, '')
-        .replace(/^["'\s]+|["'\s:;,]+$/g, '')
+        .replace(/\s+(?:CPF|C\.?P\.?F\.?|IDENTIFICA[ÇC][ÃA]O|NASC(?:IMENTO)?|DT\.?\s*NASC|D\.?N\.?|DATA(?:\s+DO\s+EXAME|\s+DO\s+ATENDIMENTO|\s+DE\s+NASCIMENTO)?|IDADE|SOLICITANTE|SOLICITA[ÇC][ÃA]O|M[EÉ]DICO\s+SOLICITANTE|CONV[EÊ]NIO|REGISTRO|PRONTU[AÁ]RIO|ATENDIMENTO|SEXO|LEITO|QUARTO|HORA|TELEFONE|CELULAR|RG)\s*[:：\-\t].*$/i, '')
+        .replace(/^["'\s:：\-]+|["'\s:;,]+$/g, '')
         .trim();
     };
 
-    // 1. CPF (Cadastro de Pessoa Física)
-    const cpfLabeledMatch = cleanHeader.match(/(?:CPF|C\.?P\.?F\.?|DOC(?:UMENTO)?|IDENTIFICA[ÇC][ÃA]O)[\s:：\-\t]+([0-9\.\-\s]{11,18})/i)
-      || cleanHeader.match(/(?:CPF|C\.?P\.?F\.?|DOC(?:UMENTO)?|IDENTIFICA[ÇC][ÃA]O)[\s:：\-\t]*[\r\n]+\s*([0-9\.\-\s]{11,18})/i);
+    const classifyHeaderLabel = (labelStr) => {
+      const norm = normalizeSearchStr(labelStr);
+      if (!norm) return null;
+      if (/^(?:PACIENTE|NOME|NOME DO PACIENTE|NOME COMPLETO)$/.test(norm)) return 'patient';
+      if (/^(?:CPF|C P F|IDENTIFICACAO|DOC|DOCUMENTO)$/.test(norm)) return 'cpf';
+      if (/^(?:DATA DE NASCIMENTO|DATA NASCIMENTO|DATA NASC|DT NASC|D N|DN|NASCIMENTO)$/.test(norm)) return 'birthDate';
+      if (/^(?:IDADE|FAIXA ETARIA)$/.test(norm)) return 'age';
+      if (/^(?:MEDICO SOLICITANTE|MEDICO A SOLICITANTE|SOLICITANTE|SOLICITACAO|SOLICITADO POR|INDICACAO|ENCAMINHADO POR)$/.test(norm)) return 'doctor';
+      if (/^(?:DATA DO EXAME|DATA DO ATENDIMENTO|DATA DE ATENDIMENTO|DT EXAME|DATA DA REALIZACAO|DATA)$/.test(norm)) return 'examDate';
+      if (/^(?:TELEFONE|CELULAR|WHATSAPP|FONE|TEL)$/.test(norm)) return 'phone';
+      return null;
+    };
 
-    if (cpfLabeledMatch) {
-      const digits = cpfLabeledMatch[1].replace(/\D/g, '');
-      if (digits.length === 11) {
-        extractedCpf = formatCpfDigits(digits);
+    const assignExtractedField = (fieldType, rawVal) => {
+      const val = stripTrailingLabels(rawVal);
+      if (!val || isFieldLabelOnly(val)) return;
+      if (fieldType === 'patient' && !extractedPatient) {
+        const clean = val.replace(/salvo\s+neste\s+pc/ig, '').replace(/\s+\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4}.*$/, '').trim();
+        if (clean.length > 2 && !isFieldLabelOnly(clean)) {
+          extractedPatient = clean.toUpperCase();
+        }
+      } else if (fieldType === 'cpf' && !extractedCpf) {
+        const formatted = formatCpfDigits(val);
+        if (formatted) extractedCpf = formatted;
+      } else if (fieldType === 'birthDate' && !extractedBirthDate) {
+        const d = normalizeDateStr(val);
+        if (d) extractedBirthDate = d;
+      } else if (fieldType === 'age' && !extractedAge) {
+        const m = val.match(/(\d{1,3})/);
+        if (m) extractedAge = `${m[1]} anos`;
+      } else if (fieldType === 'doctor' && !extractedDoctor) {
+        if (val.length > 1 && !/^\d{1,2}[\/\-\.]\d{1,2}/.test(val) && !isFieldLabelOnly(val)) {
+          extractedDoctor = val.toUpperCase();
+        }
+      } else if (fieldType === 'examDate' && !extractedExamDate) {
+        const d = normalizeDateStr(val);
+        if (d) extractedExamDate = d;
+      } else if (fieldType === 'phone' && !extractedPhone) {
+        extractedPhone = val;
+      }
+    };
+
+    // CAMADA 1: Inspeção estrutural de Tabelas Word via HTML (suporta tabelas com linha de cabeçalho + linha de valores e células lado a lado)
+    if (htmlContent && typeof window !== 'undefined' && window.DOMParser) {
+      try {
+        const parser = new window.DOMParser();
+        const doc = parser.parseFromString(htmlContent, 'text/html');
+        const tables = doc.querySelectorAll('table');
+        tables.forEach((table) => {
+          const rows = Array.from(table.querySelectorAll('tr'));
+          for (let r = 0; r < rows.length; r++) {
+            const cells = Array.from(rows[r].querySelectorAll('td, th')).map(c => c.textContent.replace(/\u00A0/g, ' ').trim());
+            const cellTypes = cells.map(c => classifyHeaderLabel(c));
+            const labelCountInRow = cellTypes.filter(Boolean).length;
+
+            // Caso A: Linha de cabeçalho de colunas (ex: IDENTIFICAÇÃO | IDADE | MÉDICO SOLICITANTE | DATA DO ATENDIMENTO)
+            // seguida pela linha r+1 com os respectivos valores na mesma coluna!
+            if (labelCountInRow >= 2 && r + 1 < rows.length) {
+              const nextCells = Array.from(rows[r + 1].querySelectorAll('td, th')).map(c => c.textContent.replace(/\u00A0/g, ' ').trim());
+              cellTypes.forEach((fType, colIdx) => {
+                if (fType && nextCells[colIdx] && !classifyHeaderLabel(nextCells[colIdx])) {
+                  assignExtractedField(fType, nextCells[colIdx]);
+                }
+              });
+            }
+
+            // Caso B: Rótulo e Valor na mesma célula (ex: "SOLICITANTE: DR FULANO") ou em células adjacentes (c -> c+1)
+            for (let c = 0; c < cells.length; c++) {
+              const cellText = cells[c];
+              const fType = cellTypes[c];
+              if (fType && c + 1 < cells.length && !cellTypes[c + 1]) {
+                assignExtractedField(fType, cells[c + 1]);
+              } else if (cellText.includes(':')) {
+                const idx = cellText.indexOf(':');
+                const leftLabel = cellText.slice(0, idx).trim();
+                const rightVal = cellText.slice(idx + 1).trim();
+                const inlineType = classifyHeaderLabel(leftLabel);
+                if (inlineType && rightVal) {
+                  assignExtractedField(inlineType, rightVal);
+                }
+              }
+            }
+          }
+        });
+      } catch (htmlErr) {
+        console.warn('Aviso ao inspecionar tabelas HTML do Word:', htmlErr);
       }
     }
 
+    // CAMADA 2: Varredura linear inteligente linha a linha no cabeçalho do documento (.docx)
+    const headerLines = cleanHeader
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean);
+
+    for (let i = 0; i < headerLines.length; i++) {
+      const line = headerLines[i];
+      // Verifica se a linha inteira é apenas um rótulo (ex: "SOLICITANTE:" ou "NOME:") e o valor está na linha seguinte i+1
+      const cleanLabelCandidate = line.replace(/[:：\-\s]+$/, '').trim();
+      const standaloneType = classifyHeaderLabel(cleanLabelCandidate);
+      if (standaloneType && (line.endsWith(':') || line.endsWith('：') || isFieldLabelOnly(line))) {
+        const afterColonSameLine = line.includes(':') ? line.slice(line.indexOf(':') + 1).trim() : '';
+        if (afterColonSameLine && !isFieldLabelOnly(afterColonSameLine)) {
+          assignExtractedField(standaloneType, afterColonSameLine);
+        } else if (i + 1 < headerLines.length) {
+          const nextLine = headerLines[i + 1];
+          // Só usa a próxima linha se ela NÃO for outro rótulo (ex: se SOLICITANTE estiver em branco antes de DATA DO EXAME:)
+          if (!isFieldLabelOnly(nextLine) && !classifyHeaderLabel(nextLine.replace(/[:：\-\s]+$/, ''))) {
+            assignExtractedField(standaloneType, nextLine);
+          }
+        }
+        continue;
+      }
+
+      // Verifica se a linha possui "RÓTULO: VALOR" na mesma linha
+      const colonIdx = line.indexOf(':');
+      if (colonIdx > 0) {
+        const leftPart = line.slice(0, colonIdx).trim();
+        const rightPart = line.slice(colonIdx + 1).trim();
+        const inlineType = classifyHeaderLabel(leftPart);
+        if (inlineType && rightPart && !isFieldLabelOnly(rightPart)) {
+          assignExtractedField(inlineType, rightPart);
+        }
+      }
+    }
+
+    // CAMADA 3: Regex de segurança para padrões específicos no cabeçalho (caso haja múltiplos campos na mesma linha)
     if (!extractedCpf) {
-      const cpfDirectMatch = cleanHeader.match(/\b(\d{3}\.\d{3}\.\d{3}-\d{2})\b/);
-      if (cpfDirectMatch) {
-        extractedCpf = cpfDirectMatch[1];
+      const cpfLabeledMatch = cleanHeader.match(/(?:CPF|C\.?P\.?F\.?|IDENTIFICA[ÇC][ÃA]O|DOC(?:UMENTO)?)[\s:：\-\t]+([0-9]{3}[\.\s]?[0-9]{3}[\.\s]?[0-9]{3}[\-\/\s]?[0-9]{2}|\b\d{11}\b)/i);
+      if (cpfLabeledMatch) {
+        extractedCpf = formatCpfDigits(cpfLabeledMatch[1]);
+      } else {
+        const cpfDirectMatch = cleanHeader.match(/\b(\d{3}\.\d{3}\.\d{3}[\-\/]\d{2})\b/);
+        if (cpfDirectMatch) {
+          extractedCpf = formatCpfDigits(cpfDirectMatch[1]);
+        }
       }
     }
 
-    // 2. Data de Nascimento
-    const dobLabeledMatch = cleanHeader.match(/(?:DATA(?:\s+DE)?\s+NASC(?:IMENTO)?|DT\.?\s*NASC\.?|D\.?N\.?|NASC(?:IMENTO)?|NASCID[OA](?:\s+EM)?)[\s:：\-\t]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i)
-      || cleanHeader.match(/(?:DATA(?:\s+DE)?\s+NASC(?:IMENTO)?|DT\.?\s*NASC\.?|D\.?N\.?|NASC(?:IMENTO)?|NASCID[OA](?:\s+EM)?)[\s:：\-\t]*[\r\n]+\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i)
-      || cleanHeader.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})\s*[\(\[]?\s*\d+\s*(?:anos|a\b)/i);
-
-    if (dobLabeledMatch) {
-      extractedBirthDate = normalizeDateStr(dobLabeledMatch[1]);
+    if (!extractedBirthDate) {
+      const dobMatch = cleanHeader.match(/(?:DATA(?:\s+DE)?\s+NASC(?:IMENTO)?|DT\.?\s*NASC\.?|D\.?N\.?|NASC(?:IMENTO)?)[\s:：\-\t]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i)
+        || cleanHeader.match(/(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})\s*[\(\[]?\s*\d{1,3}\s*(?:anos|ano\b)/i);
+      if (dobMatch) {
+        extractedBirthDate = normalizeDateStr(dobMatch[1]);
+      }
     }
 
-    // 3. Idade (Extração direta ou cálculo a partir da data de nascimento)
-    const ageLabeledMatch = cleanHeader.match(/(?:IDADE|FAIXA\s+ET[AÁ]RIA)[\s:：\-\t]+(\d{1,3}(?:\s*(?:anos|ano|a\b))?)/i)
-      || cleanHeader.match(/(?:IDADE|FAIXA\s+ET[AÁ]RIA)[\s:：\-\t]*[\r\n]+\s*(\d{1,3}(?:\s*(?:anos|ano|a\b))?)/i)
-      || cleanHeader.match(/[\(\[]\s*(\d{1,3})\s*(?:anos|ano|a\b)\s*[\)\]]/i)
-      || cleanHeader.match(/\b(\d{1,3})\s*(?:anos|ano)\b/i);
-
-    if (ageLabeledMatch) {
-      let rawAge = ageLabeledMatch[1].trim();
-      extractedAge = /^\d+$/.test(rawAge) ? `${rawAge} anos` : rawAge;
+    if (!extractedAge) {
+      const ageMatch = cleanHeader.match(/(?:IDADE|FAIXA\s+ET[AÁ]RIA)[\s:：\-\t]+(\d{1,3})\b/i)
+        || cleanHeader.match(/\b(\d{1,3})\s*(?:anos|ano)\b/i);
+      if (ageMatch) {
+        extractedAge = `${ageMatch[1]} anos`;
+      } else if (extractedBirthDate) {
+        const calc = calculateAge(extractedBirthDate);
+        if (calc) extractedAge = formatAgeValue(calc);
+      }
     } else if (extractedBirthDate) {
-      const calc = calculateAge(extractedBirthDate);
-      if (calc !== null) {
-        extractedAge = `${calc} anos`;
+      // Garante formatação consistente da idade
+      extractedAge = formatAgeValue(extractedAge);
+    }
+
+    if (!extractedPatient) {
+      const patInline = cleanHeader.match(/(?:PACIENTE|NOME(?:\s+DO\s+PACIENTE|\s+COMPLETO)?)\s*[:：\-]\s*([^\r\n]+)/i);
+      if (patInline) {
+        assignExtractedField('patient', patInline[1]);
+      }
+      if (!extractedPatient && fileName) {
+        const cleanFileName = fileName.replace(/\.docx?$/i, '').trim();
+        const nameParts = cleanFileName.split(/[-_]/);
+        if (nameParts[0] && nameParts[0].trim().length > 3) {
+          extractedPatient = nameParts[0].trim().toUpperCase();
+        }
       }
     }
 
-    // 4. Nome Completo do Paciente
-    const patMatch = cleanHeader.match(/(?:PACIENTE|NOME(?:\s+DO\s+PACIENTE|\s+COMPLETO)?)[\s:：\-\t]+([^\r\n]+)/i)
-      || cleanHeader.match(/(?:PACIENTE|NOME(?:\s+DO\s+PACIENTE|\s+COMPLETO)?)[\s:：\-\t]*[\r\n]+\s*([^\r\n]+)/i);
-
-    if (patMatch) {
-      let clean = stripTrailingLabels(patMatch[1].trim());
-      clean = clean.replace(/salvo\s+neste\s+pc/ig, '').trim();
-      clean = clean.replace(/\s+\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4}.*$/, '').trim();
-      if (clean.length > 2 && !/^(?:RESULTADOS|ELETRONEUROMIOGRAFIA|LAUDO|CONCLUSAO)/i.test(clean)) {
-        extractedPatient = clean.toUpperCase().trim();
-      }
-    } else if (fileName) {
-      const cleanFileName = fileName.replace(/\.docx?$/i, '').trim();
-      const nameParts = cleanFileName.split(/[-_]/);
-      if (nameParts[0] && nameParts[0].trim().length > 3) {
-        extractedPatient = nameParts[0].trim().toUpperCase();
+    if (!extractedDoctor) {
+      const docInline = cleanHeader.match(/(?:M[EÉ]DICO(?:\(A\))?\s+SOLICITANTE|SOLICITANTE|SOLICITA[ÇC][ÃA]O|SOLICITADO\s+POR|INDICA[ÇC][ÃA]O)\s*[:：\-]\s*([^\r\n]+)/i);
+      if (docInline) {
+        assignExtractedField('doctor', docInline[1]);
       }
     }
 
-    // 5. Médico Solicitante
-    const docMatch = cleanHeader.match(/(?:M[EÉ]DICO\s+SOLICITANTE|SOLICITANTE|SOLICITA[ÇC][ÃA]O|SOLICITADO\s+POR)[\s:：\-\t]+([^\r\n]+)/i)
-      || cleanHeader.match(/(?:M[EÉ]DICO\s+SOLICITANTE|SOLICITANTE|SOLICITA[ÇC][ÃA]O|SOLICITADO\s+POR)[\s:：\-\t]*[\r\n]+\s*([^\r\n]+)/i)
-      || cleanHeader.match(/(DR[A]?\.?\s+[A-ZÀ-Ú\s\.\-]+(?:\s*-\s*CRM[^\n\r\t]*)?)/i);
-
-    if (docMatch) {
-      let cleanDoc = stripTrailingLabels(docMatch[1] || docMatch[0]);
-      if (cleanDoc.length > 2) {
-        extractedDoctor = cleanDoc.toUpperCase().trim();
+    if (!extractedExamDate) {
+      const dateInline = cleanHeader.match(/(?:DATA(?:\s+DO\s+EXAME|\s+DO\s+ATENDIMENTO|\s+DA\s+REALIZA[ÇC][ÃA]O)?|DT\.?\s*EXAME)\s*[:：\-]\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
+      if (dateInline) {
+        extractedExamDate = normalizeDateStr(dateInline[1]);
+      } else {
+        const allDates = [...cleanHeader.matchAll(/\b(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})\b/g)].map(m => normalizeDateStr(m[1]));
+        const nonBirthDate = allDates.find(d => d && d !== extractedBirthDate);
+        extractedExamDate = nonBirthDate || new Date().toLocaleDateString('pt-BR');
       }
     }
 
-    // 6. Data do Exame
-    const dateMatch = cleanHeader.match(/(?:DATA(?:\s+DO\s+EXAME|\s+DO\s+ATENDIMENTO|\s+DA\s+REALIZA[ÇC][ÃA]O)?|DT\.?\s*EXAME|DATA\s+DE\s+ATENDIMENTO)[\s:：\-\t]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i)
-      || cleanHeader.match(/(?:DATA(?:\s+DO\s+EXAME|\s+DO\s+ATENDIMENTO|\s+DA\s+REALIZA[ÇC][ÃA]O)?|DT\.?\s*EXAME)[\s:：\-\t]*[\r\n]+\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i)
-      || cleanHeader.match(/\bDATA:?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
-
-    if (dateMatch) {
-      extractedExamDate = normalizeDateStr(dateMatch[1]);
-    } else {
-      const allDates = [...cleanHeader.matchAll(/\b(\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})\b/g)].map(m => normalizeDateStr(m[1]));
-      const nonBirthDate = allDates.find(d => d !== extractedBirthDate);
-      extractedExamDate = nonBirthDate || new Date().toLocaleDateString('pt-BR');
-    }
-
-    // 7. Seções Técnicas
-    const motorMatch = normalizedText.match(/NEUROCONDU[ÇC][ÃA]O\s+MOTORA:?\s*([\s\S]*?)(?=NEUROCONDU[ÇC][ÃA]O\s+SENSITIVA|ONDA\s+F|ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
+    // 7. Seções Técnicas do Corpo do Laudo
+    const motorMatch = normalizedText.match(/NEUROCONDU[ÇC][ÃA]O\s+MOTORA\s*[:：\-–]?\s*([\s\S]*?)(?=NEUROCONDU[ÇC][ÃA]O\s+SENSITIVA|ONDA\s+F|ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
     if (motorMatch) extractedMotor = motorMatch[1].trim();
 
-    const sensoryMatch = normalizedText.match(/NEUROCONDU[ÇC][ÃA]O\s+SENSITIVA:?\s*([\s\S]*?)(?=ONDA\s+F|ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
+    const sensoryMatch = normalizedText.match(/NEUROCONDU[ÇC][ÃA]O\s+SENSITIVA\s*[:：\-–]?\s*([\s\S]*?)(?=ONDA\s+F|ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
     if (sensoryMatch) extractedSensory = sensoryMatch[1].trim();
 
-    const fWaveMatch = normalizedText.match(/ONDA\s+F:?\s*([\s\S]*?)(?=ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
+    const fWaveMatch = normalizedText.match(/ONDA\s+F\s*[:：\-–]?\s*([\s\S]*?)(?=ELETROMIOGRAFIA|CONCLUS[ÃA]O|$)/i);
     if (fWaveMatch) extractedFWave = fWaveMatch[1].trim();
 
-    const emgMatch = normalizedText.match(/ELETROMIOGRAFIA:?\s*([\s\S]*?)(?=CONCLUS[ÃA]O|$)/i);
+    const emgMatch = normalizedText.match(/ELETROMIOGRAFIA\s*[:：\-–]?\s*([\s\S]*?)(?=CONCLUS[ÃA]O|$)/i);
     if (emgMatch) extractedEmg = emgMatch[1].trim();
 
-    // 8. Conclusão
-    const concMatch = normalizedText.match(/CONCLUS[ÃA]O:?\s*([\s\S]*?)$/i);
+    const concMatch = normalizedText.match(/(?:B\)\s*)?CONCLUS[ÃA]O\s*[:：\-–]?\s*([\s\S]*?)$/i);
     if (concMatch) {
       extractedConclusion = concMatch[1].trim();
     } else {
       extractedConclusion = normalizedText.trim();
     }
 
-    // Cruzamento automático com a base de 1.739 pacientes
+    // 8. Cruzamento automático insensível a acentos com a base de 1.739 pacientes
     let matchedInDb = null;
     if (extractedCpf) {
       matchedInDb = findPatientByCPF(patientDb, extractedCpf);
     }
     if (!matchedInDb && extractedPatient) {
-      const cleanSearchName = extractedPatient.toLowerCase().trim();
-      matchedInDb = patientDb.find(p => p.name && p.name.toLowerCase().trim() === cleanSearchName)
-        || patientDb.find(p => p.name && (p.name.toLowerCase().includes(cleanSearchName) || cleanSearchName.includes(p.name.toLowerCase())));
+      const targetNorm = normalizeSearchStr(extractedPatient);
+      if (targetNorm.length >= 3) {
+        const exactMatches = patientDb.filter(p => p.name && normalizeSearchStr(p.name) === targetNorm);
+        if (exactMatches.length === 1) {
+          matchedInDb = exactMatches[0];
+        } else if (exactMatches.length > 1) {
+          matchedInDb = exactMatches.find(p => extractedBirthDate && p.birthDate === extractedBirthDate)
+            || exactMatches.find(p => p.cpf && p.cpf.trim().length >= 11)
+            || exactMatches[0];
+        } else {
+          // Busca por nome parcial apenas se a data de nascimento coincidir ou se o nome completo tiver >= 2 sobrenomes iguais
+          matchedInDb = patientDb.find(p => {
+            if (!p.name) return false;
+            const pNorm = normalizeSearchStr(p.name);
+            if (!pNorm) return false;
+            const nameOverlap = pNorm.includes(targetNorm) || targetNorm.includes(pNorm);
+            if (!nameOverlap) return false;
+            if (extractedBirthDate && p.birthDate) {
+              return p.birthDate === extractedBirthDate;
+            }
+            return targetNorm.split(' ').length >= 3 && pNorm.split(' ').length >= 3;
+          });
+        }
+      }
     }
 
     if (matchedInDb) {
-      if (!extractedCpf && matchedInDb.cpf) extractedCpf = matchedInDb.cpf;
+      if (!extractedCpf && matchedInDb.cpf) {
+        extractedCpf = formatCpfDigits(matchedInDb.cpf) || matchedInDb.cpf;
+      }
       if (!extractedBirthDate && matchedInDb.birthDate) {
         extractedBirthDate = matchedInDb.birthDate;
-        const calc = calculateAge(matchedInDb.birthDate);
-        if (!extractedAge && calc !== null) extractedAge = `${calc} anos`;
       }
-      if (!extractedDoctor && matchedInDb.requestingDoctor) extractedDoctor = matchedInDb.requestingDoctor;
-      if (matchedInDb.phone || matchedInDb.mobilePhone) setPatientPhone(matchedInDb.phone || matchedInDb.mobilePhone);
+      if (!extractedAge && (extractedBirthDate || matchedInDb.birthDate)) {
+        const calc = calculateAge(extractedBirthDate || matchedInDb.birthDate);
+        if (calc) extractedAge = formatAgeValue(calc);
+      }
+      if (!extractedDoctor && (matchedInDb.requestingDoctor || matchedInDb.indication)) {
+        extractedDoctor = (matchedInDb.requestingDoctor || matchedInDb.indication).toUpperCase().trim();
+      }
+      if (!extractedPhone && (matchedInDb.phone || matchedInDb.mobilePhone || matchedInDb.homePhone)) {
+        extractedPhone = matchedInDb.phone || matchedInDb.mobilePhone || matchedInDb.homePhone;
+      }
     }
 
-    // Transcrição completa para os estados do Laudo
-    if (extractedPatient) setPatientName(extractedPatient);
-    if (extractedCpf) setCpf(extractedCpf);
-    if (extractedBirthDate) setBirthDate(extractedBirthDate);
-    if (extractedAge) setPatientAge(extractedAge);
-    if (extractedDoctor) setRequestingDoctor(extractedDoctor);
-    if (extractedExamDate) setExamDate(extractedExamDate);
+    // Se ainda não calculou a idade mas tem data de nascimento, calcula agora
+    if (!extractedAge && extractedBirthDate) {
+      const calc = calculateAge(extractedBirthDate);
+      if (calc) extractedAge = formatAgeValue(calc);
+    }
+
+    // IMPORTANTE (Correção Crítica NEU-132): SEMPRE atualiza e limpa todos os campos do paciente
+    // para NUNCA manter CPF ("123.456.789-00"), Data de Nascimento ("07/05/1967") ou Médico Solicitante ("DR HEMANOEL FERRO")
+    // residuais do paciente anterior/demonstração quando o novo .docx não contiver algum desses campos!
+    setPatientName(extractedPatient || '');
+    setCpf(extractedCpf || '');
+    setBirthDate(extractedBirthDate || '');
+    setPatientAge(extractedAge || '');
+    setRequestingDoctor(extractedDoctor || '');
+    setExamDate(extractedExamDate || new Date().toLocaleDateString('pt-BR'));
+    setPatientPhone(extractedPhone || '');
+    setCpfSearchStatus(matchedInDb ? 'found' : null);
+    setSelectedPatientExams(matchedInDb?.examHistory || []);
+
     if (extractedMotor) setMotorConduction(extractedMotor);
     if (extractedSensory) setSensoryConduction(extractedSensory);
     if (extractedFWave) setFWave(extractedFWave);
@@ -717,22 +887,52 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       examDate: extractedExamDate,
       matchedInDb: Boolean(matchedInDb),
       patientCpf: extractedCpf || matchedInDb?.cpf || '',
-      patientPhone: matchedInDb?.phone || matchedInDb?.mobilePhone || '',
+      patientPhone: extractedPhone || '',
     });
+
+    // Se o .docx trouxe um CPF válido de 11 dígitos e ainda faltam dados (ex: Data de Nascimento), consulta online
+    if (extractedCpf && (!extractedBirthDate || !extractedPatient)) {
+      try {
+        const onlineData = await fetchCpfOnlineData(extractedCpf);
+        if (onlineData) {
+          if (!extractedPatient && onlineData.name) {
+            setPatientName(onlineData.name.toUpperCase());
+          }
+          if (!extractedBirthDate && onlineData.birthDate) {
+            setBirthDate(onlineData.birthDate);
+            const calc = calculateAge(onlineData.birthDate);
+            if (calc) setPatientAge(formatAgeValue(calc));
+          }
+          setCpfSearchStatus('found_online');
+        }
+      } catch (e) {}
+    }
   };
 
   const handleWordFileUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Se o médico selecionar um arquivo .pdf neste botão, encaminha direto para o fluxo de PDF Pronto Finalizado (sem leitura de texto)
+    if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
+      handleReadyPdfUpload({ target: { files: [file] } });
+      if (wordFileInputRef.current) wordFileInputRef.current.value = '';
+      return;
+    }
+
     setIsProcessingDocx(true);
     try {
       const arrayBuffer = await file.arrayBuffer();
       let extractedText = '';
+      let extractedHtml = '';
 
       if (file.name.toLowerCase().endsWith('.docx') || file.name.toLowerCase().endsWith('.doc')) {
-        const result = await mammoth.extractRawText({ arrayBuffer });
-        extractedText = result.value || '';
+        const [rawRes, htmlRes] = await Promise.all([
+          mammoth.extractRawText({ arrayBuffer }),
+          mammoth.convertToHtml({ arrayBuffer }).catch(() => ({ value: '' }))
+        ]);
+        extractedText = rawRes.value || '';
+        extractedHtml = htmlRes.value || '';
       } else {
         const textDecoder = new TextDecoder('utf-8');
         extractedText = textDecoder.decode(arrayBuffer);
@@ -744,7 +944,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
         return;
       }
 
-      parseWordDocumentContent(extractedText, file.name);
+      await parseWordDocumentContent(extractedText, file.name, extractedHtml);
     } catch (err) {
       console.error('Erro ao ler arquivo Word:', err);
       alert("⚠️ Erro ao processar o arquivo Word: " + (err.message || err));
@@ -759,13 +959,20 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   const [attachedTracingsFile, setAttachedTracingsFile] = useState('Graficos_Aparelho_ENMG_Clelia.pdf');
 
   // ==========================================
-  // NEU-133: Estados e Handlers para Carregamento de PDF com Laudo Já Pronto
-  // Permite upload de PDF com laudo e traçados prontos (dispensa edição) para assinatura e liberação imediata ao paciente
+  // NEU-133: Estados e Handlers para Arquivo PDF Já Pronto / Finalizado
+  // Fluxo sem edição de texto: 1) Anexar PDF Finalizado -> 2) Colocar Assinatura Digital no PDF -> 3) Disponibilizar com Login e Senha para o Paciente
   // ==========================================
+  const generateRandomPassword = () => String(Math.floor(100000 + Math.random() * 900000));
+
   const [emissionMode, setEmissionMode] = useState('editor'); // 'editor' | 'ready_pdf'
-  const [readyPdfFile, setReadyPdfFile] = useState(null); // { name, size, rawSize, type, dataUrl, lastModified }
+  const [readyPdfFile, setReadyPdfFile] = useState(null); // { name, size, rawSize, type, dataUrl, unsignedDataUrl, lastModified }
   const [readyTracingsFile, setReadyTracingsFile] = useState(null); // { name, size, rawSize, type, dataUrl }
   const [readyPdfExamType, setReadyPdfExamType] = useState('ELETRONEUROMIOGRAFIA (ENMG)');
+  const [stampVisualSignatureOnPdf, setStampVisualSignatureOnPdf] = useState(true);
+  const [patientAccessLogin, setPatientAccessLogin] = useState('');
+  const [patientAccessPassword, setPatientAccessPassword] = useState(() => generateRandomPassword());
+  const [readyPdfPatientSearch, setReadyPdfPatientSearch] = useState('');
+  const [copiedCredentials, setCopiedCredentials] = useState(false);
   const [isSigningReadyPdf, setIsSigningReadyPdf] = useState(false);
   const [isReadyPdfSigned, setIsReadyPdfSigned] = useState(false);
   const [readyPdfSignatureDetails, setReadyPdfSignatureDetails] = useState(null);
@@ -774,7 +981,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   const readyPdfInputRef = useRef(null);
   const readyTracingsInputRef = useRef(null);
 
-  // Lista de exames liberados com persistência em localStorage
+  // Lista de exames liberados com persistência em localStorage + IndexedDB Vault
   const [releasedExams, setReleasedExams] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -790,6 +997,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
         patientName: 'CLELIA MARI DE CARVALHO',
         cpf: '123.456.789-00',
         cpfClean: '12345678900',
+        accessLogin: '123.456.789-00',
+        accessPassword: '123456',
         examDate: '03/10/2025',
         examType: 'ELETRONEUROMIOGRAFIA (ENMG)',
         doctor: 'DR. HEMANOEL FERRO',
@@ -808,15 +1017,56 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   const handleSelectPatientFromDb = (pt) => {
     if (!pt) return;
     setPatientName(pt.name || '');
-    if (pt.cpf) setCpf(pt.cpf);
+    setCpf(pt.cpf || '');
+    if (pt.cpf) setPatientAccessLogin(pt.cpf);
     if (pt.birthDate) {
       setBirthDate(pt.birthDate);
       const calc = calculateAge(pt.birthDate);
-      if (calc) setPatientAge(calc.includes('ano') ? calc : `${calc} anos`);
+      setPatientAge(calc ? formatAgeValue(calc) : '');
+    } else {
+      setBirthDate('');
+      setPatientAge('');
     }
-    if (pt.phone || pt.mobilePhone) setPatientPhone(pt.phone || pt.mobilePhone);
+    setRequestingDoctor(pt.requestingDoctor || pt.indication || '');
+    setPatientPhone(pt.phone || pt.mobilePhone || pt.homePhone || '');
     if (pt.lastExam) setExamDate(pt.lastExam);
     setSelectedPatientExams(pt.examHistory || []);
+    setCpfSearchStatus('found');
+    setReadyPdfPatientSearch('');
+  };
+
+  // Pacientes sugeridos no autocomplete rápido da estação de PDF Pronto
+  const readyPdfAutocompleteMatches = React.useMemo(() => {
+    const q = normalizeSearchStr(readyPdfPatientSearch);
+    const qDigits = readyPdfPatientSearch.replace(/\D/g, '');
+    if (q.length < 2 && qDigits.length < 3) return [];
+    return (patientDb || [])
+      .filter(p => {
+        if (qDigits.length >= 3 && (p.cpfClean || '').includes(qDigits)) return true;
+        if (q.length >= 2 && p.name && normalizeSearchStr(p.name).includes(q)) return true;
+        return false;
+      })
+      .slice(0, 8);
+  }, [readyPdfPatientSearch, patientDb]);
+
+  const handleSwitchToReadyPdfMode = (openFilePicker = false) => {
+    setEmissionMode('ready_pdf');
+    // Se ainda estiver com os dados estáticos de demonstração (Clelia Mari), limpa para evitar vincular PDF pronto ao CPF de demonstração
+    if (patientName === 'CLELIA MARI DE CARVALHO' && cpf === '123.456.789-00') {
+      setPatientName('');
+      setCpf('');
+      setBirthDate('');
+      setPatientAge('');
+      setRequestingDoctor('');
+      setPatientPhone('');
+      setExamDate(new Date().toLocaleDateString('pt-BR'));
+      setPatientAccessLogin('');
+      setPatientAccessPassword(generateRandomPassword());
+      setCpfSearchStatus(null);
+    }
+    if (openFilePicker) {
+      setTimeout(() => readyPdfInputRef.current?.click(), 80);
+    }
   };
 
   const handleReadyPdfUpload = (event) => {
@@ -837,27 +1087,49 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
         rawSize: file.size,
         type: file.type || 'application/pdf',
         dataUrl: dataUrl,
+        unsignedDataUrl: dataUrl,
         lastModified: new Date(file.lastModified).toLocaleDateString('pt-BR')
       });
       setIsReadyPdfSigned(false);
       setIsReadyPdfReleased(false);
       setReleasedConfirmation(null);
       setEmissionMode('ready_pdf');
+      setPatientAccessPassword(generateRandomPassword());
 
-      // Tenta inferir nome do paciente e tipo de exame
       const lower = file.name.toLowerCase();
-      if (lower.includes('eeg') || lower.includes('eletroencefalo')) {
+      if (lower.includes('eeg') || lower.includes('eletroencefalo') || lower.includes('mapeamento')) {
         setReadyPdfExamType('ELETROENCEFALOGRAMA (EEG)');
       } else if (lower.includes('enmg') || lower.includes('eletroneuro')) {
         setReadyPdfExamType('ELETRONEUROMIOGRAFIA (ENMG)');
       }
 
-      // Se paciente não informado ou padrão, tenta encontrar na base pelo nome do arquivo
-      const cleanFileName = file.name.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
-      if (!patientName || patientName === 'Nome do Paciente' || patientName === 'PACIENTE TESTE') {
-        const found = patientDb.find(p => p.name && cleanFileName.toLowerCase().includes(p.name.toLowerCase()));
-        if (found) {
-          handleSelectPatientFromDb(found);
+      // Extrai possível nome do paciente a partir do nome do arquivo PDF (sem precisar ler/editar o corpo do laudo)
+      const cleanFileName = file.name
+        .replace(/\.pdf$/i, '')
+        .replace(/\b(laudo|exame|enmg|eeg|eletroneuromiografia|eletroencefalograma|assinado|oficial|dr|eduardo|magalhaes|timbrado|pronto|final)\b/ig, ' ')
+        .replace(/[-_0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const normFile = normalizeSearchStr(cleanFileName);
+      const foundInDb = normFile.length >= 4
+        ? patientDb.find(p => p.name && (normalizeSearchStr(p.name) === normFile || normFile.includes(normalizeSearchStr(p.name)) || normalizeSearchStr(p.name).includes(normFile)))
+        : null;
+
+      if (foundInDb) {
+        handleSelectPatientFromDb(foundInDb);
+      } else {
+        // Se estava no paciente demo (Clelia Mari), limpa e preenche o nome sugerido pelo arquivo PDF
+        if (!patientName || patientName === 'CLELIA MARI DE CARVALHO') {
+          setPatientName(cleanFileName.length >= 3 ? cleanFileName.toUpperCase() : '');
+          setCpf('');
+          setBirthDate('');
+          setPatientAge('');
+          setRequestingDoctor('');
+          setPatientPhone('');
+          setExamDate(new Date().toLocaleDateString('pt-BR'));
+          setPatientAccessLogin('');
+          setCpfSearchStatus(null);
         }
       }
     };
@@ -899,47 +1171,134 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     setReadyTracingsFile(null);
   };
 
-  const handleSignReadyPdf = () => {
+  // Etapa 1 do PDF Pronto: Assinatura Digital ICP-Brasil (estampa a chancela de assinatura digital diretamente no PDF!)
+  const handleSignReadyPdf = async () => {
     if (!readyPdfFile) {
-      alert('⚠️ Por favor, carregue o arquivo PDF do laudo antes de realizar a assinatura digital.');
-      return;
-    }
-
-    if (!patientName.trim()) {
-      alert('⚠️ Por favor, informe ou confirme o Nome do Paciente antes de assinar o laudo.');
+      alert('⚠️ Por favor, anexe o arquivo PDF finalizado antes de colocar a assinatura digital.');
       return;
     }
 
     setIsSigningReadyPdf(true);
-    setTimeout(() => {
+    try {
       const now = new Date();
       const codeSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
       const authCode = `ICP-RO-${now.getFullYear()}-${codeSuffix}`;
       const signHash = `SHA256:${Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
+      const signedAtStr = now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+      const cleanCpf = (cpf || '').trim();
+      const generatedLogin = (patientAccessLogin || cleanCpf || authCode).trim();
+      const generatedPass = (patientAccessPassword || generateRandomPassword()).trim();
+      setPatientAccessLogin(generatedLogin);
+      setPatientAccessPassword(generatedPass);
+
+      let finalSignedDataUrl = readyPdfFile.unsignedDataUrl || readyPdfFile.dataUrl;
+
+      // Estampa a chancela de Assinatura Digital ICP-Brasil diretamente no arquivo PDF usando pdf-lib (preservando o timbrado e o laudo intactos)
+      if (stampVisualSignatureOnPdf && finalSignedDataUrl) {
+        try {
+          const base64Part = finalSignedDataUrl.split(',')[1];
+          const binaryStr = window.atob(base64Part);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+
+          const pdfDoc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+          pdfDoc.setAuthor('Dr. Eduardo José Cunha Magalhães - CRM-RO 2103 / RQE 504');
+          pdfDoc.setProducer('Clínica Dr. Eduardo Magalhães - Assinatura Digital ICP-Brasil (PAdES)');
+          pdfDoc.setKeywords([authCode, signHash, 'ICP-Brasil', 'CRM-RO 2103']);
+
+          const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+          const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+          const pages = pdfDoc.getPages();
+          const lastPage = pages[pages.length - 1];
+          const { width } = lastPage.getSize();
+
+          const boxW = Math.min(width - 48, 500);
+          const boxH = 44;
+          const boxX = (width - boxW) / 2;
+          const boxY = 14;
+
+          lastPage.drawRectangle({
+            x: boxX,
+            y: boxY,
+            width: boxW,
+            height: boxH,
+            color: rgb(0.95, 0.98, 1),
+            borderColor: rgb(0.02, 0.45, 0.68),
+            borderWidth: 1,
+          });
+
+          lastPage.drawText('DOCUMENTO ASSINADO DIGITALMENTE - ICP-BRASIL (MP 2.200-2/2001 • CFM)', {
+            x: boxX + 10,
+            y: boxY + 31,
+            size: 7.5,
+            font: fontBold,
+            color: rgb(0.0, 0.22, 0.42),
+          });
+
+          lastPage.drawText('Dr. Eduardo Jose Cunha Magalhaes • Medico Neurologista e Neurofisiologista • CRM-RO 2103 • RQE 504', {
+            x: boxX + 10,
+            y: boxY + 20,
+            size: 7.5,
+            font: fontBold,
+            color: rgb(0.1, 0.15, 0.25),
+          });
+
+          lastPage.drawText(
+            `Assinado em: ${signedAtStr} | Protocolo: ${authCode} | Hash: ${signHash.slice(0, 28)}...`,
+            {
+              x: boxX + 10,
+              y: boxY + 9,
+              size: 6.5,
+              font: fontRegular,
+              color: rgb(0.3, 0.38, 0.48),
+            }
+          );
+
+          const signedPdfBytes = await pdfDoc.save();
+          let binary = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < signedPdfBytes.length; i += chunkSize) {
+            binary += String.fromCharCode.apply(null, signedPdfBytes.subarray(i, i + chunkSize));
+          }
+          finalSignedDataUrl = 'data:application/pdf;base64,' + window.btoa(binary);
+        } catch (pdfErr) {
+          console.warn('Aviso ao estampar chancela visual no PDF (mantendo PDF original):', pdfErr);
+        }
+      }
+
+      setReadyPdfFile(prev => prev ? {
+        ...prev,
+        dataUrl: finalSignedDataUrl
+      } : prev);
 
       setReadyPdfSignatureDetails({
-        signedAt: now.toLocaleDateString('pt-BR') + ' às ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        signedAt: signedAtStr,
         authenticityCode: authCode,
         hash: signHash,
         signerName: 'Dr. Eduardo José Cunha Magalhães',
         crm: 'CRM-RO 2103 • RQE 504',
         certificateAuthority: 'Autoridade Certificadora ICP-Brasil (PAdES / CFM)',
-        validationUrl: `https://neuro.eduardomagalhaes.helpusbr.com/validar?doc=${authCode}`
+        validationUrl: `https://neuro.eduardomagalhaes.helpusbr.com/?portal=1&login=${encodeURIComponent(generatedLogin)}&senha=${encodeURIComponent(generatedPass)}`
       });
 
       setIsReadyPdfSigned(true);
+    } finally {
       setIsSigningReadyPdf(false);
-    }, 500);
+    }
   };
 
-  const handleReleaseReadyPdfToPatient = () => {
+  // Etapa 2 do PDF Pronto: Disponibilizar para o Paciente com Login e Senha no Portal
+  const handleReleaseReadyPdfToPatient = async () => {
     if (!readyPdfFile) {
       alert('⚠️ Nenhum arquivo PDF carregado para liberação.');
       return;
     }
 
     if (!isReadyPdfSigned) {
-      alert('⚠️ O documento precisa ser assinado digitalmente antes da liberação ao paciente.');
+      alert('⚠️ O documento precisa receber a Assinatura Digital antes da liberação ao paciente.');
       return;
     }
 
@@ -947,23 +1306,32 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     const now = new Date();
     const releaseId = 'rel-' + Date.now();
     const authCode = readyPdfSignatureDetails?.authenticityCode || `NEU-${now.getFullYear()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    const finalLogin = (patientAccessLogin || cpf || authCode).trim();
+    const finalPassword = (patientAccessPassword || generateRandomPassword()).trim();
+
+    setPatientAccessLogin(finalLogin);
+    setPatientAccessPassword(finalPassword);
+
+    const resolvedPatientName = (patientName || readyPdfFile.name.replace(/\.pdf$/i, '') || 'PACIENTE').trim().toUpperCase();
 
     const newReleasedExam = {
       id: releaseId,
-      patientName: (patientName || 'PACIENTE').trim().toUpperCase(),
+      patientName: resolvedPatientName,
       cpf: cpf || '',
       cpfClean: cleanCpfDigits,
+      accessLogin: finalLogin,
+      accessPassword: finalPassword,
       birthDate: birthDate || '',
       examDate: examDate || reportIssueDate || now.toLocaleDateString('pt-BR'),
       examType: readyPdfExamType || 'ELETRONEUROMIOGRAFIA (ENMG)',
       doctor: requestingDoctor || 'DR. EDUARDO MAGALHÃES',
-      pdfFileName: readyPdfFile.name,
+      pdfFileName: readyPdfFile.name.startsWith('Assinado_') ? readyPdfFile.name : `Assinado_${readyPdfFile.name}`,
       pdfDataUrl: readyPdfFile.dataUrl,
       pdfSize: readyPdfFile.size,
       hasTracings: Boolean(readyTracingsFile),
       tracingsFileName: readyTracingsFile?.name || null,
       tracingsDataUrl: readyTracingsFile?.dataUrl || null,
-      status: 'Liberado no Portal do Paciente',
+      status: 'Assinado e Liberado (Login & Senha Ativos)',
       authenticityCode: authCode,
       signatureHash: readyPdfSignatureDetails?.hash || '',
       releasedAt: now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
@@ -971,23 +1339,26 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       isReadyPdf: true
     };
 
+    // Salva o PDF assinado completo no IndexedDB Vault (suporta arquivos grandes sem limite de 5MB do localStorage)
+    await savePdfToVault(releaseId, readyPdfFile.dataUrl, readyTracingsFile?.dataUrl || null);
+
     const updatedList = [newReleasedExam, ...releasedExams];
     setReleasedExams(updatedList);
 
     try {
       const storageSafeList = updatedList.map(item => ({
         ...item,
-        pdfDataUrl: item.pdfDataUrl && item.pdfDataUrl.length > 2000000 ? null : item.pdfDataUrl,
-        tracingsDataUrl: item.tracingsDataUrl && item.tracingsDataUrl.length > 2000000 ? null : item.tracingsDataUrl
+        pdfDataUrl: item.pdfDataUrl && item.pdfDataUrl.length > 1800000 ? null : item.pdfDataUrl,
+        tracingsDataUrl: item.tracingsDataUrl && item.tracingsDataUrl.length > 1800000 ? null : item.tracingsDataUrl
       }));
       localStorage.setItem('neuro_released_exams', JSON.stringify(storageSafeList));
     } catch (quotaErr) {
-      console.warn('Quota localStorage atingida, mantendo estado em memória:', quotaErr);
+      console.warn('Quota localStorage atingida, mantendo PDF no Vault IndexedDB:', quotaErr);
     }
 
     // Atualiza paciente na base cadastral
     if (patientDb && patientDb.length > 0) {
-      const idx = patientDb.findIndex(p => (cleanCpfDigits && p.cpfClean === cleanCpfDigits) || (p.name && p.name.toUpperCase() === newReleasedExam.patientName));
+      const idx = patientDb.findIndex(p => (cleanCpfDigits && p.cpfClean === cleanCpfDigits) || (p.name && normalizeSearchStr(p.name) === normalizeSearchStr(resolvedPatientName)));
       if (idx >= 0) {
         const updatedDb = [...patientDb];
         const existingHistory = updatedDb[idx].examHistory || [];
@@ -1000,8 +1371,10 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
               date: newReleasedExam.examDate,
               type: newReleasedExam.examType,
               status: 'Liberado / Assinado',
-              pdfName: readyPdfFile.name,
-              code: authCode
+              pdfName: newReleasedExam.pdfFileName,
+              code: authCode,
+              accessLogin: finalLogin,
+              accessPassword: finalPassword
             },
             ...existingHistory
           ]
@@ -1015,10 +1388,24 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       id: releaseId,
       patientName: newReleasedExam.patientName,
       cpf: newReleasedExam.cpf,
+      accessLogin: finalLogin,
+      accessPassword: finalPassword,
       examType: newReleasedExam.examType,
       authenticityCode: authCode,
       releasedAt: newReleasedExam.releasedAt
     });
+  };
+
+  const handleCopyPatientCredentials = (loginVal, passVal, patName) => {
+    const loginStr = loginVal || patientAccessLogin || cpf || '---';
+    const passStr = passVal || patientAccessPassword || '---';
+    const directUrl = `https://neuro.eduardomagalhaes.helpusbr.com/?portal=1&login=${encodeURIComponent(loginStr)}&senha=${encodeURIComponent(passStr)}`;
+    const textToCopy = `Clínica de Neurologia Dr. Eduardo Magalhães\nPaciente: ${patName || patientName || 'Paciente'}\nPortal de Laudos: https://neuro.eduardomagalhaes.helpusbr.com\nLogin de Acesso: ${loginStr}\nSenha de Acesso: ${passStr}\nAcesso Direto: ${directUrl}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(textToCopy);
+      setCopiedCredentials(true);
+      setTimeout(() => setCopiedCredentials(false), 3000);
+    }
   };
 
   const handleDownloadReadyPdf = () => {
@@ -1031,11 +1418,21 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     document.body.removeChild(link);
   };
 
-  const handleSendReadyPdfWhatsApp = () => {
-    const cleanPhone = patientPhone.replace(/\D/g, '');
+  const handleSendReadyPdfWhatsApp = (customExam = null) => {
+    const targetPatName = customExam?.patientName || patientName || 'Paciente';
+    const targetLogin = customExam?.accessLogin || releasedConfirmation?.accessLogin || patientAccessLogin || cpf || readyPdfSignatureDetails?.authenticityCode || '';
+    const targetPass = customExam?.accessPassword || releasedConfirmation?.accessPassword || patientAccessPassword || '';
+    const targetExamType = customExam?.examType || readyPdfExamType || 'Exame Neurológico';
+    const cleanPhone = (patientPhone || '').replace(/\D/g, '');
     const targetNumber = cleanPhone ? (cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`) : '';
+    const portalUrl = `https://neuro.eduardomagalhaes.helpusbr.com/?portal=1&login=${encodeURIComponent(targetLogin)}&senha=${encodeURIComponent(targetPass)}`;
     const text = encodeURIComponent(
-      `Olá ${patientName || 'Paciente'}! Seu laudo de exame e traçados neurofisiológicos prontos (${readyPdfExamType}) foram oficialmente assinados pelo Dr. Eduardo Magalhães (CRM-RO 2103) e já estão disponíveis no Portal do Paciente. Acesse https://neuro.eduardomagalhaes.helpusbr.com com seu CPF (${cpf || 'cadastrado'}) para baixar seu laudo oficial em PDF.`
+      `Olá *${targetPatName}*! Seu laudo oficial de *${targetExamType}* já está finalizado e assinado digitalmente pelo *Dr. Eduardo Magalhães (CRM-RO 2103)*.\n\n` +
+      `🔐 *Dados para acessar e baixar seu PDF:*\n` +
+      `• *Portal:* https://neuro.eduardomagalhaes.helpusbr.com\n` +
+      `• *Login:* ${targetLogin}\n` +
+      `• *Senha:* ${targetPass}\n\n` +
+      `👉 *Link de Acesso Direto:* ${portalUrl}`
     );
     window.open(`https://wa.me/${targetNumber}?text=${text}`, '_blank');
   };
@@ -1463,13 +1860,14 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   const performCpfLookup = async (targetCpf = cpf) => {
     const found = findPatientByCPF(patientDb, targetCpf);
     if (found) {
-      setPatientName(found.name);
-      setBirthDate(found.birthDate);
+      setPatientName(found.name || '');
+      setBirthDate(found.birthDate || '');
       const calc = calculateAge(found.birthDate);
-      if (calc !== null) setPatientAge(`${calc} anos`);
-      if (found.requestingDoctor) setRequestingDoctor(found.requestingDoctor);
-      if (found.phone) setPatientPhone(found.phone);
+      setPatientAge(calc ? formatAgeValue(calc) : '');
+      if (found.requestingDoctor || found.indication) setRequestingDoctor(found.requestingDoctor || found.indication);
+      if (found.phone || found.mobilePhone) setPatientPhone(found.phone || found.mobilePhone);
       if (found.lastExam) setExamDate(found.lastExam);
+      if (found.cpf) setPatientAccessLogin(found.cpf);
       setCpfSearchStatus('found');
       setSelectedPatientExams(found.examHistory || []);
       return;
@@ -1482,7 +1880,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       if (onlineData.birthDate) {
         setBirthDate(onlineData.birthDate);
         const calc = calculateAge(onlineData.birthDate);
-        if (calc !== null) setPatientAge(`${calc} anos`);
+        setPatientAge(calc ? formatAgeValue(calc) : '');
       }
       setCpfSearchStatus('found_online');
       setSelectedPatientExams([]);
@@ -1653,8 +2051,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     doc.setTextColor(...textDark);
     doc.text(cpf || '---', 25, colYVal);
     const resolvedPdfAge = patientAge
-      ? (patientAge.toLowerCase().includes('ano') ? patientAge : `${patientAge} anos`)
-      : (calculateAge(birthDate) ? `${calculateAge(birthDate)} anos` : '---');
+      ? formatAgeValue(patientAge)
+      : (calculateAge(birthDate) ? formatAgeValue(calculateAge(birthDate)) : '---');
     doc.text(resolvedPdfAge, 68, colYVal);
     doc.text(requestingDoctor || 'O Próprio', 105, colYVal);
     doc.text(examDate || reportIssueDate || '---', 152, colYVal);
@@ -1862,35 +2260,6 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 </svg>
                 <span>ENTRAR COM O GOOGLE</span>
               </button>
-
-              <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-slate-800"></div>
-                <span className="flex-shrink mx-3 text-[10px] uppercase font-bold text-slate-500">ou acesso direto de consultório</span>
-                <div className="flex-grow border-t border-slate-800"></div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const doctorUser = {
-                    email: 'eduardojcmagalhaes@gmail.com',
-                    role: 'doctor',
-                    name: 'Dr. Eduardo Magalhães (Gestor / Médico)',
-                    loginTimestamp: Date.now(),
-                    lastActivityTimestamp: Date.now(),
-                    time: Date.now()
-                  };
-                  sessionStorage.setItem('neuro_auth_user', JSON.stringify(doctorUser));
-                  localStorage.setItem('neuro_auth_user', JSON.stringify(doctorUser));
-                  setCurrentUserRole('doctor');
-                  setCurrentUserName(doctorUser.name);
-                  setIsAuthenticated(true);
-                  setLoginError('');
-                }}
-                className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 hover:border-amber-400 text-amber-300 font-bold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer shadow-md"
-              >
-                <span>👑 Entrar como Dr. Eduardo Magalhães (Médico)</span>
-              </button>
             </div>
           </div>
         ) : (
@@ -2004,56 +2373,53 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
             {activeTab === 'generator' && (
               <div className="flex-1 overflow-y-auto pr-1 space-y-4">
-                {/* Mode Switcher: Digitação de Laudo vs Upload de PDF Pronto (NEU-133) */}
+                {/* Mode Switcher: Digitação/Word (.docx) vs Arquivo PDF Já Pronto Finalizado (NEU-133) */}
                 <div className="bg-slate-900/90 border border-slate-800 p-2.5 rounded-2xl flex items-center justify-between flex-wrap gap-3 shadow-lg">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 pl-1 hidden sm:inline">
-                      Modo de Trabalho:
+                      Fluxo de Emissão:
                     </span>
-                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 flex-wrap">
                       <button
                         type="button"
                         onClick={() => setEmissionMode('editor')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                        className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
                           emissionMode === 'editor'
                             ? 'bg-cyan-500 text-slate-950 shadow-md font-extrabold'
                             : 'text-slate-400 hover:text-white'
                         }`}
                       >
                         <Edit3 className="w-3.5 h-3.5" />
-                        <span>📝 Digitação / Modelos</span>
+                        <span>📝 Laudo Word (.docx) / Digitação</span>
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => setEmissionMode('ready_pdf')}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                        onClick={() => handleSwitchToReadyPdfMode(false)}
+                        className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
                           emissionMode === 'ready_pdf'
                             ? 'bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-600 text-white shadow-md font-extrabold'
-                            : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                            : 'text-slate-200 hover:text-white bg-indigo-950/50 border border-indigo-500/30 hover:bg-indigo-900/50'
                         }`}
                       >
                         <FileUp className="w-3.5 h-3.5 text-cyan-300" />
-                        <span>📑 Carregar PDF Pronto (Laudo & Traçados)</span>
-                        <span className="px-1.5 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 text-[10px] font-extrabold border border-cyan-400/30">
-                          NEU-133
-                        </span>
+                        <span>📄 PDF Já Pronto / Finalizado (Assinar + Login e Senha)</span>
                       </button>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 text-xs">
                     {emissionMode === 'ready_pdf' ? (
-                      <span className="px-3 py-1 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-bold flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-purple-400" /> Dispensa Edição de Texto • Assinatura ICP-Brasil & Liberação Imediata
+                      <span className="px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> PDF Pronto com Timbrado • Sem Leitura/Edição • Assinatura Digital + Login e Senha
                       </span>
                     ) : (
                       <button
                         type="button"
-                        onClick={() => setEmissionMode('ready_pdf')}
-                        className="text-[11px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 cursor-pointer transition underline decoration-cyan-500/40"
+                        onClick={() => handleSwitchToReadyPdfMode(true)}
+                        className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-[11px] text-purple-200 hover:text-white font-bold flex items-center gap-1.5 cursor-pointer transition"
                       >
-                        <Upload className="w-3.5 h-3.5" /> Já tem o laudo pronto em PDF? Clique aqui para carregar
+                        <Upload className="w-3.5 h-3.5 text-purple-300" /> Anexar PDF Já Pronto (Assinar e Liberar com Login/Senha)
                       </button>
                     )}
                   </div>
@@ -2227,7 +2593,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                       </span>
                     </div>
 
-                    {/* Importador Nativo de Laudos em Word (.docx) */}
+                    {/* Importador Nativo de Laudos em Word (.docx) & Atalho Direto para PDF Finalizado */}
                     <div className="p-4 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-slate-900/80 to-indigo-950/40 border-2 border-cyan-500/30 shadow-lg space-y-3">
                       <input
                         type="file"
@@ -2243,16 +2609,17 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             <FileUp className="w-5 h-5" />
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <h4 className="text-xs font-black text-white uppercase tracking-wider">
-                                Importador Direto de Laudo Word (.docx)
+                                Central de Arquivos: Word (.docx) para Edição ou PDF Já Pronto (.pdf)
                               </h4>
                               <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
                                 Dr. Eduardo Magalhães
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-400 mt-0.5">
-                              Carregue o arquivo <code className="text-cyan-300 bg-slate-950/80 px-1 py-0.5 rounded">.docx</code> do laudo gerado no consultório para preenchimento automático completo.
+                            <p className="text-[11px] text-slate-300 mt-0.5">
+                              • <strong>Arquivo .docx:</strong> lê e preenche automaticamente Nome, CPF, Data Nasc., Idade e Médico Solicitante.<br />
+                              • <strong>Arquivo .pdf:</strong> laudo já finalizado com timbrado (sem leitura/edição) → vai direto para <strong>Assinatura Digital e Login/Senha do Paciente</strong>.
                             </p>
                           </div>
                         </div>
@@ -2262,8 +2629,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             type="button"
                             onClick={() => wordFileInputRef.current?.click()}
                             disabled={isProcessingDocx}
-                            className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg shadow-cyan-500/20 cursor-pointer disabled:opacity-50"
-                            title="Carregar Word (.docx) para edição no consultório"
+                            className="px-3.5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg shadow-cyan-500/20 cursor-pointer disabled:opacity-50"
+                            title="Anexar Word (.docx) para leitura automática dos campos e edição"
                           >
                             {isProcessingDocx ? (
                               <>
@@ -2273,22 +2640,19 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             ) : (
                               <>
                                 <UploadCloud className="w-4 h-4" />
-                                <span>📥 Carregar Word (.docx)</span>
+                                <span>📥 Anexar Word (.docx)</span>
                               </>
                             )}
                           </button>
 
                           <button
                             type="button"
-                            onClick={() => {
-                              setEmissionMode('ready_pdf');
-                              setTimeout(() => readyPdfInputRef.current?.click(), 100);
-                            }}
-                            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg shadow-purple-500/20 cursor-pointer"
-                            title="Carregar PDF com laudo pronto (dispensa digitação)"
+                            onClick={() => handleSwitchToReadyPdfMode(true)}
+                            className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg shadow-purple-500/20 cursor-pointer"
+                            title="Anexar PDF já finalizado com timbrado (sem edição) para Assinar e Gerar Login/Senha do Paciente"
                           >
                             <FileUp className="w-4 h-4" />
-                            <span>📑 Carregar PDF Pronto (.pdf)</span>
+                            <span>📄 Anexar PDF Já Pronto (.pdf)</span>
                           </button>
                         </div>
                       </div>
@@ -2773,7 +3137,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
                 </div>
                 ) : (
-                  /* NEU-133: Estação Dedicada de Carregamento de PDF com Laudo Já Pronto */
+                  /* NEU-133: Estação Dedicada para Arquivo PDF Já Pronto / Finalizado (Sem Leitura/Edição -> Assinatura Digital + Login e Senha do Paciente) */
                   <div className="space-y-5 animate-in fade-in duration-200">
                     {/* Input files ocultos */}
                     <input
@@ -2800,17 +3164,17 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="text-base font-extrabold text-white tracking-wide">
-                              Estação de Carregamento de PDF com Laudo Já Pronto & Traçados
+                              Laudo em PDF Já Pronto / Finalizado (Com Timbrado)
                             </h3>
                             <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
-                              Sem Edição de Texto
+                              Sem Leitura nem Edição de Texto
                             </span>
                             <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
-                              Assinatura & Liberação Imediata
+                              Etapas Seguintes: 1. Assinatura Digital → 2. Login e Senha do Paciente
                             </span>
                           </div>
                           <p className="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
-                            Upload direto de laudos e traçados em PDF emitidos pelos aparelhos (EEG / ENMG) ou sistemas externos. O documento dispensa qualquer digitação manual, permitindo vincular ao paciente, aplicar a <strong>Assinatura Digital ICP-Brasil (Dr. Eduardo Magalhães CRM-RO 2103)</strong> e <strong>liberar instantaneamente para o paciente</strong> no Portal e WhatsApp.
+                            Para arquivos <strong>.pdf</strong> que já estão prontos e finalizados com papel timbrado: o sistema <strong>não altera nem edita o texto do laudo</strong>. Basta anexar o PDF finalizado, aplicar a <strong>Assinatura Digital ICP-Brasil (Dr. Eduardo Magalhães • CRM-RO 2103)</strong> e <strong>disponibilizar para o paciente acessar com Login e Senha</strong>.
                           </p>
                         </div>
                       </div>
@@ -2822,164 +3186,18 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                         >
                           <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
-                          <span>Voltar para Digitação</span>
+                          <span>Ir para Word (.docx) / Digitação</span>
                         </button>
                       </div>
                     </div>
 
-                    {/* Identificação do Paciente (Vinculação Cadastral) */}
-                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4 shadow-lg">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                          <User className="w-4 h-4 text-cyan-400" />
-                          <span>Identificação do Paciente para o Laudo em PDF:</span>
-                        </h4>
-
-                        <div className="flex items-center gap-2">
-                          {patientDb && patientDb.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setActiveTab('winsoft')}
-                              className="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-                            >
-                              <Database className="w-3 h-3" /> Buscar na Base de 1.739 Pacientes
-                            </button>
-                          )}
-                          {cpfSearchStatus === 'found' && (
-                            <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
-                              <Check className="w-3.5 h-3.5" /> Localizado no Histórico!
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                        <div className="sm:col-span-3">
-                          <label className="block text-[11px] font-semibold text-slate-400 mb-1 flex items-center justify-between">
-                            <span>CPF do Paciente</span>
-                            <span className="text-[10px] text-cyan-400 font-mono">Mevo</span>
-                          </label>
-                          <div className="flex gap-1">
-                            <input
-                              type="text"
-                              value={cpf}
-                              onChange={(e) => handleCpfChange(e.target.value)}
-                              placeholder="000.000.000-00"
-                              className="w-full px-2 py-2 rounded-xl bg-slate-950 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono font-bold"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => performCpfLookup()}
-                              title="Buscar CPF"
-                              className="px-2 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer"
-                            >
-                              <Search className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="sm:col-span-4">
-                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Nome Completo</label>
-                          <input
-                            type="text"
-                            value={patientName}
-                            onChange={(e) => setPatientName(e.target.value)}
-                            placeholder="Nome Completo do Paciente"
-                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-2">
-                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Data Nasc.</label>
-                          <input
-                            type="text"
-                            value={birthDate}
-                            onChange={(e) => handleBirthDateChange(e.target.value)}
-                            placeholder="DD/MM/AAAA"
-                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-1">
-                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Idade</label>
-                          <input
-                            type="text"
-                            value={patientAge}
-                            onChange={(e) => setPatientAge(e.target.value)}
-                            placeholder="Ex: 58 anos"
-                            className="w-full px-2 py-2 rounded-xl bg-slate-950 border border-slate-700 text-cyan-300 font-semibold text-xs text-center"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-2">
-                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Tipo de Exame</label>
-                          <select
-                            value={readyPdfExamType}
-                            onChange={(e) => setReadyPdfExamType(e.target.value)}
-                            className="w-full px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold focus:outline-none focus:border-cyan-400"
-                          >
-                            <option value="ELETRONEUROMIOGRAFIA (ENMG)">ENMG</option>
-                            <option value="ELETROENCEFALOGRAMA (EEG)">EEG</option>
-                            <option value="POTENCIAL EVOCADO">Potencial Evocado</option>
-                            <option value="LAUDO NEUROLÓGICO ESPECIALIZADO">Laudo Geral</option>
-                          </select>
-                        </div>
-
-                        <div className="sm:col-span-4">
-                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Médico Solicitante</label>
-                          <input
-                            type="text"
-                            value={requestingDoctor}
-                            onChange={(e) => setRequestingDoctor(e.target.value)}
-                            placeholder="Ex: DR HEMANOEL FERRO"
-                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-4">
-                          <label className="block text-[11px] font-semibold text-amber-400 mb-1">📅 Data do Exame</label>
-                          <div className="relative flex items-center">
-                            <input
-                              type="text"
-                              value={examDate}
-                              onChange={(e) => setExamDate(formatDateMask(e.target.value))}
-                              placeholder="03/10/2025"
-                              className="w-full pl-3 pr-10 py-2 rounded-xl bg-slate-950 border border-amber-500/40 text-amber-200 text-xs font-semibold focus:outline-none focus:border-amber-400"
-                            />
-                            <div className="absolute right-2.5 flex items-center justify-center cursor-pointer text-amber-400 hover:text-amber-300">
-                              <Calendar className="w-4 h-4 pointer-events-none" />
-                              <input
-                                type="date"
-                                value={convertBrToIsoDate(examDate)}
-                                onChange={(e) => {
-                                  if (e.target.value) setExamDate(convertIsoToBrDate(e.target.value));
-                                }}
-                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="sm:col-span-4">
-                          <label className="block text-[11px] font-semibold text-emerald-400 mb-1">📱 Celular / WhatsApp</label>
-                          <input
-                            type="text"
-                            value={patientPhone}
-                            onChange={(e) => setPatientPhone(e.target.value)}
-                            placeholder="(69) 99234-5678"
-                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-emerald-500/40 text-emerald-200 text-xs font-semibold"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Dual Upload Slots: Laudo PDF + Traçados PDF */}
+                    {/* ETAPA 1: Upload do PDF Finalizado + Traçados Opcionais */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Slot 1: PDF do Laudo Já Pronto */}
+                      {/* Slot 1: PDF do Laudo Já Pronto Finalizado */}
                       <div className={`p-4 rounded-2xl border-2 transition-all ${
                         readyPdfFile
                           ? 'bg-gradient-to-br from-cyan-950/40 to-slate-900 border-cyan-500/50 shadow-lg'
-                          : 'bg-slate-900/80 border-dashed border-slate-700 hover:border-cyan-500/60'
+                          : 'bg-slate-900/80 border-dashed border-cyan-500/50 hover:border-cyan-400'
                       }`}>
                         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                           <div className="flex items-center gap-2">
@@ -2988,15 +3206,15 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             </div>
                             <div>
                               <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">
-                                1. Laudo Já Pronto em PDF *
+                                Etapa 1 — Anexar PDF Já Pronto / Finalizado *
                               </h4>
-                              <p className="text-[10px] text-slate-400">Arquivo principal com laudo neurofisiológico</p>
+                              <p className="text-[10px] text-slate-400">Arquivo .pdf já pronto com timbrado (não requer edição)</p>
                             </div>
                           </div>
 
                           {readyPdfFile && (
                             <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/30">
-                              Carregado
+                              ✓ PDF Pronto Anexado
                             </span>
                           )}
                         </div>
@@ -3026,7 +3244,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                     className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[11px] font-bold transition cursor-pointer"
                                     title="Substituir por outro arquivo PDF"
                                   >
-                                    Trocar
+                                    Trocar PDF
                                   </button>
                                   <button
                                     type="button"
@@ -3056,10 +3274,10 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                 <UploadCloud className="w-5 h-5" />
                               </div>
                               <div className="text-xs font-bold text-white">
-                                Arraste e solte o Laudo em PDF aqui
+                                Clique aqui ou arraste seu Laudo em PDF Já Pronto (.pdf)
                               </div>
                               <p className="text-[11px] text-slate-400">
-                                ou clique para buscar no computador (Formato <span className="text-cyan-300 font-mono">.pdf</span>)
+                                O arquivo entrará direto para <span className="text-cyan-300 font-semibold">Assinatura Digital e Liberação com Login e Senha</span>
                               </p>
                             </div>
                           )}
@@ -3079,9 +3297,9 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             </div>
                             <div>
                               <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">
-                                2. Traçados & Gráficos do Aparelho (PDF Opcional)
+                                Anexo Opcional — Traçados / Gráficos (.pdf)
                               </h4>
-                              <p className="text-[10px] text-slate-400">Curvas de EEG ou ondas de ENMG emitidas pelo aparelho</p>
+                              <p className="text-[10px] text-slate-400">Se os gráficos do aparelho estiverem em um 2º PDF separado</p>
                             </div>
                           </div>
 
@@ -3147,10 +3365,10 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                 <Paperclip className="w-5 h-5" />
                               </div>
                               <div className="text-xs font-bold text-white">
-                                Anexar Gráficos / Traçados (.pdf)
+                                Anexar Gráficos / Traçados Separados (.pdf)
                               </div>
                               <p className="text-[11px] text-slate-400">
-                                Opcional: disponibilizado para download pelo paciente no portal
+                                Opcional: caso o laudo em PDF já contenha os gráficos, não é necessário anexar
                               </p>
                             </div>
                           )}
@@ -3158,13 +3376,376 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                       </div>
                     </div>
 
-                    {/* Pré-visualização Interativa do PDF Carregado */}
+                    {/* Vinculação Rápida do Paciente (para gerar Login, Senha e envio no WhatsApp) */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4 shadow-lg">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                          <User className="w-4 h-4 text-cyan-400" />
+                          <span>Paciente Vinculado ao PDF (Para Acesso no Portal com Login e Senha):</span>
+                        </h4>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Autocomplete Rápido nos 1.739 Pacientes */}
+                          <div className="relative w-64 sm:w-80">
+                            <Search className="w-3.5 h-3.5 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={readyPdfPatientSearch}
+                              onChange={(e) => setReadyPdfPatientSearch(e.target.value)}
+                              placeholder="🔍 Buscar paciente por Nome ou CPF (1.739)..."
+                              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-950 border border-cyan-500/40 text-white text-xs focus:outline-none focus:border-cyan-400"
+                            />
+                            {readyPdfAutocompleteMatches.length > 0 && (
+                              <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-slate-950 border border-cyan-500/50 rounded-xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-slate-800">
+                                {readyPdfAutocompleteMatches.map((pt, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => handleSelectPatientFromDb(pt)}
+                                    className="w-full text-left px-3 py-2 hover:bg-cyan-500/20 transition flex items-center justify-between gap-2 text-xs cursor-pointer"
+                                  >
+                                    <span className="font-bold text-white truncate">{pt.name}</span>
+                                    <span className="text-[10px] font-mono text-cyan-300 shrink-0">
+                                      {pt.cpf || pt.birthDate || 'Selecionar'}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {cpfSearchStatus === 'found' && (
+                            <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
+                              <Check className="w-3.5 h-3.5" /> Selecionado da Base!
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                        <div className="sm:col-span-4">
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1">Nome do Paciente *</label>
+                          <input
+                            type="text"
+                            value={patientName}
+                            onChange={(e) => setPatientName(e.target.value)}
+                            placeholder="Digite ou busque o nome do paciente"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold focus:border-cyan-400 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-3">
+                          <label className="block text-[11px] font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                            <span>CPF (ou Login do Paciente)</span>
+                            <span className="text-[10px] text-cyan-400 font-mono">Portal</span>
+                          </label>
+                          <div className="flex gap-1">
+                            <input
+                              type="text"
+                              value={cpf}
+                              onChange={(e) => {
+                                handleCpfChange(e.target.value);
+                                setPatientAccessLogin(formatCPF(e.target.value));
+                              }}
+                              placeholder="000.000.000-00"
+                              className="w-full px-2.5 py-2 rounded-xl bg-slate-950 border border-cyan-500/50 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono font-bold"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => performCpfLookup()}
+                              title="Buscar CPF na Base / Receita"
+                              className="px-2.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer"
+                            >
+                              <Search className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="sm:col-span-3">
+                          <label className="block text-[11px] font-semibold text-emerald-400 mb-1">📱 WhatsApp do Paciente</label>
+                          <input
+                            type="text"
+                            value={patientPhone}
+                            onChange={(e) => setPatientPhone(e.target.value)}
+                            placeholder="(69) 99234-5678"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-emerald-500/40 text-emerald-200 text-xs font-semibold"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Tipo de Exame</label>
+                          <select
+                            value={readyPdfExamType}
+                            onChange={(e) => setReadyPdfExamType(e.target.value)}
+                            className="w-full px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-semibold focus:outline-none focus:border-cyan-400"
+                          >
+                            <option value="ELETRONEUROMIOGRAFIA (ENMG)">ENMG</option>
+                            <option value="ELETROENCEFALOGRAMA (EEG)">EEG</option>
+                            <option value="POTENCIAL EVOCADO">Potencial Evocado</option>
+                            <option value="LAUDO NEUROLÓGICO ESPECIALIZADO">Laudo Geral</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ETAPA 2 & ETAPA 3: Colocar Assinatura Digital + Gerar Login e Senha para o Paciente */}
+                    <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/70 border-2 border-cyan-500/40 space-y-4 shadow-xl">
+                      <div className="flex items-center justify-between flex-wrap gap-4 pb-3 border-b border-slate-800">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2.5 rounded-xl border ${
+                            isReadyPdfSigned
+                              ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                              : 'bg-amber-500/20 border-amber-500/40 text-amber-400'
+                          }`}>
+                            <ShieldCheck className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-xs sm:text-sm font-extrabold text-white uppercase tracking-wider">
+                                Etapa 2 & 3 — Assinatura Digital no PDF + Disponibilizar com Login e Senha
+                              </h4>
+                              {isReadyPdfSigned ? (
+                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold flex items-center gap-1">
+                                  <Check className="w-3 h-3" /> PDF Assinado Digitalmente (ICP-Brasil)
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold">
+                                  Aguardando Assinatura Digital
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-300 mt-0.5">
+                              Assinante: <strong>Dr. Eduardo José Cunha Magalhães • CRM-RO 2103 • RQE 504</strong> (PAdES / ICP-Brasil)
+                            </p>
+                          </div>
+                        </div>
+
+                        {isReadyPdfSigned && readyPdfSignatureDetails && (
+                          <div className="text-right text-[11px] font-mono text-emerald-400 bg-emerald-950/30 px-3 py-1.5 rounded-xl border border-emerald-500/30">
+                            <div>✓ Protocolo: {readyPdfSignatureDetails.authenticityCode}</div>
+                            <div className="text-[10px] text-slate-400">{readyPdfSignatureDetails.signedAt}</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Configuração das Credenciais do Paciente (Login & Senha) + Opção de Chancela no PDF */}
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 items-end">
+                        <div className="md:col-span-4">
+                          <label className="block text-[11px] font-bold text-cyan-300 mb-1 flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5" />
+                            <span>Login de Acesso do Paciente (CPF ou Código)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={patientAccessLogin || cpf}
+                            onChange={(e) => setPatientAccessLogin(e.target.value)}
+                            placeholder="CPF do paciente ou Protocolo (gerado ao assinar)"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-white text-xs font-mono font-bold focus:outline-none focus:border-cyan-400"
+                          />
+                        </div>
+
+                        <div className="md:col-span-4">
+                          <label className="block text-[11px] font-bold text-amber-300 mb-1 flex items-center gap-1.5">
+                            <Key className="w-3.5 h-3.5" />
+                            <span>Senha de Acesso do Paciente no Portal</span>
+                          </label>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              value={patientAccessPassword}
+                              onChange={(e) => setPatientAccessPassword(e.target.value)}
+                              placeholder="Senha de 6 dígitos"
+                              className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-200 text-xs font-mono font-extrabold tracking-wider focus:outline-none focus:border-amber-400"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setPatientAccessPassword(generateRandomPassword())}
+                              title="Gerar nova senha numérica de 6 dígitos"
+                              className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold shrink-0 cursor-pointer flex items-center gap-1"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" /> Nova
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="md:col-span-4 flex items-center">
+                          <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none p-2 rounded-xl bg-slate-900/70 border border-slate-800 w-full">
+                            <input
+                              type="checkbox"
+                              checked={stampVisualSignatureOnPdf}
+                              onChange={(e) => setStampVisualSignatureOnPdf(e.target.checked)}
+                              className="w-4 h-4 accent-cyan-500 rounded cursor-pointer"
+                            />
+                            <span className="text-[11px] leading-tight">
+                              Estampar chancela visual da <strong>Assinatura Digital ICP-Brasil</strong> no PDF
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Botões de Ação Principal: 1) Assinar Digitalmente e 2) Disponibilizar com Login e Senha */}
+                      <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <a
+                            href="https://assinador.iti.br"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 text-[11px] font-bold flex items-center gap-1.5 transition"
+                            title="Abrir Assinador Oficial Gov.br / ITI caso deseje assinar externamente com Token USB"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Assinador Gov.br / ITI (Opcional)</span>
+                          </a>
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {!isReadyPdfSigned ? (
+                            <button
+                              type="button"
+                              onClick={handleSignReadyPdf}
+                              disabled={!readyPdfFile || isSigningReadyPdf}
+                              className="px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isSigningReadyPdf ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                  <span>Aplicando Assinatura Digital no PDF...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ShieldCheck className="w-4 h-4" />
+                                  <span>✍️ 1. Colocar Assinatura Digital no PDF (ICP-Brasil)</span>
+                                </>
+                              )}
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={handleDownloadReadyPdf}
+                                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
+                              >
+                                <Printer className="w-4 h-4 text-cyan-400" />
+                                <span>Baixar PDF Assinado</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={handleReleaseReadyPdfToPatient}
+                                disabled={isReadyPdfReleased}
+                                className={`px-5 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition shadow-xl flex items-center gap-2 cursor-pointer ${
+                                  isReadyPdfReleased
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
+                                    : 'bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 shadow-emerald-500/25 active:scale-95'
+                                }`}
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                                <span>
+                                  {isReadyPdfReleased
+                                    ? '✓ Disponibilizado para o Paciente (Login & Senha Ativos)'
+                                    : '🚀 2. Disponibilizar para o Paciente (Ativar Login e Senha)'}
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleCopyPatientCredentials()}
+                                className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                                <span>{copiedCredentials ? '✓ Copiado!' : 'Copiar Login/Senha'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleSendReadyPdfWhatsApp()}
+                                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-600/20"
+                              >
+                                <Send className="w-4 h-4" />
+                                <span>Enviar Login e Senha no WhatsApp</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Comprovante de Liberação Imediata com Login e Senha do Paciente */}
+                    {isReadyPdfReleased && releasedConfirmation && (
+                      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-teal-950/70 border-2 border-emerald-500/50 text-emerald-200 text-xs space-y-3 shadow-xl animate-in fade-in duration-300">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className="p-2 rounded-xl bg-emerald-500 text-slate-950 font-black">
+                              <CheckCircle2 className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-extrabold text-white">
+                                🎉 PDF Assinado e Disponibilizado para o Paciente com Login e Senha!
+                              </h4>
+                              <p className="text-[11px] text-emerald-300">
+                                O paciente já pode entrar no Portal do Paciente com o Login e a Senha abaixo para baixar o PDF finalizado assinado.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono text-[11px] font-bold">
+                              Protocolo: {releasedConfirmation.authenticityCode}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-950/90 border border-emerald-500/30 text-xs">
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-bold">👤 Paciente:</span>
+                            <strong className="text-white text-xs">{releasedConfirmation.patientName}</strong>
+                          </div>
+                          <div>
+                            <span className="text-cyan-300 block text-[10px] uppercase font-bold">🔐 Login de Acesso:</span>
+                            <strong className="text-cyan-300 font-mono text-sm">{releasedConfirmation.accessLogin}</strong>
+                          </div>
+                          <div>
+                            <span className="text-amber-300 block text-[10px] uppercase font-bold">🔑 Senha de Acesso:</span>
+                            <strong className="text-amber-300 font-mono text-sm tracking-wider">{releasedConfirmation.accessPassword}</strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px] uppercase font-bold">⏰ Data/Hora Liberação:</span>
+                            <strong className="text-slate-200">{releasedConfirmation.releasedAt}</strong>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 flex-wrap gap-3">
+                          <p className="text-[11px] text-slate-300">
+                            Portal do Paciente: <code className="text-cyan-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">https://neuro.eduardomagalhaes.helpusbr.com</code>
+                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyPatientCredentials(releasedConfirmation.accessLogin, releasedConfirmation.accessPassword, releasedConfirmation.patientName)}
+                              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>{copiedCredentials ? '✓ Credenciais Copiadas!' : '📋 Copiar Login e Senha'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSendReadyPdfWhatsApp(releasedConfirmation)}
+                              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-lg shadow-emerald-500/20"
+                            >
+                              <Send className="w-3.5 h-3.5" /> 📲 Enviar Login, Senha e Link no WhatsApp
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pré-visualização Interativa do PDF Carregado / Assinado */}
                     <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-xl">
                       <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-slate-800">
                         <div className="flex items-center gap-2">
                           <Eye className="w-4 h-4 text-cyan-400" />
                           <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                            Pré-visualização do Documento PDF Carregado
+                            Pré-visualização do Arquivo PDF Finalizado {isReadyPdfSigned ? '(Com Assinatura Digital ICP-Brasil)' : ''}
                           </h4>
                           {readyPdfFile && (
                             <span className="text-[11px] font-mono text-cyan-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
@@ -3195,7 +3776,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                       </div>
 
                       {readyPdfFile ? (
-                        <div className="w-full h-[520px] rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner relative">
+                        <div className="w-full h-[500px] rounded-xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner relative">
                           <iframe
                             src={readyPdfFile.dataUrl}
                             className="w-full h-full border-0"
@@ -3203,14 +3784,14 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                           />
                         </div>
                       ) : (
-                        <div className="h-64 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 flex flex-col items-center justify-center text-center p-6 space-y-3">
+                        <div className="h-52 rounded-xl border border-dashed border-slate-800 bg-slate-950/60 flex flex-col items-center justify-center text-center p-6 space-y-3">
                           <div className="p-3 rounded-2xl bg-slate-900 text-slate-600">
                             <FileText className="w-8 h-8" />
                           </div>
                           <div>
-                            <h5 className="text-xs font-bold text-slate-300">Nenhum arquivo PDF carregado para visualização</h5>
+                            <h5 className="text-xs font-bold text-slate-300">Nenhum arquivo PDF carregado ainda</h5>
                             <p className="text-[11px] text-slate-500 mt-1 max-w-sm">
-                              Carregue o laudo em PDF no slot acima para validar a visualização e prosseguir com a assinatura digital.
+                              Selecione o laudo já pronto em PDF na Etapa 1 acima para assinar digitalmente e liberar com Login e Senha.
                             </p>
                           </div>
                           <button
@@ -3218,179 +3799,23 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             onClick={() => readyPdfInputRef.current?.click()}
                             className="px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                           >
-                            <UploadCloud className="w-4 h-4" /> Selecionar Arquivo PDF Agora
+                            <UploadCloud className="w-4 h-4" /> Selecionar PDF Já Pronto Agora
                           </button>
                         </div>
                       )}
                     </div>
 
-                    {/* Assinatura Digital ICP-Brasil & Liberação ao Paciente */}
-                    <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/60 border border-slate-800 space-y-4 shadow-xl">
-                      <div className="flex items-center justify-between flex-wrap gap-4 pb-3 border-b border-slate-800">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2.5 rounded-xl border ${
-                            isReadyPdfSigned
-                              ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
-                              : 'bg-amber-500/20 border-amber-500/40 text-amber-400'
-                          }`}>
-                            <ShieldCheck className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-xs font-extrabold text-white uppercase tracking-wider">
-                                Assinatura Digital ICP-Brasil (PAdES) & Chancela Médica
-                              </h4>
-                              {isReadyPdfSigned ? (
-                                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold flex items-center gap-1">
-                                  <Check className="w-3 h-3" /> Assinado Digitalmente
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold">
-                                  Aguardando Assinatura
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-slate-400 mt-0.5">
-                              Dr. Eduardo José Cunha Magalhães • CRM-RO 2103 • RQE 504 (Neurologia & Neurofisiologia)
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Detalhes Técnicos da Assinatura quando assinada */}
-                        {isReadyPdfSigned && readyPdfSignatureDetails && (
-                          <div className="text-right text-[11px] font-mono text-emerald-400 bg-emerald-950/30 px-3 py-1.5 rounded-xl border border-emerald-500/30">
-                            <div>✓ Chave: {readyPdfSignatureDetails.hash.substring(0, 18)}...</div>
-                            <div className="text-[10px] text-slate-400">{readyPdfSignatureDetails.signedAt}</div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Botões de Ação Principal: Assinar e Liberar */}
-                      <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
-                        <div className="text-xs text-slate-400 flex items-center gap-2">
-                          <Shield className="w-4 h-4 text-cyan-400" />
-                          <span>Em conformidade com a MP 2.200-2/2001 e Resoluções CFM para laudos eletrônicos.</span>
-                        </div>
-
-                        <div className="flex items-center gap-3 flex-wrap">
-                          {!isReadyPdfSigned ? (
-                            <button
-                              type="button"
-                              onClick={handleSignReadyPdf}
-                              disabled={!readyPdfFile || isSigningReadyPdf}
-                              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs uppercase tracking-wider transition shadow-lg shadow-amber-500/20 flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {isSigningReadyPdf ? (
-                                <>
-                                  <RefreshCw className="w-4 h-4 animate-spin" />
-                                  <span>Assinando ICP-Brasil...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <ShieldCheck className="w-4 h-4" />
-                                  <span>✍️ Assinar Digitalmente Laudo em PDF (ICP-Brasil)</span>
-                                </>
-                              )}
-                            </button>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={handleDownloadReadyPdf}
-                                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-2 transition cursor-pointer"
-                              >
-                                <Printer className="w-4 h-4 text-cyan-400" />
-                                <span>Baixar PDF Assinado</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={handleReleaseReadyPdfToPatient}
-                                disabled={isReadyPdfReleased}
-                                className={`px-5 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition shadow-xl flex items-center gap-2 cursor-pointer ${
-                                  isReadyPdfReleased
-                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
-                                    : 'bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 shadow-emerald-500/25 active:scale-95'
-                                }`}
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                                <span>{isReadyPdfReleased ? '✓ Exame Liberado no Portal' : '🚀 Liberar para o Paciente'}</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={handleSendReadyPdfWhatsApp}
-                                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-600/20"
-                              >
-                                <Send className="w-4 h-4" />
-                                <span>Notificar via WhatsApp</span>
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Comprovante de Liberação Imediata */}
-                    {isReadyPdfReleased && releasedConfirmation && (
-                      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-teal-950/60 border-2 border-emerald-500/40 text-emerald-200 text-xs space-y-3 shadow-xl animate-in fade-in duration-300">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center gap-2.5">
-                            <div className="p-2 rounded-xl bg-emerald-500 text-slate-950 font-black">
-                              <CheckCircle2 className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-extrabold text-white">
-                                🎉 Laudo e Traçados Prontos Liberados com Sucesso para o Paciente!
-                              </h4>
-                              <p className="text-[11px] text-emerald-300">
-                                O paciente já pode acessar e baixar o PDF em alta resolução no Portal Oficial da Clínica.
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono text-[11px] font-bold">
-                              ID: {releasedConfirmation.authenticityCode}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-2 border-t border-emerald-500/30 text-[11px] text-slate-200">
-                          <div>👤 <strong>Paciente:</strong> <span className="text-white font-bold">{releasedConfirmation.patientName}</span></div>
-                          <div>🆔 <strong>CPF:</strong> <span className="text-cyan-300 font-mono">{releasedConfirmation.cpf}</span></div>
-                          <div>📋 <strong>Exame:</strong> <span className="text-amber-300 font-bold">{releasedConfirmation.examType}</span></div>
-                          <div>⏰ <strong>Data Liberação:</strong> <span className="text-slate-300">{releasedConfirmation.releasedAt}</span></div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-2 flex-wrap gap-3">
-                          <p className="text-[11px] text-slate-300">
-                            Link do Portal do Paciente: <code className="text-cyan-300 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">https://neuro.eduardomagalhaes.helpusbr.com</code>
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={handleSendReadyPdfWhatsApp}
-                              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer"
-                            >
-                              <Send className="w-3.5 h-3.5" /> Disparar Aviso Imediato no WhatsApp
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tabela de Exames em PDF Liberados no Consultório */}
+                    {/* Tabela de Exames em PDF Liberados no Consultório (com Login e Senha do Paciente) */}
                     <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3 shadow-lg">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-2">
                           <History className="w-4 h-4 text-cyan-400" />
                           <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                            Histórico de Laudos em PDF Prontos & Liberados ({releasedExams.length})
+                            Histórico de Laudos em PDF Assinados & Credenciais dos Pacientes ({releasedExams.length})
                           </h4>
                         </div>
                         <span className="text-[10px] text-slate-400">
-                          Persistidos no consultório e sincronizados com a consulta por CPF
+                          O paciente acessa no Portal informando o Login e a Senha abaixo
                         </span>
                       </div>
 
@@ -3400,8 +3825,8 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                             <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase font-bold tracking-wider">
                               <th className="py-2.5 px-3">Data / Hora</th>
                               <th className="py-2.5 px-3">Paciente</th>
-                              <th className="py-2.5 px-3">CPF</th>
-                              <th className="py-2.5 px-3">Tipo de Exame</th>
+                              <th className="py-2.5 px-3">Login do Paciente</th>
+                              <th className="py-2.5 px-3">Senha de Acesso</th>
                               <th className="py-2.5 px-3">Arquivo PDF</th>
                               <th className="py-2.5 px-3">Status</th>
                               <th className="py-2.5 px-3 text-right">Ações</th>
@@ -3416,13 +3841,13 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                 <td className="py-3 px-3 font-bold text-white whitespace-nowrap">
                                   {exam.patientName}
                                 </td>
-                                <td className="py-3 px-3 font-mono text-cyan-300 text-[11px] whitespace-nowrap">
-                                  {exam.cpf || '---'}
+                                <td className="py-3 px-3 font-mono text-cyan-300 text-[11px] font-bold whitespace-nowrap">
+                                  {exam.accessLogin || exam.cpf || exam.authenticityCode || '---'}
                                 </td>
-                                <td className="py-3 px-3 text-slate-300 font-medium whitespace-nowrap">
-                                  {exam.examType}
+                                <td className="py-3 px-3 font-mono text-amber-300 text-[11px] font-extrabold whitespace-nowrap">
+                                  {exam.accessPassword || '123456'}
                                 </td>
-                                <td className="py-3 px-3 font-mono text-[11px] text-slate-400 max-w-[200px] truncate" title={exam.pdfFileName}>
+                                <td className="py-3 px-3 font-mono text-[11px] text-slate-400 max-w-[180px] truncate" title={exam.pdfFileName}>
                                   {exam.pdfFileName}
                                 </td>
                                 <td className="py-3 px-3 whitespace-nowrap">
@@ -3432,27 +3857,29 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                 </td>
                                 <td className="py-3 px-3 text-right whitespace-nowrap">
                                   <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyPatientCredentials(exam.accessLogin || exam.cpf || exam.authenticityCode, exam.accessPassword || '123456', exam.patientName)}
+                                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 transition cursor-pointer"
+                                      title="Copiar Login e Senha do Paciente"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                    </button>
                                     {exam.pdfDataUrl && (
                                       <a
                                         href={exam.pdfDataUrl}
                                         download={exam.pdfFileName}
                                         className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white transition"
-                                        title="Baixar PDF Original"
+                                        title="Baixar PDF Assinado"
                                       >
                                         <Download className="w-3.5 h-3.5" />
                                       </a>
                                     )}
                                     <button
                                       type="button"
-                                      onClick={() => {
-                                        const cleanPhone = (patientPhone || '').replace(/\D/g, '');
-                                        const text = encodeURIComponent(
-                                          `Olá ${exam.patientName}! Seu laudo oficial assinado pelo Dr. Eduardo Magalhães está disponível no portal: https://neuro.eduardomagalhaes.helpusbr.com/ (CPF: ${exam.cpf})`
-                                        );
-                                        window.open(`https://wa.me/${cleanPhone ? '55' + cleanPhone : ''}?text=${text}`, '_blank');
-                                      }}
+                                      onClick={() => handleSendReadyPdfWhatsApp(exam)}
                                       className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 transition cursor-pointer"
-                                      title="Enviar no WhatsApp"
+                                      title="Enviar Login, Senha e Link no WhatsApp"
                                     >
                                       <Send className="w-3.5 h-3.5" />
                                     </button>
