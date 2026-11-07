@@ -61,3 +61,20 @@ export const getPdfFromVault = async (id) => {
     return null;
   }
 };
+
+export const deletePdfFromVault = async (id) => {
+  try {
+    const db = await openVaultDb();
+    if (!db || !id) return false;
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.delete(id);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  } catch (e) {
+    console.warn('Erro ao excluir PDF do IndexedDB Vault:', e);
+    return false;
+  }
+};

@@ -13,7 +13,7 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { ALL_EXAM_TEMPLATES, EXAM_CATEGORIES } from '../data/eegTemplates';
 import { INITIAL_PATIENT_DATABASE, formatCPF, findPatientByCPF, fetchCpfOnlineData } from '../data/patientDatabase';
 import { TIMBRADO_HEADER, TIMBRADO_FOOTER } from '../data/timbradoImages';
-import { savePdfToVault } from '../utils/pdfVault';
+import { savePdfToVault, getPdfFromVault, deletePdfFromVault } from '../utils/pdfVault';
 
 // Utility: Calculate patient age from DD/MM/YYYY birth date
 const calculateAge = (bDate) => {
@@ -417,8 +417,8 @@ export const MedicalLaudosApp = ({ isOpen, onClose, t, lang, isStandalonePage: i
   const [selectedTemplateId, setSelectedTemplateId] = useState('enmg_stc_grau2');
   const [templateSearchText, setTemplateSearchText] = useState('');
 
-  // Collapsible Explorer Tree & Full-Width Expanded Editor State
-  const [isTreeVisible, setIsTreeVisible] = useState(true);
+  // Collapsible Explorer Tree & Full-Width Expanded Editor State (Default Fechada - NEU-137)
+  const [isTreeVisible, setIsTreeVisible] = useState(false);
 
   // Rich Text Formatting & Editor Font Size State
   const [editorFontSize, setEditorFontSize] = useState(15);
@@ -978,6 +978,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
   const [readyPdfSignatureDetails, setReadyPdfSignatureDetails] = useState(null);
   const [isReadyPdfReleased, setIsReadyPdfReleased] = useState(false);
   const [releasedConfirmation, setReleasedConfirmation] = useState(null);
+  const [editingReleasedExamId, setEditingReleasedExamId] = useState(null);
   const readyPdfInputRef = useRef(null);
   const readyTracingsInputRef = useRef(null);
 
@@ -1304,7 +1305,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
     const cleanCpfDigits = (cpf || '').replace(/\D/g, '');
     const now = new Date();
-    const releaseId = 'rel-' + Date.now();
+    const releaseId = editingReleasedExamId || ('rel-' + Date.now());
     const authCode = readyPdfSignatureDetails?.authenticityCode || `NEU-${now.getFullYear()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const finalLogin = (patientAccessLogin || cpf || authCode).trim();
     const finalPassword = (patientAccessPassword || generateRandomPassword()).trim();
@@ -1342,8 +1343,12 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
     // Salva o PDF assinado completo no IndexedDB Vault (suporta arquivos grandes sem limite de 5MB do localStorage)
     await savePdfToVault(releaseId, readyPdfFile.dataUrl, readyTracingsFile?.dataUrl || null);
 
-    const updatedList = [newReleasedExam, ...releasedExams];
+    const existsInList = releasedExams.some(item => item.id === releaseId);
+    const updatedList = existsInList
+      ? releasedExams.map(item => item.id === releaseId ? newReleasedExam : item)
+      : [newReleasedExam, ...releasedExams];
     setReleasedExams(updatedList);
+    setEditingReleasedExamId(releaseId);
 
     try {
       const storageSafeList = updatedList.map(item => ({
@@ -1394,6 +1399,112 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
       authenticityCode: authCode,
       releasedAt: newReleasedExam.releasedAt
     });
+  };
+
+  // NEU-137: Reabrir PDF previamente anexado para alterar dados, visualizar, substituir ou reenviar
+  const handleReopenSavedPdfExam = async (exam, triggerFileReplace = false) => {
+    if (!exam) return;
+    setEmissionMode('ready_pdf');
+    setEditingReleasedExamId(exam.id);
+    setPatientName(exam.patientName || '');
+    setCpf(exam.cpf || '');
+    setBirthDate(exam.birthDate || '');
+    const calc = calculateAge(exam.birthDate || '');
+    setPatientAge(calc ? formatAgeValue(calc) : '');
+    setRequestingDoctor(exam.doctor || 'DR. EDUARDO MAGALHÃES');
+    setExamDate(exam.examDate || new Date().toLocaleDateString('pt-BR'));
+    setReadyPdfExamType(exam.examType || 'ELETRONEUROMIOGRAFIA (ENMG)');
+    setPatientAccessLogin(exam.accessLogin || exam.cpf || exam.authenticityCode || '');
+    setPatientAccessPassword(exam.accessPassword || '123456');
+
+    let pdfDataUrl = exam.pdfDataUrl || null;
+    let tracingsDataUrl = exam.tracingsDataUrl || null;
+    if (!pdfDataUrl && exam.id) {
+      const vaultRecord = await getPdfFromVault(exam.id);
+      if (vaultRecord) {
+        pdfDataUrl = vaultRecord.pdfDataUrl || null;
+        tracingsDataUrl = vaultRecord.tracingsDataUrl || tracingsDataUrl;
+      }
+    }
+
+    setReadyPdfFile({
+      name: exam.pdfFileName || `Laudo_${(exam.patientName || 'Paciente').replace(/\s+/g, '_')}.pdf`,
+      size: exam.pdfSize || 'PDF Anexado',
+      rawSize: 0,
+      type: 'application/pdf',
+      dataUrl: pdfDataUrl,
+      unsignedDataUrl: pdfDataUrl,
+      lastModified: exam.releasedAt || exam.examDate || new Date().toLocaleDateString('pt-BR')
+    });
+
+    if (exam.hasTracings || exam.tracingsFileName) {
+      setReadyTracingsFile({
+        name: exam.tracingsFileName || 'Tracados_Exame.pdf',
+        size: 'Anexado',
+        rawSize: 0,
+        type: 'application/pdf',
+        dataUrl: tracingsDataUrl
+      });
+    } else {
+      setReadyTracingsFile(null);
+    }
+
+    setReadyPdfSignatureDetails({
+      signedAt: exam.releasedAt || exam.examDate,
+      authenticityCode: exam.authenticityCode || 'ICP-RO-ATIVO',
+      hash: exam.signatureHash || 'SHA256-VERIFICADO',
+      signerName: 'Dr. Eduardo José Cunha Magalhães',
+      crm: 'CRM-RO 2103 • RQE 504'
+    });
+    setIsReadyPdfSigned(true);
+    setIsReadyPdfReleased(false);
+    setReleasedConfirmation(null);
+
+    if (triggerFileReplace) {
+      setTimeout(() => readyPdfInputRef.current?.click(), 100);
+    }
+  };
+
+  // NEU-137: Excluir PDF previamente anexado
+  const handleDeleteSavedPdfExam = async (examId) => {
+    if (!examId) return;
+    const target = releasedExams.find(item => item.id === examId);
+    const label = target ? `${target.pdfFileName || 'PDF'} (${target.patientName})` : 'este PDF anexado';
+    if (!window.confirm(`Deseja realmente excluir ${label}?`)) return;
+
+    const updatedList = releasedExams.filter(item => item.id !== examId);
+    setReleasedExams(updatedList);
+    try {
+      localStorage.setItem('neuro_released_exams', JSON.stringify(updatedList));
+    } catch (e) {}
+    await deletePdfFromVault(examId);
+
+    if (editingReleasedExamId === examId) {
+      setEditingReleasedExamId(null);
+      handleRemoveReadyPdf();
+    }
+  };
+
+  // NEU-137: Iniciar novo anexo de PDF limpo
+  const handleStartNewReadyPdf = (openPicker = true) => {
+    setEditingReleasedExamId(null);
+    setReadyPdfFile(null);
+    setReadyTracingsFile(null);
+    setIsReadyPdfSigned(false);
+    setIsReadyPdfReleased(false);
+    setReleasedConfirmation(null);
+    setPatientName('');
+    setCpf('');
+    setBirthDate('');
+    setPatientAge('');
+    setRequestingDoctor('');
+    setPatientPhone('');
+    setPatientAccessLogin('');
+    setPatientAccessPassword(generateRandomPassword());
+    setEmissionMode('ready_pdf');
+    if (openPicker) {
+      setTimeout(() => readyPdfInputRef.current?.click(), 80);
+    }
   };
 
   const handleCopyPatientCredentials = (loginVal, passVal, patName) => {
@@ -2263,48 +2374,59 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col overflow-hidden space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 flex-wrap gap-4 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
-                  <Lock className="w-6 h-6" />
+          <div className="flex-1 flex flex-col space-y-2">
+            {/* NEU-137: Barra Superior Unificada e Compacta (economiza espaço vertical e elimina rolagem desnecessária) */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800/90 flex-wrap gap-2 shrink-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="p-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400">
+                  <Lock className="w-4 h-4" />
                 </div>
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
-                    <span>{labels.modalTitle}</span>
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                      currentUserRole === 'superadmin' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' :
-                      currentUserRole === 'doctor' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                      'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                    }`}>
-                      {currentUserRole === 'superadmin' ? '⚡ SuperAdmin (Master)' :
-                       currentUserRole === 'doctor' ? '👑 Gerente do Site / Médico' :
-                       labels.receptionBadge}
-                    </span>
-                  </h2>
-                  <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                    <span>Sessão Autenticada: <strong>{currentUserName}</strong></span>
-                  </p>
+                <h2 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-1.5">
+                  <span>{labels.modalTitle}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {currentUserName}
+                  </span>
+                </h2>
+
+                <div className="h-4 w-px bg-slate-800 mx-1 hidden sm:block" />
+
+                {/* Abas Principais Integradas na Mesma Linha Superior */}
+                <div className="flex items-center gap-1 text-[11px] font-bold">
+                  <button
+                    onClick={() => setActiveTab('generator')}
+                    className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer ${activeTab === 'generator' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+                  >
+                    <FileText className="w-3.5 h-3.5 inline mr-1" /> {labels.tabLaudos}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('winsoft')}
+                    className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer ${activeTab === 'winsoft' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+                  >
+                    <Database className="w-3.5 h-3.5 inline mr-1" /> Pacientes ({patientDb.length})
+                  </button>
+                  {currentUserRole === 'doctor' && (
+                    <button
+                      onClick={() => setActiveTab('users')}
+                      className={`px-2.5 py-1.5 rounded-lg transition cursor-pointer ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 inline mr-1" /> Equipe ({employees.length})
+                    </button>
+                  )}
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 {(currentUserRole === 'doctor' || currentUserRole === 'superadmin') && (
-                  <div className="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 text-xs">
-                    {currentUserRole === 'superadmin' && (
-                      <span className="px-3 py-1.5 rounded-xl font-bold bg-purple-500 text-white shadow-md text-xs">
-                        ⚡ SuperAdmin Master
-                      </span>
-                    )}
+                  <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-[11px]">
                     <button
-                      onClick={() => { setCurrentUserRole('doctor'); setCurrentUserName('Dr. Eduardo Magalhães (Gerente)'); }}
-                      className={`px-3 py-1.5 rounded-xl font-bold transition ${currentUserRole === 'doctor' ? 'bg-amber-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                      onClick={() => { setCurrentUserRole('doctor'); setCurrentUserName('Dr. Eduardo Magalhães'); }}
+                      className={`px-2 py-1 rounded-lg font-bold transition cursor-pointer ${currentUserRole === 'doctor' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}
                     >
-                      👑 Gerente / Médico
+                      👑 Médico
                     </button>
                     <button
                       onClick={() => { setCurrentUserRole('reception'); setCurrentUserName('Juliana Costa (Secretária)'); }}
-                      className={`px-3 py-1.5 rounded-xl font-bold transition ${currentUserRole === 'reception' ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`px-2 py-1 rounded-lg font-bold transition cursor-pointer ${currentUserRole === 'reception' ? 'bg-cyan-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}
                     >
                       📋 Secretária
                     </button>
@@ -2314,78 +2436,33 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                 {isStandalonePage && (
                   <button
                     onClick={() => { window.location.href = window.location.origin; }}
-                    title="Ir para o Site Principal da Clínica"
-                    className="px-3 py-2 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition flex items-center gap-1.5 font-bold text-xs cursor-pointer"
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 transition flex items-center gap-1 font-bold text-[11px] cursor-pointer"
                   >
-                    🌐 Site Principal
+                    🌐 Site
                   </button>
                 )}
-
-                <div 
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium" 
-                  title="Sessão médica protegida: encerramento automático após 30 minutos de inatividade"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Auto-logout 30 min</span>
-                </div>
 
                 <button
                   onClick={handleLogout}
-                  title="Encerrar Sessão e Bloquear Acesso"
-                  className="px-3.5 py-2 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition flex items-center gap-1.5 font-bold text-xs cursor-pointer shadow-sm hover:shadow"
+                  className="px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 transition flex items-center gap-1 font-bold text-[11px] cursor-pointer"
                 >
-                  <LogOut className="w-4 h-4 text-rose-400" /> <span>Sair / Bloquear</span>
+                  <LogOut className="w-3.5 h-3.5 text-rose-400" /> <span>Sair</span>
                 </button>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 flex-wrap gap-3 shrink-0">
-              <div className="flex items-center gap-2 text-xs font-bold">
-                <button
-                  onClick={() => setActiveTab('generator')}
-                  className={`px-4 py-2 rounded-xl transition ${activeTab === 'generator' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
-                >
-                  <FileText className="w-4 h-4 inline mr-1.5" /> {labels.tabLaudos}
-                </button>
-                <button
-                  onClick={() => setActiveTab('winsoft')}
-                  className={`px-4 py-2 rounded-xl transition ${activeTab === 'winsoft' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
-                >
-                  <Database className="w-4 h-4 inline mr-1.5" /> {labels.tabWinsoft} ({patientDb.length})
-                </button>
-                {currentUserRole === 'doctor' && (
-                  <button
-                    onClick={() => setActiveTab('users')}
-                    className={`px-4 py-2 rounded-xl transition ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
-                  >
-                    <ShieldCheck className="w-4 h-4 inline mr-1.5" /> {labels.tabUsers} ({employees.length})
-                  </button>
-                )}
-              </div>
-
-              {currentUserRole === 'reception' && (
-                <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold">
-                  <Shield className="w-3.5 h-3.5" />
-                  <span>Modo Recepção: Conclusões Médicas Ocultas (LGPD)</span>
-                </div>
-              )}
             </div>
 
             {activeTab === 'generator' && (
-              <div className="flex-1 overflow-y-auto pr-1 space-y-4">
-                {/* Mode Switcher: Digitação/Word (.docx) vs Arquivo PDF Já Pronto Finalizado (NEU-133) */}
-                <div className="bg-slate-900/90 border border-slate-800 p-2.5 rounded-2xl flex items-center justify-between flex-wrap gap-3 shadow-lg">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 pl-1 hidden sm:inline">
-                      Fluxo de Emissão:
-                    </span>
-                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 flex-wrap">
+              <div className="flex-1 space-y-2.5">
+                {/* NEU-137: Barra Única Compacta de Fluxo (.docx vs .pdf), Botão da Árvore (Fechada por padrão) e Upload Rápido */}
+                <div className="bg-slate-900/90 border border-slate-800 px-3 py-2 rounded-xl flex items-center justify-between flex-wrap gap-2 shadow">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
                       <button
                         type="button"
                         onClick={() => setEmissionMode('editor')}
-                        className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                           emissionMode === 'editor'
-                            ? 'bg-cyan-500 text-slate-950 shadow-md font-extrabold'
+                            ? 'bg-cyan-500 text-slate-950 shadow font-extrabold'
                             : 'text-slate-400 hover:text-white'
                         }`}
                       >
@@ -2396,34 +2473,135 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                       <button
                         type="button"
                         onClick={() => handleSwitchToReadyPdfMode(false)}
-                        className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                           emissionMode === 'ready_pdf'
-                            ? 'bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-600 text-white shadow-md font-extrabold'
-                            : 'text-slate-200 hover:text-white bg-indigo-950/50 border border-indigo-500/30 hover:bg-indigo-900/50'
+                            ? 'bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-600 text-white shadow font-extrabold'
+                            : 'text-slate-200 hover:text-white bg-indigo-950/50 border border-indigo-500/30'
                         }`}
                       >
                         <FileUp className="w-3.5 h-3.5 text-cyan-300" />
-                        <span>📄 PDF Já Pronto / Finalizado (Assinar + Login e Senha)</span>
+                        <span>📄 PDF Já Pronto / Finalizado ({releasedExams.length})</span>
                       </button>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 text-xs">
-                    {emissionMode === 'ready_pdf' ? (
-                      <span className="px-3 py-1 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5">
-                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> PDF Pronto com Timbrado • Sem Leitura/Edição • Assinatura Digital + Login e Senha
-                      </span>
-                    ) : (
+                    {emissionMode === 'editor' && (
                       <button
                         type="button"
-                        onClick={() => handleSwitchToReadyPdfMode(true)}
-                        className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-[11px] text-purple-200 hover:text-white font-bold flex items-center gap-1.5 cursor-pointer transition"
+                        onClick={() => setIsTreeVisible(!isTreeVisible)}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                          isTreeVisible
+                            ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                            : 'bg-slate-950 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-cyan-300'
+                        }`}
                       >
-                        <Upload className="w-3.5 h-3.5 text-purple-300" /> Anexar PDF Já Pronto (Assinar e Liberar com Login/Senha)
+                        <FolderOpen className="w-3.5 h-3.5 text-amber-400" />
+                        <span>{isTreeVisible ? 'Ocultar Árvore de Modelos' : '📂 Abrir Árvore de Modelos'}</span>
                       </button>
                     )}
                   </div>
+
+                  {/* Ações Rápidas de Upload na Mesma Linha */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmissionMode('editor');
+                        setTimeout(() => wordFileInputRef.current?.click(), 50);
+                      }}
+                      disabled={isProcessingDocx}
+                      className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs transition flex items-center gap-1.5 cursor-pointer shadow"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      <span>{isProcessingDocx ? 'Lendo Word...' : '📥 Carregar .docx'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleStartNewReadyPdf(true)}
+                      className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-xs transition flex items-center gap-1.5 cursor-pointer shadow"
+                    >
+                      <FileUp className="w-3.5 h-3.5" />
+                      <span>📄 Anexar Outro / Novo .PDF</span>
+                    </button>
+                  </div>
                 </div>
+
+                {/* NEU-137: Barra Sempre Visível de PDFs Previamente Anexados (Reabrir, Alterar, Excluir ou Anexar Outro PDF) */}
+                {releasedExams.length > 0 && (
+                  <div className="bg-slate-900/95 border border-indigo-500/30 px-3 py-2 rounded-xl space-y-1.5 shadow">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                        <span className="text-[11px] font-extrabold text-cyan-300 uppercase tracking-wider">
+                          📂 PDFs Previamente Anexados ({releasedExams.length}) — Clique para Reabrir, Alterar, Trocar PDF ou Excluir:
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleStartNewReadyPdf(true)}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition"
+                      >
+                        <Plus className="w-3 h-3" /> Anexar Outro PDF
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {releasedExams.map((exam) => {
+                        const isCurrentlyOpen = editingReleasedExamId === exam.id && emissionMode === 'ready_pdf';
+                        return (
+                          <div
+                            key={exam.id}
+                            className={`shrink-0 px-2.5 py-1.5 rounded-lg border text-xs flex items-center gap-2 transition ${
+                              isCurrentlyOpen
+                                ? 'bg-cyan-950/70 border-cyan-400 text-white shadow-md'
+                                : 'bg-slate-950/90 border-slate-800 text-slate-300 hover:border-slate-700'
+                            }`}
+                          >
+                            <div
+                              onClick={() => handleReopenSavedPdfExam(exam, false)}
+                              className="cursor-pointer max-w-[210px]"
+                              title="Clique para reabrir este PDF e alterar dados ou arquivo"
+                            >
+                              <div className="font-bold text-[11px] text-white truncate flex items-center gap-1">
+                                <span>📄 {exam.patientName}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-mono truncate">
+                                {exam.pdfFileName} • Senha: <span className="text-amber-300 font-bold">{exam.accessPassword || '123456'}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 pl-1 border-l border-slate-800">
+                              <button
+                                type="button"
+                                onClick={() => handleReopenSavedPdfExam(exam, false)}
+                                className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-[10px] font-bold cursor-pointer transition"
+                                title="Reabrir este PDF para visualizar ou alterar dados"
+                              >
+                                Reabrir / Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleReopenSavedPdfExam(exam, true)}
+                                className="px-2 py-1 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-[10px] font-bold cursor-pointer transition"
+                                title="Substituir / Anexar outro arquivo PDF para este paciente"
+                              >
+                                Trocar PDF
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSavedPdfExam(exam.id)}
+                                className="p-1 rounded bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-200 cursor-pointer transition"
+                                title="Excluir este PDF anexado"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {emissionMode === 'editor' ? (
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
@@ -2568,116 +2746,30 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                     </div>
                   )}
 
-                  <div className={`${isTreeVisible ? 'lg:col-span-8' : 'lg:col-span-12'} space-y-4 transition-all duration-300`}>
-                    <div className="flex items-center justify-between bg-slate-900/90 p-2.5 rounded-2xl border border-slate-800 flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsTreeVisible(!isTreeVisible)}
-                        className="px-3.5 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 text-xs font-bold flex items-center gap-2 transition"
-                      >
-                        {isTreeVisible ? (
-                          <>
-                            <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
-                            <span>{labels.hideTreeBtn}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Minimize2 className="w-3.5 h-3.5 text-cyan-400" />
-                            <span>{labels.showTreeBtn}</span>
-                          </>
-                        )}
-                      </button>
-
-                      <span className="text-[11px] text-slate-400 font-medium">
-                        {isTreeVisible ? 'Árvore Visível à Esquerda' : '✨ Área de Edição Expandida em 100% da Tela'}
-                      </span>
-                    </div>
-
-                    {/* Importador Nativo de Laudos em Word (.docx) & Atalho Direto para PDF Finalizado */}
-                    <div className="p-4 rounded-2xl bg-gradient-to-r from-cyan-950/40 via-slate-900/80 to-indigo-950/40 border-2 border-cyan-500/30 shadow-lg space-y-3">
-                      <input
-                        type="file"
-                        ref={wordFileInputRef}
-                        onChange={handleWordFileUpload}
-                        accept=".docx,.doc,.txt"
-                        className="hidden"
-                      />
-
-                      <div className="flex items-center justify-between flex-wrap gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2.5 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 shadow-md">
-                            <FileUp className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="text-xs font-black text-white uppercase tracking-wider">
-                                Central de Arquivos: Word (.docx) para Edição ou PDF Já Pronto (.pdf)
-                              </h4>
-                              <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
-                                Dr. Eduardo Magalhães
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-300 mt-0.5">
-                              • <strong>Arquivo .docx:</strong> lê e preenche automaticamente Nome, CPF, Data Nasc., Idade e Médico Solicitante.<br />
-                              • <strong>Arquivo .pdf:</strong> laudo já finalizado com timbrado (sem leitura/edição) → vai direto para <strong>Assinatura Digital e Login/Senha do Paciente</strong>.
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            onClick={() => wordFileInputRef.current?.click()}
-                            disabled={isProcessingDocx}
-                            className="px-3.5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg shadow-cyan-500/20 cursor-pointer disabled:opacity-50"
-                            title="Anexar Word (.docx) para leitura automática dos campos e edição"
-                          >
-                            {isProcessingDocx ? (
-                              <>
-                                <RefreshCw className="w-4 h-4 animate-spin" />
-                                <span>Lendo Word...</span>
-                              </>
-                            ) : (
-                              <>
-                                <UploadCloud className="w-4 h-4" />
-                                <span>📥 Anexar Word (.docx)</span>
-                              </>
-                            )}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleSwitchToReadyPdfMode(true)}
-                            className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider transition flex items-center gap-2 shadow-lg shadow-purple-500/20 cursor-pointer"
-                            title="Anexar PDF já finalizado com timbrado (sem edição) para Assinar e Gerar Login/Senha do Paciente"
-                          >
-                            <FileUp className="w-4 h-4" />
-                            <span>📄 Anexar PDF Já Pronto (.pdf)</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Dropzone & Quick Info */}
-                      <div
-                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                            const droppedFile = e.dataTransfer.files[0];
-                            if (droppedFile.name.toLowerCase().endsWith('.pdf')) {
-                              handleReadyPdfUpload({ target: { files: [droppedFile] } });
-                            } else {
-                              handleWordFileUpload({ target: { files: e.dataTransfer.files } });
-                            }
+                  <div className={`${isTreeVisible ? 'lg:col-span-8' : 'lg:col-span-12'} space-y-2.5 transition-all duration-300`}>
+                    <input
+                      type="file"
+                      ref={wordFileInputRef}
+                      onChange={handleWordFileUpload}
+                      accept=".docx,.doc,.txt"
+                      className="hidden"
+                    />
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                          const droppedFile = e.dataTransfer.files[0];
+                          if (droppedFile.name.toLowerCase().endsWith('.pdf')) {
+                            handleReadyPdfUpload({ target: { files: [droppedFile] } });
+                          } else {
+                            handleWordFileUpload({ target: { files: e.dataTransfer.files } });
                           }
-                        }}
-                        onClick={() => wordFileInputRef.current?.click()}
-                        className="p-3 rounded-xl border border-dashed border-cyan-500/40 hover:border-cyan-400 bg-slate-950/50 hover:bg-slate-950/80 transition cursor-pointer text-center text-xs text-slate-400 flex items-center justify-center gap-2"
-                      >
-                        <FileText className="w-4 h-4 text-cyan-400" />
-                        <span>Arraste e solte o arquivo <strong>.docx</strong> (para editar) ou <strong>.pdf</strong> (laudo pronto) aqui</span>
-                      </div>
+                        }
+                      }}
+                      className="space-y-2"
+                    >
 
                       {/* Success / Details Banner */}
                       {wordImportBanner && (
@@ -2715,11 +2807,11 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                       )}
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+                    <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                          <User className="w-4 h-4 text-cyan-400" />
-                          <span>Dados Cadastrais do Paciente (Transcrição Automática e Busca por CPF):</span>
+                        <h4 className="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Dados do Paciente (Arraste .docx/.pdf ou busque por CPF):</span>
                         </h4>
 
                         <div className="flex items-center gap-2">
@@ -3026,7 +3118,7 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
 
                             <textarea
                               id="unified-editor-textarea"
-                              rows={isTreeVisible ? 14 : 18}
+                              rows={isTreeVisible ? 10 : 12}
                               value={fullReportText}
                               onChange={(e) => updateFullReportText(e.target.value)}
                               onKeyDown={(e) => {
@@ -3859,6 +3951,22 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                   <div className="flex items-center justify-end gap-1.5">
                                     <button
                                       type="button"
+                                      onClick={() => handleReopenSavedPdfExam(exam, false)}
+                                      className="px-2 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-[10px] font-bold transition cursor-pointer"
+                                      title="Reabrir este PDF para alterar dados ou visualizar"
+                                    >
+                                      Reabrir / Editar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleReopenSavedPdfExam(exam, true)}
+                                      className="px-2 py-1 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-[10px] font-bold transition cursor-pointer"
+                                      title="Substituir / Anexar outro PDF"
+                                    >
+                                      Trocar PDF
+                                    </button>
+                                    <button
+                                      type="button"
                                       onClick={() => handleCopyPatientCredentials(exam.accessLogin || exam.cpf || exam.authenticityCode, exam.accessPassword || '123456', exam.patientName)}
                                       className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 transition cursor-pointer"
                                       title="Copiar Login e Senha do Paciente"
@@ -3882,6 +3990,14 @@ Exame compatível com neuropatia do mediano ao nível do carpo, com comprometime
                                       title="Enviar Login, Senha e Link no WhatsApp"
                                     >
                                       <Send className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteSavedPdfExam(exam.id)}
+                                      className="p-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-400 hover:text-rose-200 transition cursor-pointer"
+                                      title="Excluir este PDF anexado"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
                                     </button>
                                   </div>
                                 </td>
